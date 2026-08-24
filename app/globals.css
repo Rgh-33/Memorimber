@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ivory: #fbf8f1;
+  --ink: #202c46;
+  --line: #e6dccf;
+  --coral: #ef7668;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #e9e1d5;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #e9e1d5;
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  background-image: radial-gradient(rgba(32, 44, 70, 0.035) 0.7px, transparent 0.7px);
+  background-size: 7px 7px;
+}
+
+.page-pad {
+  padding: 26px 20px 32px;
+}
+
+.photo-picker {
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.photo-picker:hover {
+  border-color: rgba(239, 118, 104, 0.7);
+  background-color: rgba(239, 118, 104, 0.04);
+}
+
+.photo-picker:active {
+  transform: scale(0.995);
+}
+
+.scribble-line {
+  position: relative;
+  display: inline-block;
+}
+
+.scribble-line::after {
+  position: absolute;
+  bottom: -8px;
+  left: 3%;
+  width: 94%;
+  height: 5px;
+  border-bottom: 2px solid rgba(239, 118, 104, 0.72);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(-1deg);
+}
+
+.paper-tape {
+  position: absolute;
+  height: 18px;
+  width: 62px;
+  border-radius: 4px;
+  background: rgba(243, 160, 91, 0.3);
+  transform: rotate(-7deg);
+}
+
+@media print {
+  html,
+  body {
+    background: white;
+  }
+
+  .app-shell {
+    max-width: none;
+    box-shadow: none;
+    background-image: none;
+  }
+
+  .page-pad {
+    padding: 0;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+}
