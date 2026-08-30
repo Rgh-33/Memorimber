@@ -251,3 +251,5 @@ npm run start -- -p 3001
 | `npm run lint` | ESLintでコードを検査 |
 | `npm run build` | 本番用ビルドを作成 |
 | `npm run start` | ビルド済みアプリを起動 |
+
+test/vercelpreview
