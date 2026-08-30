@@ -1,18 +1,12 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSafeAuthRedirect } from "@/lib/auth-redirect";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
-function getSafeNext(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
-  return value;
-}
-
 export async function GET(request: NextRequest) {
-  const redirectUrl = request.nextUrl.clone();
-  const next = getSafeNext(request.nextUrl.searchParams.get("next"));
-  redirectUrl.pathname = next;
-  redirectUrl.search = "";
+  const next = getSafeAuthRedirect(request.nextUrl.searchParams.get("next"));
+  const redirectUrl = new URL(next, request.url);
 
   if (!isSupabaseConfigured()) {
     redirectUrl.pathname = "/login";
