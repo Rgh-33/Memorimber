@@ -2,20 +2,16 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSafeAuthRedirect } from "@/lib/auth-redirect";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
-
-function getSafeNext(value: FormDataEntryValue | string | null | undefined) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
-  return value;
-}
 
 export async function login(formData: FormData) {
   if (!isSupabaseConfigured()) redirect("/login?error=configuration");
 
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = getSafeNext(formData.get("next"));
+  const next = getSafeAuthRedirect(formData.get("next"));
   if (!email || !password) redirect("/login?error=missing_fields");
 
   const supabase = await createClient();
@@ -30,7 +26,7 @@ export async function signup(formData: FormData) {
 
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = getSafeNext(formData.get("next"));
+  const next = getSafeAuthRedirect(formData.get("next"));
   if (!email || !password) redirect("/signup?error=missing_fields");
 
   const requestOrigin = (await headers()).get("origin");

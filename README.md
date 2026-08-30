@@ -143,6 +143,22 @@ Supabaseの接続情報が未設定の場合、ローカル開発では既存UI�
 
 メール確認の有無やメールテンプレートなど、Supabaseプロジェクト側の設定に依存する部分は実プロジェクト接続後に確認が必要です。
 
+### Supabase Dashboard の認証設定
+
+1. **Authentication > URL Configuration** の Site URL に本番URL（例: `https://your-app.vercel.app`）を設定します。
+2. 同画面の Redirect URLs に本番の `https://your-app.vercel.app/auth/callback` と、ローカル確認用の `http://localhost:3000/auth/callback` を追加します。Preview Deploymentでもメール確認を行う場合は、そのURLも許可します。
+3. **Authentication > Providers > Email** でEmailプロバイダーを有効にし、Confirm emailの利用有無を確認します。
+4. **Project Settings > API / Connect** からProject URLとPublishable Keyを取得します。`service_role`、secret key、Database PasswordはこのアプリやVercelへ登録しません。
+
+Vercelとローカルの `.env.local` には、どちらも次の公開情報を登録します。旧形式のプロジェクトでPublishable Keyが発行されていない場合だけ、`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` の代わりに `NEXT_PUBLIC_SUPABASE_ANON_KEY` を利用できます。
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+接続後は、新規登録、確認メールのcallback、ログイン、保護ページへの遷移、`/api/profile` の本人プロフィール応答、ログアウト、ログアウト後の保護ページからのリダイレクトを順に確認してください。ブラウザの開発者ツールではSupabaseの認証Cookieが作成・更新されることと、クライアントへ配信されたコードやVercelの環境変数に秘密鍵が含まれないことも確認します。
+
 ## 今回実装していないもの
 
 - Supabase実プロジェクトへの接続確認

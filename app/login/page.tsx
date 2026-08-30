@@ -2,6 +2,7 @@ import Link from "next/link";
 import { login } from "@/app/auth/actions";
 import { AuthPageShell } from "@/components/auth-page-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
+import { getSafeAuthRedirect } from "@/lib/auth-redirect";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -24,9 +25,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const errorCode = typeof params.error === "string" ? params.error : "";
   const messageCode = typeof params.message === "string" ? params.message : "";
-  const next = typeof params.next === "string" && params.next.startsWith("/") && !params.next.startsWith("//")
-    ? params.next
-    : "/";
+  const next = getSafeAuthRedirect(typeof params.next === "string" ? params.next : null);
   const configured = isSupabaseConfigured();
   const notice = errorCode && ERROR_MESSAGES[errorCode]
     ? { tone: "error" as const, text: ERROR_MESSAGES[errorCode] }
