@@ -8,6 +8,7 @@ import { BottomNav } from "./bottom-nav";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { startProcessing, stopProcessing } = useProcessing();
+  const isAuthPage = pathname === "/login" || pathname === "/signup" || pathname.startsWith("/auth/");
 
   useEffect(() => {
     stopProcessing();
@@ -30,8 +31,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--page-bg)] text-ink">
       <div className="app-shell relative mx-auto min-h-screen w-full max-w-[430px] overflow-hidden bg-ivory shadow-phone" onClickCapture={handleNavigationStart}>
-        <main className="min-h-screen pb-[92px]">{children}</main>
-        <BottomNav />
+        <main className={`min-h-screen ${isAuthPage ? "" : "pb-[92px]"}`}>{children}</main>
+        {!isAuthPage && <BottomNav />}
       </div>
     </div>
   );

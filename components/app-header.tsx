@@ -4,14 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { Info, LogOut, Menu, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { logout } from "@/app/auth/actions";
 import { BrandHomeLink } from "@/components/brand-home-link";
 import { useMemories } from "@/lib/memories-context";
+import { useProcessing } from "@/lib/processing-context";
 import { useProfile } from "@/lib/profile-context";
 
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const { resetDemo } = useMemories();
+  const { startProcessing } = useProcessing();
   const { avatarDataUrl, nickname } = useProfile();
 
   useEffect(() => {
@@ -110,10 +113,18 @@ export function AppHeader() {
                 <UserCog size={17} />
                 <span>アカウント</span>
               </button>
-              <button type="button" className="app-side-menu-item">
-                <LogOut size={17} />
-                <span>ログアウト</span>
-              </button>
+              <form
+                action={logout}
+                onSubmit={() => {
+                  startProcessing();
+                  setMenuOpen(false);
+                }}
+              >
+                <button type="submit" className="app-side-menu-item">
+                  <LogOut size={17} />
+                  <span>ログアウト</span>
+                </button>
+              </form>
             </nav>
           </aside>
         </div>

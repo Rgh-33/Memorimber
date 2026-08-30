@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Music2, Pause, Play, Printer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { MemoryCard } from "@/components/memory-card";
 import { ALBUM_MONTHS } from "@/lib/data";
@@ -10,7 +10,6 @@ import { useMemories } from "@/lib/memories-context";
 export default function AlbumPage() {
   const { getMonthMemories } = useMemories();
   const [monthIndex, setMonthIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
   const month = ALBUM_MONTHS[monthIndex];
   const memories = getMonthMemories(month.key);
 
@@ -38,15 +37,6 @@ export default function AlbumPage() {
       </section>
 
       <button type="button" onClick={() => window.print()} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper print-hide"><Printer size={18} /> {month.label.replace("2026年", "")}をプリントする</button>
-
-      <section className="mt-4 flex items-center justify-between rounded-xl border border-line bg-ivory px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-3"><Music2 size={19} /><div><p className="text-xs font-medium text-ink">BGM</p><p className="mt-0.5 text-[10px] text-ink/40">今月の記憶</p></div></div>
-        <div className="flex items-center gap-3 text-ink">
-          <ChevronLeft size={17} fill="currentColor" />
-          <button type="button" onClick={() => setPlaying((value) => !value)} className="flex h-10 w-10 items-center justify-center rounded-full bg-coral text-white shadow-sm" aria-label={playing ? "BGMを停止" : "BGMを再生"}>{playing ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}</button>
-          <ChevronRight size={17} fill="currentColor" />
-        </div>
-      </section>
     </div>
   );
 }

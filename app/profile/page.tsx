@@ -149,11 +149,13 @@ export default function ProfilePage() {
               <ChevronRight size={23} strokeWidth={2} />
             </button>
           </div>
-          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-ivory ring-1 ring-line" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(levelProgress.progress * 100)}>
-            <div className="profile-level-progress h-full rounded-full" style={{ width: `${levelProgress.progress * 100}%` }} />
+          <div className="profile-level-track mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(levelProgress.progress * 100)}>
+            <div className="profile-level-progress" style={{ width: `${levelProgress.progress * 100}%` }} />
           </div>
-          <p className="mt-2 text-left text-[12px] font-semibold tabular-nums text-coral">
-            {levelProgress.photosIntoLevel}/{levelProgress.photosForNextLevel}
+          <p className="profile-level-fraction mt-2" aria-label={`${levelProgress.photosIntoLevel}/${levelProgress.photosForNextLevel}`}>
+            <span className="profile-level-fraction-current">{levelProgress.photosIntoLevel}</span>
+            <span className="profile-level-fraction-slash" aria-hidden="true">/</span>
+            <span>{levelProgress.photosForNextLevel}</span>
           </p>
         </div>
 

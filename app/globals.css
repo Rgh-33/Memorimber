@@ -144,6 +144,32 @@ a {
   animation: brand-processing-pulse 920ms ease-in-out infinite;
 }
 
+.auth-notice {
+  padding: 11px 13px;
+  border: 1px solid rgb(var(--line-rgb) / 0.9);
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.auth-notice--info {
+  border-color: rgb(var(--accent-rgb) / 0.28);
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: rgb(var(--ink-rgb) / 0.7);
+}
+
+.auth-notice--success {
+  border-color: rgb(63 145 105 / 0.32);
+  background: rgb(63 145 105 / 0.1);
+  color: rgb(var(--ink-rgb) / 0.76);
+}
+
+.auth-notice--error {
+  border-color: rgb(211 86 86 / 0.36);
+  background: rgb(211 86 86 / 0.09);
+  color: rgb(var(--ink-rgb) / 0.78);
+}
+
 .page-pad {
   padding: 22px 20px 34px;
 }
@@ -257,11 +283,47 @@ a {
   box-shadow: 0 0 0 1px rgb(var(--ink-rgb) / 0.14);
 }
 
+.profile-level-track {
+  position: relative;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgb(var(--line-rgb) / 0.62), rgb(var(--line-rgb) / 0.9));
+  box-shadow: inset 0 1px 1px rgb(var(--ink-rgb) / 0.045);
+}
+
 .profile-level-progress {
+  height: 100%;
   min-width: 3px;
-  background: linear-gradient(90deg, var(--accent-soft), var(--accent-strong));
-  box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.26);
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent-strong) 82%);
+  box-shadow: 1px 0 0 rgb(var(--accent-strong-rgb) / 0.28);
   transition: width 300ms ease;
+}
+
+.profile-level-fraction {
+  color: rgb(var(--ink-rgb) / 0.5);
+  font-family: "Avenir Next", "Helvetica Neue", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0.075em;
+  line-height: 1;
+  text-align: left;
+}
+
+.profile-level-fraction-current {
+  color: var(--accent-strong);
+  font-weight: 650;
+}
+
+.profile-level-fraction-slash {
+  display: inline-block;
+  margin: 0 0.35em;
+  color: rgb(var(--ink-rgb) / 0.27);
+  font-size: 0.86em;
+  font-weight: 400;
+  transform: translateY(-0.02em);
 }
 
 .profile-level-summary {
