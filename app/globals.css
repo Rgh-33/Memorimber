@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --ivory: #fbf8f1;
-  --ink: #202c46;
-  --line: #e6dccf;
-  --coral: #ef7668;
+  --ivory: #ffffff;
+  --ink: #082657;
+  --line: #d6e5f7;
+  --accent: #4a90e2;
 }
 
 * {
@@ -14,14 +14,14 @@
 }
 
 html {
-  background: #e9e1d5;
+  background: #edf5fd;
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  background: #e9e1d5;
+  background: #edf5fd;
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -39,12 +39,11 @@ a {
 }
 
 .app-shell {
-  background-image: radial-gradient(rgba(32, 44, 70, 0.035) 0.7px, transparent 0.7px);
-  background-size: 7px 7px;
+  background: #ffffff;
 }
 
 .page-pad {
-  padding: 26px 20px 32px;
+  padding: 22px 20px 34px;
 }
 
 .photo-picker {
@@ -53,8 +52,8 @@ a {
 }
 
 .photo-picker:hover {
-  border-color: rgba(239, 118, 104, 0.7);
-  background-color: rgba(239, 118, 104, 0.04);
+  border-color: rgba(74, 144, 226, 0.78);
+  background-color: rgba(74, 144, 226, 0.045);
 }
 
 .photo-picker:active {
@@ -72,7 +71,7 @@ a {
   left: 3%;
   width: 94%;
   height: 5px;
-  border-bottom: 2px solid rgba(239, 118, 104, 0.72);
+  border-bottom: 2px solid rgba(74, 144, 226, 0.72);
   border-radius: 50%;
   content: "";
   transform: rotate(-1deg);
@@ -83,8 +82,16 @@ a {
   height: 18px;
   width: 62px;
   border-radius: 4px;
-  background: rgba(243, 160, 91, 0.3);
+  background: rgba(132, 181, 236, 0.3);
   transform: rotate(-7deg);
+}
+
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
 }
 
 @media print {

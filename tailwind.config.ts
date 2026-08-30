@@ -9,18 +9,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ivory: "#FBF8F1",
-        paper: "#F5EFE5",
-        ink: "#202C46",
-        coral: "#EF7668",
-        sunset: "#F3A05B",
-        sage: "#AAC8B8",
-        lavender: "#DED5EE",
-        line: "#E6DCCF",
+        ivory: "#FFFFFF",
+        paper: "#F4F9FF",
+        ink: "#082657",
+        coral: "#4A90E2",
+        sunset: "#84B5EC",
+        sage: "#DCEEFF",
+        lavender: "#EAF2FD",
+        line: "#D6E5F7",
       },
       boxShadow: {
-        card: "0 14px 40px rgba(53, 45, 35, 0.08)",
-        phone: "0 18px 50px rgba(53, 45, 35, 0.16)",
+        card: "0 10px 28px rgba(38, 92, 154, 0.10)",
+        phone: "0 18px 50px rgba(24, 74, 132, 0.14)",
       },
       borderRadius: {
         "4xl": "2rem",
