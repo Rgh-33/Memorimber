@@ -22,7 +22,7 @@ export function BottomNav() {
         if (primary) {
           return (
             <Link key={href} href={href} className="-mt-5 flex flex-col items-center gap-1" aria-label="思い出を投稿">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#66a7ed] to-[#3f83d5] text-white shadow-card ring-4 ring-white transition-transform hover:-translate-y-0.5 active:scale-95">
+              <span className="accent-gradient flex h-14 w-14 items-center justify-center rounded-full text-white shadow-card ring-4 ring-white transition-transform hover:-translate-y-0.5 active:scale-95">
                 <Icon size={26} strokeWidth={2.2} />
               </span>
               <span className="text-[10px] font-medium text-ink/65">{label}</span>

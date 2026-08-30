@@ -131,7 +131,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
         </details>
       </div>
 
-      <button type="submit" className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#5799e5] to-[#3f83d5] px-4 py-3.5 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition hover:-translate-y-0.5 active:translate-y-0">
+      <button type="submit" className="accent-gradient mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition hover:-translate-y-0.5 active:translate-y-0">
         思い出を追加する
       </button>
     </form>

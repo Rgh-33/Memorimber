@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/app-header";
 import { MemoryTree } from "@/components/memory-tree";
+import { SAMPLE_MEMORIES } from "@/lib/data";
 import { TREE_PREVIEW_ITEMS } from "@/lib/tree-data";
 
 export default function HomePage() {
@@ -13,7 +14,7 @@ export default function HomePage() {
         <p className="mt-2 text-xs leading-6 text-ink/52">何気ない一日を、未来の自分へ。</p>
       </section>
 
-      <MemoryTree items={TREE_PREVIEW_ITEMS} />
+      <MemoryTree items={TREE_PREVIEW_ITEMS} memories={SAMPLE_MEMORIES} />
     </div>
   );
 }

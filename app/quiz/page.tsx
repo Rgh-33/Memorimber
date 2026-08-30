@@ -61,7 +61,7 @@ export default function QuizPage() {
       <button type="button" onClick={() => setShowHint((value) => !value)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 py-3 text-xs text-ink hover:bg-paper"><HelpCircle size={17} className="text-coral" /> {showHint ? question.hint : "ヒントを見る"}</button>
 
       {!answered ? (
-        <button type="button" onClick={() => selected && setConfirmed(true)} disabled={!selected} className="mt-3 w-full rounded-xl bg-gradient-to-r from-[#5799e5] to-[#3f83d5] px-4 py-3.5 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-45">答えを確認</button>
+        <button type="button" onClick={() => selected && setConfirmed(true)} disabled={!selected} className="accent-gradient mt-3 w-full rounded-xl px-4 py-3.5 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-45">答えを確認</button>
       ) : (
         <div className="mt-3 rounded-xl border border-line bg-paper p-4">
           <p className="font-medium text-ink">{correct ? "正解！ 記憶がつながったね。" : `正解は「${question.correctChoice}」です。`}</p>
