@@ -155,8 +155,8 @@ a {
 }
 
 .memory-tree-art > img {
-  opacity: 0.92;
-  filter: saturate(0.82) contrast(0.96);
+  opacity: 0.84;
+  filter: saturate(0.42) contrast(0.88) brightness(1.06);
 }
 
 .memory-fruit-hit-area {
