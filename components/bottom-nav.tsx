@@ -16,13 +16,13 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="bottom-nav fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[82px] max-w-[430px] items-end justify-around border-t border-line bg-white/95 px-3 pb-3 pt-2 backdrop-blur-md print:hidden" aria-label="メインナビゲーション">
+    <nav className="bottom-nav fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[82px] max-w-[430px] items-end justify-around border-t border-line bg-ivory/95 px-3 pb-3 pt-2 backdrop-blur-md print:hidden" aria-label="メインナビゲーション">
       {items.map(({ href, label, icon: Icon, primary }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         if (primary) {
           return (
             <Link key={href} href={href} className="-mt-5 flex flex-col items-center gap-1" aria-label="思い出を投稿">
-              <span className="accent-gradient flex h-14 w-14 items-center justify-center rounded-full text-white shadow-card ring-4 ring-white transition-transform hover:-translate-y-0.5 active:scale-95">
+              <span className="accent-gradient flex h-14 w-14 items-center justify-center rounded-full text-white shadow-card ring-4 ring-ivory transition-transform hover:-translate-y-0.5 active:scale-95">
                 <Icon size={26} strokeWidth={2.2} />
               </span>
               <span className="text-[10px] font-medium text-ink/65">{label}</span>

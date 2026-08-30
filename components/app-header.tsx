@@ -1,13 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { LogOut, Menu, Settings, X } from "lucide-react";
+import { Info, LogOut, Menu, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BrandHomeLink } from "@/components/brand-home-link";
+import { useMemories } from "@/lib/memories-context";
+import { useProfile } from "@/lib/profile-context";
 
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const { resetDemo } = useMemories();
+  const { avatarDataUrl, nickname } = useProfile();
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -30,23 +35,36 @@ export function AppHeader() {
     <>
       <header className="flex h-10 items-center justify-between">
         <BrandHomeLink />
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          className="rounded-lg p-2 text-ink transition hover:bg-paper hover:text-coral"
-          aria-label="メニューを開く"
-          aria-expanded={menuOpen}
-          aria-controls="app-side-menu"
-        >
-          <Menu size={23} strokeWidth={1.7} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <Link
+            href="/profile"
+            className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full border border-coral/55 bg-paper text-coral shadow-sm transition hover:border-coral hover:ring-2 hover:ring-coral/15"
+            aria-label={`${nickname || "自分"}のプロフィールを開く`}
+          >
+            {avatarDataUrl ? (
+              <Image src={avatarDataUrl} alt="" fill sizes="32px" className="object-cover" unoptimized />
+            ) : (
+              <UserRound size={18} strokeWidth={1.65} />
+            )}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            className="rounded-lg p-2 text-ink transition hover:bg-paper hover:text-coral"
+            aria-label="メニューを開く"
+            aria-expanded={menuOpen}
+            aria-controls="app-side-menu"
+          >
+            <Menu size={23} strokeWidth={1.7} />
+          </button>
+        </div>
       </header>
 
       {menuOpen && (
         <div className="app-menu-layer" role="presentation">
           <button type="button" className="app-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="メニューを閉じる" />
           <aside id="app-side-menu" className="app-side-menu" role="dialog" aria-modal="true" aria-label="メニュー">
-            <div className="flex items-center justify-between border-b border-line px-3 py-4">
+            <div className="flex items-center justify-between px-3 py-4">
               <span className="text-[10px] font-semibold tracking-[0.16em] text-ink/45">MENU</span>
               <button
                 ref={closeButtonRef}
@@ -59,14 +77,43 @@ export function AppHeader() {
               </button>
             </div>
             <nav className="grid" aria-label="サイドメニュー">
-              <button type="button" className="app-side-menu-item">
-                <LogOut size={17} />
-                <span>ログアウト</span>
+              <Link href="/profile" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
+                <UserRound size={17} />
+                <span>プロフィール</span>
+              </Link>
+              <div className="app-side-menu-divider" aria-hidden="true" />
+              <Link href="/post" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
+                <Sparkles size={17} />
+                <span>新しい思い出を残す</span>
+              </Link>
+              <Link href="/more#about" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
+                <Info size={17} />
+                <span>このプロトタイプについて</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  resetDemo();
+                  setMenuOpen(false);
+                }}
+                className="app-side-menu-item"
+              >
+                <RotateCcw size={17} />
+                <span>デモデータを初期化</span>
               </button>
+              <div className="app-side-menu-divider" aria-hidden="true" />
               <Link href="/settings" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
                 <Settings size={17} />
                 <span>設定</span>
               </Link>
+              <button type="button" className="app-side-menu-item">
+                <UserCog size={17} />
+                <span>アカウント</span>
+              </button>
+              <button type="button" className="app-side-menu-item">
+                <LogOut size={17} />
+                <span>ログアウト</span>
+              </button>
             </nav>
           </aside>
         </div>

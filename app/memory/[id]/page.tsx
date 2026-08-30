@@ -29,7 +29,7 @@ export default function MemoryDetailPage() {
       <h1 className="pt-7 text-center font-sans text-[25px] font-medium tracking-[0.1em] text-ink">思い出詳細</h1>
 
       <article className="mt-4">
-        <div className="overflow-hidden rounded-xl border border-dashed border-coral/45 bg-white p-2">
+        <div className="overflow-hidden rounded-xl border border-dashed border-coral/45 bg-ivory p-2">
           <img src={memory.imageUrl} alt={memory.caption} className="aspect-[4/3] w-full rounded-lg object-cover" />
         </div>
         <p className="mt-4 flex items-center gap-2 text-xs text-ink/65"><CalendarDays size={16} className="text-ink" /> {formatJapaneseDate(memory.date)}</p>

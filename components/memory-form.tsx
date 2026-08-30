@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Check, ChevronRight, ImagePlus, Sprout, Tag, Users } from "lucide-react";
 import { SAMPLE_MEMORIES } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { useProcessing } from "@/lib/processing-context";
 
 const PEOPLE = ["友達", "家族", "クラスのみんな", "部活の仲間"];
 const TAGS = ["放課後", "帰り道", "教室", "行事", "昼休み", "8月"];
@@ -14,6 +15,7 @@ const TAGS = ["放課後", "帰り道", "教室", "行事", "昼休み", "8月"]
 export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const { addMemory } = useMemories();
+  const { startProcessing, stopProcessing } = useProcessing();
   const [imageUrl, setImageUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [date, setDate] = useState("2026-08-25");
@@ -22,8 +24,14 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const [errors, setErrors] = useState<{ image?: string; caption?: string }>({});
 
   const readFile = (file: File) => {
+    startProcessing();
     const reader = new FileReader();
-    reader.addEventListener("load", () => setImageUrl(String(reader.result)));
+    reader.addEventListener("load", () => {
+      setImageUrl(String(reader.result));
+      stopProcessing();
+    });
+    reader.addEventListener("error", stopProcessing);
+    reader.addEventListener("abort", stopProcessing);
     reader.readAsDataURL(file);
   };
 
@@ -49,21 +57,22 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     if (nextErrors.image || nextErrors.caption) return;
 
     const id = addMemory({ imageUrl, caption: caption.trim(), date, people, tags });
+    startProcessing();
     router.push(`/memory/${id}?new=1`);
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`rounded-[22px] border border-line bg-white p-3 shadow-card ${compact ? "" : "mt-5"}`}>
+    <form onSubmit={handleSubmit} className={`rounded-[22px] border border-line bg-ivory p-3 shadow-card ${compact ? "" : "mt-5"}`}>
       <div className="mb-2 flex items-center gap-2 px-1 pb-1">
         <Sprout size={21} className="text-coral" strokeWidth={1.7} />
         <p className="font-sans text-base tracking-[0.08em] text-ink">今日の思い出を残す</p>
       </div>
 
-      <label htmlFor="memory-photo" className={`photo-picker relative block overflow-hidden rounded-xl border border-dashed ${errors.image ? "border-red-400 bg-red-50" : "border-coral/45 bg-white"}`}>
+      <label htmlFor="memory-photo" className={`photo-picker relative block overflow-hidden rounded-xl border border-dashed ${errors.image ? "border-red-400 bg-red-50" : "border-coral/45 bg-ivory"}`}>
         {imageUrl ? (
           <div className="relative aspect-[16/10]">
             <img src={imageUrl} alt="投稿する写真のプレビュー" className="h-full w-full object-cover" />
-            <span className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-ink shadow-sm">写真を変更</span>
+            <span className="absolute right-3 top-3 rounded-full bg-ivory/90 px-3 py-1 text-[11px] font-medium text-ink shadow-sm">写真を変更</span>
           </div>
         ) : (
           <div className="flex min-h-[168px] flex-col items-center justify-center px-6 text-center">
@@ -87,13 +96,13 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
           placeholder="一言を残す"
           rows={2}
           aria-label="一言を残す"
-          className={`w-full resize-none rounded-lg border bg-white px-3 py-3 pr-12 text-sm leading-5 text-ink outline-none transition placeholder:text-ink/40 focus:border-coral focus:ring-2 focus:ring-coral/10 ${errors.caption ? "border-red-400" : "border-line"}`}
+          className={`w-full resize-none rounded-lg border bg-ivory px-3 py-3 pr-12 text-sm leading-5 text-ink outline-none transition placeholder:text-ink/40 focus:border-coral focus:ring-2 focus:ring-coral/10 ${errors.caption ? "border-red-400" : "border-line"}`}
         />
         <span className="absolute bottom-2 right-3 text-[10px] text-ink/30">{caption.length}/80</span>
       </div>
       {errors.caption && <p className="mt-1 px-1 text-[11px] font-medium text-red-500">{errors.caption}</p>}
 
-      <div className="mt-2 overflow-hidden rounded-xl border border-line bg-white">
+      <div className="mt-2 overflow-hidden rounded-xl border border-line bg-ivory">
         <label htmlFor="memory-date" className="grid grid-cols-[auto_1fr] items-center gap-3 border-b border-line px-3 py-2.5">
           <CalendarDays size={18} className="text-ink" strokeWidth={1.6} />
           <div className="flex items-center justify-between gap-2">
@@ -111,7 +120,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
           <div className="flex flex-wrap gap-2 bg-paper/60 px-3 pb-3 pt-1">
             {PEOPLE.map((person) => {
               const selected = people.includes(person);
-              return <button key={person} type="button" onClick={() => toggle(person, setPeople)} className={`rounded-full border px-3 py-1.5 text-[11px] transition ${selected ? "border-coral bg-coral text-white" : "border-line bg-white text-ink/65"}`}>{selected && <Check size={11} className="mr-1 inline" />}{person}</button>;
+              return <button key={person} type="button" onClick={() => toggle(person, setPeople)} className={`rounded-full border px-3 py-1.5 text-[11px] transition ${selected ? "border-coral bg-coral text-white" : "border-line bg-ivory text-ink/65"}`}>{selected && <Check size={11} className="mr-1 inline" />}{person}</button>;
             })}
           </div>
         </details>
@@ -125,7 +134,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
           <div className="flex flex-wrap gap-2 bg-paper/60 px-3 pb-3 pt-1">
             {TAGS.map((tag) => {
               const selected = tags.includes(tag);
-              return <button key={tag} type="button" onClick={() => toggle(tag, setTags)} className={`rounded-full border px-3 py-1.5 text-[11px] transition ${selected ? "border-coral bg-coral text-white" : "border-line bg-white text-ink/65"}`}>{selected && <Check size={11} className="mr-1 inline" />}{tag}</button>;
+              return <button key={tag} type="button" onClick={() => toggle(tag, setTags)} className={`rounded-full border px-3 py-1.5 text-[11px] transition ${selected ? "border-coral bg-coral text-white" : "border-line bg-ivory text-ink/65"}`}>{selected && <Check size={11} className="mr-1 inline" />}{tag}</button>;
             })}
           </div>
         </details>

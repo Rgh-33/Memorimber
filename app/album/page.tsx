@@ -37,9 +37,9 @@ export default function AlbumPage() {
         )}
       </section>
 
-      <button type="button" onClick={() => window.print()} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-white px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper print-hide"><Printer size={18} /> {month.label.replace("2026年", "")}をプリントする</button>
+      <button type="button" onClick={() => window.print()} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper print-hide"><Printer size={18} /> {month.label.replace("2026年", "")}をプリントする</button>
 
-      <section className="mt-4 flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 shadow-sm">
+      <section className="mt-4 flex items-center justify-between rounded-xl border border-line bg-ivory px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3"><Music2 size={19} /><div><p className="text-xs font-medium text-ink">BGM</p><p className="mt-0.5 text-[10px] text-ink/40">今月の記憶</p></div></div>
         <div className="flex items-center gap-3 text-ink">
           <ChevronLeft size={17} fill="currentColor" />

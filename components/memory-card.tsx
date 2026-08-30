@@ -8,7 +8,7 @@ import { Memory } from "@/lib/types";
 export function MemoryCard({ memory, compact = false, dateOnly = false }: { memory: Memory; compact?: boolean; dateOnly?: boolean }) {
   if (dateOnly) {
     return (
-      <Link href={`/memory/${memory.id}`} className="group block rounded-lg border border-dashed border-coral/35 bg-white p-1.5 transition hover:-translate-y-0.5 hover:border-coral hover:shadow-card">
+      <Link href={`/memory/${memory.id}`} className="group block rounded-lg border border-dashed border-coral/35 bg-ivory p-1.5 transition hover:-translate-y-0.5 hover:border-coral hover:shadow-card">
         <div className="aspect-square overflow-hidden rounded-md bg-paper">
           <img src={memory.imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         </div>
@@ -19,7 +19,7 @@ export function MemoryCard({ memory, compact = false, dateOnly = false }: { memo
 
   if (compact) {
     return (
-      <Link href={`/memory/${memory.id}`} className="group block rounded-lg border border-dashed border-coral/35 bg-white p-1.5 transition hover:border-coral">
+      <Link href={`/memory/${memory.id}`} className="group block rounded-lg border border-dashed border-coral/35 bg-ivory p-1.5 transition hover:border-coral">
         <div className="aspect-square overflow-hidden rounded-md bg-paper">
           <img src={memory.imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         </div>
@@ -28,7 +28,7 @@ export function MemoryCard({ memory, compact = false, dateOnly = false }: { memo
   }
 
   return (
-    <Link href={`/memory/${memory.id}`} className="group block rounded-2xl border border-line bg-white p-2 shadow-sm">
+    <Link href={`/memory/${memory.id}`} className="group block rounded-2xl border border-line bg-ivory p-2 shadow-sm">
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-paper">
         <img src={memory.imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
       </div>

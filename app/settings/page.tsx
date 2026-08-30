@@ -3,7 +3,7 @@ import { ChevronRight, CircleHelp, Images, ImagePlus, MoreHorizontal, Music2, Pa
 import { SettingsHeader } from "@/components/settings-header";
 
 const settingsSections = [
-  { href: "/settings/style", label: "スタイル", description: "テーマカラーを変更", icon: Palette },
+  { href: "/settings/style", label: "スタイル", description: "明るさとテーマカラーを変更", icon: Palette },
   { href: "/settings/sound", label: "サウンド", description: "BGMと効果音の音量", icon: Music2 },
   { href: "/settings/tree", label: "木", description: "思い出の木の設定", icon: TreePine },
   { href: "/settings/album", label: "アルバム", description: "アルバムの設定", icon: Images },
@@ -23,7 +23,7 @@ export default function SettingsPage() {
         <p className="mt-2 text-xs leading-6 text-ink/50">変更する項目を選んでください</p>
       </section>
 
-      <nav className="mt-7 overflow-hidden rounded-2xl border border-line bg-white shadow-card" aria-label="設定項目">
+      <nav className="mt-7 overflow-hidden rounded-2xl border border-line bg-ivory shadow-card" aria-label="設定項目">
         {settingsSections.map(({ href, label, description, icon: Icon }, index) => (
           <Link
             key={href}

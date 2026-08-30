@@ -8,7 +8,7 @@ import { MemoryCard } from "@/components/memory-card";
 import type { Memory } from "@/lib/types";
 import type { MemoryFruitTone, MemoryTreeItem } from "@/lib/tree-data";
 
-const LONG_PRESS_MS = 420;
+const LONG_PRESS_MS = 120;
 const GESTURE_SAMPLE_DISTANCE_PX = 14;
 const GESTURE_MAX_SAMPLE_MS = 360;
 const GESTURE_MIN_SPEED_PX_PER_MS = 0.14;
