@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { CalendarDays, Camera, ChevronRight, Images, Lightbulb, Medal, Sprout, UserRound, X } from "lucide-react";
+import { CalendarDays, Camera, Check, ChevronRight, Images, Lightbulb, Medal, Pencil, Sprout, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type Ref } from "react";
 import { AppHeader } from "@/components/app-header";
 import { useMemories } from "@/lib/memories-context";
@@ -60,6 +60,8 @@ export default function ProfilePage() {
   const { startProcessing, stopProcessing } = useProcessing();
   const [selectedMedalId, setSelectedMedalId] = useState(PROFILE_MEDALS[0].id);
   const [levelDetailsOpen, setLevelDetailsOpen] = useState(false);
+  const [nicknameEditing, setNicknameEditing] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState(nickname);
   const levelListRef = useRef<HTMLDivElement>(null);
   const currentLevelRef = useRef<HTMLElement>(null);
 
@@ -109,6 +111,18 @@ export default function ProfilePage() {
     event.target.value = "";
   };
 
+  const startNicknameEditing = () => {
+    setNicknameDraft(nickname);
+    setNicknameEditing(true);
+  };
+
+  const saveNickname = () => {
+    const nextNickname = nicknameDraft.trim();
+    if (!nextNickname) return;
+    setNickname(nextNickname);
+    setNicknameEditing(false);
+  };
+
   return (
     <div className="page-pad">
       <AppHeader />
@@ -118,8 +132,8 @@ export default function ProfilePage() {
         <h1 className="mt-2 text-[25px] font-semibold tracking-[0.1em] text-ink">プロフィール</h1>
       </section>
 
-      <section className="settings-card mt-7">
-        <label htmlFor="profile-avatar" className="group mx-auto block w-fit cursor-pointer text-center">
+      <section className="mt-7 px-1">
+        <label htmlFor="profile-avatar" className="group relative z-10 mx-auto block w-fit cursor-pointer text-center">
           <span className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2 border-coral bg-paper text-coral shadow-card ring-4 ring-coral/10">
             {avatarDataUrl ? (
               <Image src={avatarDataUrl} alt="選択したプロフィールアイコン" fill sizes="96px" className="object-cover" unoptimized />
@@ -130,23 +144,20 @@ export default function ProfilePage() {
               <Camera size={15} />
             </span>
           </span>
-          <span className="mt-3 block text-[11px] font-medium text-coral">アイコン画像を選択</span>
         </label>
         <input id="profile-avatar" type="file" accept="image/*" className="sr-only" onChange={handleAvatarChange} />
 
-        <div className="profile-level-summary mt-6" aria-label={`現在のレベルは${levelProgress.level}です`}>
-          <div className="flex items-end justify-between gap-4">
-            <div className="text-left text-coral">
+        <div className="profile-level-summary" aria-label={`現在のレベルは${levelProgress.level}です`}>
+          <div className="relative w-fit text-left text-coral">
               <span className="block text-[38px] font-semibold leading-none tabular-nums">{levelProgress.level}</span>
               <span className="mt-1.5 block text-[10px] font-semibold tracking-[0.12em]">レベル</span>
-            </div>
             <button
               type="button"
               onClick={() => setLevelDetailsOpen(true)}
-              className="mb-1 grid h-9 w-9 place-items-center rounded-full text-coral transition hover:bg-coral/10"
+              className="absolute left-full top-2 ml-1 grid h-8 w-8 place-items-center rounded-full text-coral transition hover:bg-coral/10"
               aria-label="すべてのレベル条件を見る"
             >
-              <ChevronRight size={23} strokeWidth={2} />
+              <ChevronRight size={20} strokeWidth={2} />
             </button>
           </div>
           <div className="profile-level-track mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(levelProgress.progress * 100)}>
@@ -159,23 +170,58 @@ export default function ProfilePage() {
           </p>
         </div>
 
-        <label className="mt-6 block">
-          <span className="text-xs font-semibold text-ink">ニックネーム</span>
-          <input
-            type="text"
-            value={nickname}
-            maxLength={20}
-            onChange={(event) => setNickname(event.target.value)}
-            placeholder="ニックネームを入力"
-            className="mt-2 w-full rounded-xl border border-line bg-ivory px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-coral focus:ring-2 focus:ring-coral/15"
-          />
-        </label>
+        <div className="mt-4">
+          {nicknameEditing ? (
+            <form
+              className="relative flex min-h-[58px] items-center justify-center border-b border-coral/35 px-11"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveNickname();
+              }}
+            >
+              <input
+                type="text"
+                value={nicknameDraft}
+                maxLength={20}
+                autoFocus
+                onChange={(event) => setNicknameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setNicknameEditing(false);
+                }}
+                aria-label="ニックネームを編集"
+                className="min-w-0 w-full bg-transparent py-2.5 text-center text-[28px] font-semibold leading-[1.3] tracking-[0.04em] text-coral outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!nicknameDraft.trim()}
+                className="absolute right-0 grid h-9 w-9 place-items-center rounded-full bg-coral text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="ニックネームを確定"
+              >
+                <Check size={16} strokeWidth={2} />
+              </button>
+            </form>
+          ) : (
+            <div className="relative flex min-h-[58px] items-center justify-center px-11">
+              <p className="min-w-0 max-w-full truncate py-1.5 text-[28px] font-semibold leading-[1.3] tracking-[0.04em] text-coral">{nickname || "ニックネーム未設定"}</p>
+              <button
+                type="button"
+                onClick={startNicknameEditing}
+                className="absolute right-0 grid h-9 w-9 place-items-center rounded-full text-coral transition hover:bg-coral/10"
+                aria-label="ニックネームを編集"
+              >
+                <Pencil size={16} strokeWidth={1.8} />
+              </button>
+            </div>
+          )}
+        </div>
       </section>
 
-      <section className="settings-card mt-4" aria-labelledby="profile-medals-heading">
+      <div className="profile-record-divider mx-auto mt-8" aria-hidden="true" />
+
+      <section className="mt-4 px-1" aria-labelledby="profile-medals-heading">
         <div className="flex items-center gap-2.5">
-          <Medal size={20} className="text-coral" />
-          <h2 id="profile-medals-heading" className="text-base font-semibold text-ink">記録</h2>
+          <Medal size={24} className="text-coral" strokeWidth={1.8} />
+          <h2 id="profile-medals-heading" className="text-lg font-semibold text-ink">記録</h2>
         </div>
         <div className="mt-5 grid grid-cols-4 gap-2">
           {PROFILE_MEDALS.map((medal: ProfileMedal) => {

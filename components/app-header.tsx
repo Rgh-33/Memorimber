@@ -109,10 +109,10 @@ export function AppHeader() {
                 <Settings size={17} />
                 <span>設定</span>
               </Link>
-              <button type="button" className="app-side-menu-item">
+              <Link href="/account" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
                 <UserCog size={17} />
                 <span>アカウント</span>
-              </button>
+              </Link>
               <form
                 action={logout}
                 onSubmit={() => {
