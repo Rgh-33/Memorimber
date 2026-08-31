@@ -71,6 +71,26 @@ export class MemorySaveError extends Error {
   }
 }
 
+function createMemoryId() {
+  if (typeof crypto !== "undefined") {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+
+    // randomUUID requires a secure context: localhost works, but an iPhone
+    // opening http://192.168.x.x may not expose it. getRandomValues remains
+    // available there and supplies the same cryptographic randomness.
+    if (typeof crypto.getRandomValues === "function") {
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6] & 0x0f) | 0x40; // UUID version 4.
+      bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC UUID variant (10xx).
+      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+  }
+
+  // Do not substitute timestamps or Math.random for a secure identifier.
+  throw new MemorySaveError("このブラウザでは安全な保存用IDを生成できません。ブラウザを更新するか、HTTPSで開き直してください。");
+}
+
 function errorDetail(error: unknown) {
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
     return error.message;
@@ -136,7 +156,7 @@ export async function saveMemory(
   const { fields, contentType, extension } = validateMemoryInput(input);
   onStage?.("auth");
   const user = await requireUser(client);
-  const id = crypto.randomUUID();
+  const id = createMemoryId();
   const pending = { id, userId: user.id, imagePath: `${user.id}/${id}.${extension}` };
   // The form journals only these identifiers before upload, so reloads can
   // resume verification. No image bytes, caption, tokens or signed URLs persist.

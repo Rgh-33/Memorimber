@@ -17,6 +17,15 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { "Content-Type": "application/json" },
 });
 
+function disableCryptoMethod(t, name) {
+  const descriptor = Object.getOwnPropertyDescriptor(crypto, name);
+  Object.defineProperty(crypto, name, { configurable: true, value: undefined });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(crypto, name, descriptor);
+    else delete crypto[name];
+  });
+}
+
 // Real supabase-js request serialization, with an entirely in-memory transport.
 // This does NOT claim to test the deployed Supabase RLS or bucket configuration.
 function harness(options = {}) {
@@ -267,4 +276,71 @@ test("failure to journal recovery information prevents upload", async () => {
   const h = harness();
   await assert.rejects(saveMemory(h.client, makeInput(), undefined, () => { throw new Error("Storage unavailable"); }), /Storage unavailable/);
   assert.deepEqual(h.calls.map((call) => call.method), ["AUTH"]);
+});
+
+for (const [byte, expectedId] of [
+  [0, "00000000-0000-4000-8000-000000000000"],
+  [255, "ffffffff-ffff-4fff-bfff-ffffffffffff"],
+]) {
+  test(`HTTP LAN: missing randomUUID still saves a valid UUID v4 (byte ${byte})`, async (t) => {
+    disableCryptoMethod(t, "randomUUID");
+    t.mock.method(crypto, "getRandomValues", function (bytes) {
+      assert.equal(this, crypto);
+      assert.ok(bytes instanceof Uint8Array);
+      assert.equal(bytes.length, 16);
+      return bytes.fill(byte);
+    });
+    const h = harness();
+    const saved = await saveMemory(h.client, makeInput());
+    assert.equal(saved.id, expectedId);
+    assert.equal(h.rows.get(saved.id).image_path, `${USER_ID}/${saved.id}.jpg`);
+    assert.ok(h.objects.has(`${USER_ID}/${saved.id}.jpg`));
+  });
+}
+
+test("HTTP LAN: fallback uses fresh cryptographic randomness, never Math.random", async (t) => {
+  disableCryptoMethod(t, "randomUUID");
+  t.mock.method(Math, "random", () => { throw new Error("Insecure randomness must not be used"); });
+  const h = harness();
+  const first = await saveMemory(h.client, makeInput());
+  const second = await saveMemory(h.client, makeInput());
+  for (const { id } of [first, second]) assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.notEqual(first.id, second.id);
+  assert.equal(h.objects.size, 2);
+  assert.equal(h.rows.size, 2);
+});
+
+test("HTTP LAN: missing all secure randomness stops before upload and journaling", async (t) => {
+  disableCryptoMethod(t, "randomUUID");
+  disableCryptoMethod(t, "getRandomValues");
+  const h = harness();
+  let journaled = false;
+  await assert.rejects(saveMemory(h.client, makeInput(), undefined, () => { journaled = true; }), (error) => {
+    assert.ok(error instanceof MemorySaveError);
+    assert.match(error.message, /保存用ID/);
+    return true;
+  });
+  assert.equal(journaled, false);
+  assert.deepEqual(h.calls.map((call) => call.method), ["AUTH"]);
+});
+
+test("HTTP LAN: DB rejection still rolls back the fallback UUID's photo", async (t) => {
+  disableCryptoMethod(t, "randomUUID");
+  const h = harness({ insertError: "DB rejected" });
+  await assert.rejects(saveMemory(h.client, makeInput()), /画像は取り消しました/);
+  assert.equal(h.objects.size, 0);
+  assert.equal(h.rows.size, 0);
+  assert.equal(h.calls.filter((call) => call.method === "DELETE").length, 1);
+});
+
+test("HTTP LAN: fallback UUID remains recoverable after a lost INSERT response", async (t) => {
+  disableCryptoMethod(t, "randomUUID");
+  const h = harness({ insertThrowsAfterCommit: true });
+  let stored;
+  const saved = await saveMemory(h.client, makeInput(), undefined, (pending) => { stored = JSON.stringify(pending); });
+  const pending = readPendingMemoryUpload({ getItem: () => stored });
+  assert.equal(pending.id, saved.id);
+  assert.deepEqual(await recoverMemorySave(h.client, pending), { saved: true, id: saved.id });
+  assert.equal(h.objects.size, 1);
+  assert.equal(h.calls.filter((call) => call.method === "DELETE").length, 0);
 });

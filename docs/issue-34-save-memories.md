@@ -73,7 +73,7 @@ INSERTにSELECTを連結していないため、登録成功後の読み取り�
 
 ## 自動テスト
 
-`npm test`：23件成功。実アカウント・実画像・実DBへの書き込みなし。
+`npm test`：29件成功。実アカウント・実画像・実DBへの書き込みなし。以下のiPhone互換性の回帰テスト6件を含む。
 
 `npm run lint`、`npx tsc --noEmit`、`npm run build` も成功。最初のビルドは `.next` の生成物不整合で失敗したため、生成キャッシュのみを削除してクリーンビルドを実施した。その後、同じプロジェクトの既存開発サーバーが起動したままだったことを確認し、対象プロセスだけを再起動した。ソースや環境設定はその対応で変更していない。
 
@@ -89,6 +89,17 @@ INSERTにSELECTを連結していないため、登録成功後の読み取り�
 - アップロード前の復旧情報記録と同じタブでの復旧、復旧情報を記録できなければアップロードしない
 
 このテストのユーザー絞り込みは**リクエスト内容の検証**であり、実環境のRLS検証の代わりではない。
+
+### iPhoneのローカルIP接続でのID生成エラー
+
+`crypto.randomUUID is not a function` は画像の形式やStorageの拒否ではなく、アップロード前のID生成で発生する。`randomUUID()` はセキュアコンテキスト限定のため、PCの `localhost` では動いても、iPhoneからHTTPでLAN内IPへアクセスすると利用できない場合がある。
+
+`randomUUID()` がない場合は `crypto.getRandomValues()` の16バイトからバージョン・variantを正しく設定したUUID v4を生成する。`Math.random()` や日時による代用はしない。どちらも使えなければ、日本語の案内を表示してアップロード前に停止する。保存パス・DBスキーマ・RLS・画像形式は変更しない。
+
+回帰テストでは `randomUUID` を未定義にして元のエラーを再現したうえで、UUIDのゼロ埋め・バージョン・variant、新しい乱数の使用、保存・補償削除・復旧が機能することと、安全な乱数がなければ送信しないことを検証する。iPhone実機での再テストは別途必要。
+
+HTTP対応はローカル検証の互換性対策であり、実際の写真・認証情報を扱う共有環境はHTTPSで利用する。
+仕様：[MDN randomUUID](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID)、[MDN getRandomValues](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)。
 
 ## 実環境で必要な確認（未実施）
 
