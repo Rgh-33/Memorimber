@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { MemoryCard } from "@/components/memory-card";
+import { GrowingTree } from "@/components/growing-tree";
 import type { Memory } from "@/lib/types";
-import type { MemoryFruitTone, MemoryTreeItem } from "@/lib/tree-data";
+import type { MemoryTreeItem } from "@/lib/tree-data";
 
 const LONG_PRESS_MS = 120;
 const GESTURE_SAMPLE_DISTANCE_PX = 14;
@@ -22,37 +21,13 @@ const WORD_MAX_OPACITY = 0.96;
 const WORD_OPACITY_DISTANCE_PX = 340;
 
 const WORD_SLOTS = [
-  { left: "0%", top: 8, rotate: -3, scale: 0.92, driftX: 4, delay: -1.2 },
-  { left: "70%", top: 20, rotate: 3, scale: 0.95, driftX: -4, delay: -2.7 },
-  { left: "18%", top: 76, rotate: -2, scale: 0.98, driftX: 5, delay: -0.5 },
-  { left: "0%", top: 142, rotate: -3, scale: 1.01, driftX: 4, delay: -3.4 },
-  { left: "68%", top: 150, rotate: 3, scale: 1.02, driftX: -5, delay: -2 },
-  { left: "67%", top: 235, rotate: 2, scale: 1.06, driftX: -4, delay: -4.1 },
-  { left: "39%", top: 4, rotate: 2, scale: 0.9, driftX: -3, delay: -3.8 },
-  { left: "49%", top: 74, rotate: 3, scale: 0.97, driftX: -4, delay: -1.8 },
-  { left: "79%", top: 92, rotate: 3, scale: 0.95, driftX: -3, delay: -4.6 },
-  { left: "34%", top: 145, rotate: 1, scale: 1, driftX: 3, delay: -0.9 },
-  { left: "13%", top: 224, rotate: -3, scale: 1.03, driftX: 4, delay: -3.1 },
-  { left: "44%", top: 233, rotate: 2, scale: 1.05, driftX: -3, delay: -1.4 },
+  { left: "1%", top: 8, rotate: -9, scale: 0.94, driftX: 8, delay: -1.2 },
+  { left: "57%", top: 18, rotate: 7, scale: 0.96, driftX: -7, delay: -2.7 },
+  { left: "8%", top: 66, rotate: -4, scale: 0.98, driftX: 9, delay: -0.5 },
+  { left: "53%", top: 80, rotate: 9, scale: 0.94, driftX: -8, delay: -3.4 },
+  { left: "0%", top: 131, rotate: -7, scale: 0.96, driftX: 7, delay: -2 },
+  { left: "60%", top: 141, rotate: 5, scale: 0.98, driftX: -8, delay: -4.1 },
 ] as const;
-
-const FRUIT_SLOTS = [
-  { left: "27%", top: "13%" },
-  { left: "66%", top: "15%" },
-  { left: "49%", top: "29%" },
-  { left: "76%", top: "36%" },
-  { left: "23%", top: "43%" },
-  { left: "66%", top: "47%" },
-] as const;
-
-const TONE_CLASS: Record<MemoryFruitTone, string> = {
-  blue: "memory-fruit--blue",
-  mint: "memory-fruit--mint",
-  peach: "memory-fruit--peach",
-  lavender: "memory-fruit--lavender",
-  lemon: "memory-fruit--lemon",
-  rose: "memory-fruit--rose",
-};
 
 type HarvestedTreeItem = Extract<MemoryTreeItem, { stage: "harvested" }>;
 
@@ -359,47 +334,27 @@ function FloatingWord({
           <span key={index} className={`memory-word-shake-particle ${index < activeParticleCount ? "memory-word-shake-particle--active" : ""}`} />
         ))}
       </span>
-      <span className="memory-floating-word-label">{item.word}</span>
+      <span className="konoha-petal-arrive">
+        <svg className="konoha-word-petal" viewBox="0 0 140 65" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M3 43 C0 20 18 1 47 5 Q65 -2 77 8 C102 -1 133 11 137 32 C145 54 109 63 82 59 Q39 68 3 43Z" />
+          <path d="M9 42 Q64 26 128 34" fill="none" stroke="currentColor" strokeOpacity=".08" />
+        </svg>
+        <span className="memory-floating-word-label">{item.word}</span>
+      </span>
     </button>
   );
 }
 
-function Fruit({ item }: { item: MemoryTreeItem }) {
-  if (item.stage === "harvested") return null;
-
-  const slot = FRUIT_SLOTS[item.fruitSlot ?? 0] ?? FRUIT_SLOTS[0];
-  const toneClass = TONE_CLASS[item.fruitTone ?? "blue"];
-  const className = `memory-fruit-hit-area ${item.stage === "quiz-ready" ? "memory-fruit-hit-area--ready" : "memory-fruit-hit-area--growing"}`;
-  const fruit = <span aria-hidden="true" className={`memory-fruit ${toneClass}`} />;
-  const style: SceneStyle = {
-    ...slot,
-    "--fruit-growth": item.growth,
-    "--fruit-width": `${19 + 8 * item.growth}px`,
-    "--fruit-height": `${22 + 8 * item.growth}px`,
-  };
-
-  if (item.stage === "quiz-ready" && item.href) {
-    return (
-      <Link href={item.href} className={className} style={style} aria-label="育った実で思い出クイズに挑戦">
-        {fruit}
-      </Link>
-    );
-  }
-
-  return (
-    <button type="button" className={className} style={style} disabled aria-label={`成長中の思い出の実（${Math.round(item.growth * 100)}%）`}>
-      {fruit}
-    </button>
-  );
-}
-
-export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memories: Memory[] }) {
+export function MemoryTree({ items, petals, memories, count, month }: { items: MemoryTreeItem[]; petals: HarvestedTreeItem[]; memories: Memory[]; count: number; month: string }) {
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const treeArtRef = useRef<HTMLDivElement>(null);
-  const harvested = items.filter((item): item is HarvestedTreeItem => item.stage === "harvested");
-  const fruitItems = items.filter((item) => item.stage !== "harvested" && item.fruitSlot !== undefined);
+  const harvested = petals;
+  const [wordPage, setWordPage] = useState(0);
+  const wordPages = Math.max(1, Math.ceil(harvested.length / WORD_SLOTS.length));
+  const currentWordPage = Math.min(wordPage, wordPages - 1);
+  const shownWords = harvested.slice().reverse().slice(currentWordPage * WORD_SLOTS.length, (currentWordPage + 1) * WORD_SLOTS.length);
   const memoriesById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory])), [memories]);
   const relatedMemoryIds = revealedItem?.relatedMemoryIds?.length
     ? revealedItem.relatedMemoryIds
@@ -424,12 +379,12 @@ export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memor
   }, [revealedItem]);
 
   return (
-    <section className="memory-tree-scene" aria-label="思い出の木">
+    <section className="memory-tree-scene konoha-scene" data-has-petals={harvested.length > 0} aria-label="思い出の木">
       <div className="memory-word-field" aria-label="収穫した思い出の言葉">
-        {harvested.map((item) => (
+        {shownWords.map((item, index) => (
           <FloatingWord
             key={item.id}
-            item={item}
+            item={{ ...item, wordSlot: index }}
             isDimmed={activeWordId !== null && activeWordId !== item.id}
             getTreeRect={getTreeRect}
             onInteractionChange={setActiveWordId}
@@ -438,16 +393,13 @@ export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memor
         ))}
       </div>
 
-      <div ref={treeArtRef} className="memory-tree-art">
-        <Image
-          src="/images/memory-tree-base-transparent-v2.png"
-          alt="淡い水彩で描かれた思い出の木"
-          width={887}
-          height={1774}
-          priority
-          className="h-auto w-full"
-        />
-        {fruitItems.map((item) => <Fruit key={item.id} item={item} />)}
+      {wordPages > 1 && <div className="konoha-word-pages konoha-tree-pages" aria-label="花びらの切り替え">
+        <button type="button" disabled={currentWordPage === 0} onClick={() => setWordPage(currentWordPage - 1)} aria-label="前の花びら"><ChevronLeft size={14} /></button>
+        <span>{currentWordPage + 1} / {wordPages}</span>
+        <button type="button" disabled={currentWordPage === wordPages - 1} onClick={() => setWordPage(currentWordPage + 1)} aria-label="次の花びら"><ChevronRight size={14} /></button>
+      </div>}
+      <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
+        <GrowingTree items={items} count={count} month={month} />
       </div>
 
       <p className="sr-only" aria-live="polite">

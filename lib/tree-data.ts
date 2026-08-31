@@ -5,6 +5,7 @@ export type MemoryFruitTone = "blue" | "mint" | "peach" | "lavender" | "lemon" |
 type MemoryTreeItemBase = {
   id: string;
   memoryId?: string;
+  growthStage?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
 };
 
 export type MemoryTreeItem =

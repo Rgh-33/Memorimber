@@ -3,30 +3,52 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Grid3X3, HelpCircle, RotateCcw, X } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { QUIZ_QUESTIONS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { useTree } from "@/lib/tree-context";
+import { memoryQuestion } from "@/lib/tree-growth";
 
 export default function QuizPage() {
+  return <Suspense fallback={<div className="page-pad"><AppHeader /></div>}><QuizContent /></Suspense>;
+}
+
+function QuizContent() {
+  const search = useSearchParams();
+  return <QuizSession key={search.get("memory") ?? "quiz"} memoryId={search.get("memory")} />;
+}
+
+function QuizSession({ memoryId }: { memoryId: string | null }) {
   const { getMemory } = useMemories();
+  const tree = useTree();
+  const router = useRouter();
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const question = QUIZ_QUESTIONS[questionIndex];
-  const memory = getMemory(question.memoryId);
+  const [word, setWord] = useState("");
+  const ripe = tree.items.filter((item) => item.stage === "quiz-ready");
+  const selectedId = memoryId ?? ripe[questionIndex % Math.max(1, ripe.length)]?.memoryId;
+  const fruit = ripe.find((item) => item.memoryId === selectedId);
+  const memory = selectedId ? tree.memories.find((item) => item.id === selectedId) : getMemory(QUIZ_QUESTIONS[questionIndex % QUIZ_QUESTIONS.length].memoryId);
+  const question = selectedId && memory ? memoryQuestion(memory) : QUIZ_QUESTIONS[questionIndex % QUIZ_QUESTIONS.length];
+  const questionCount = memoryId ? 1 : ripe.length || QUIZ_QUESTIONS.length;
   const answered = confirmed;
   const correct = selected === question.correctChoice;
 
-  if (!memory) return <div className="page-pad"><AppHeader /><p className="mt-10 text-center text-sm">クイズの思い出が見つかりません。</p></div>;
+  if (!tree.ready) return <div className="page-pad"><AppHeader /></div>;
+  if (!memory || (memoryId && !fruit)) return <div className="page-pad"><AppHeader /><p className="mt-10 text-center text-sm">クイズの思い出が見つかりません。</p></div>;
 
   const nextQuestion = () => {
-    setQuestionIndex((index) => (index + 1) % QUIZ_QUESTIONS.length);
+    if (memoryId) router.push("/quiz");
+    setQuestionIndex((index) => (index + 1) % questionCount);
     setSelected(null);
     setConfirmed(false);
     setShowHint(false);
+    setWord("");
   };
 
   return (
@@ -34,7 +56,7 @@ export default function QuizPage() {
       <AppHeader />
       <section className="pt-7 text-center">
         <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">思い出クイズ</h1>
-        <p className="mt-4 text-[11px] font-medium tracking-[0.14em] text-coral">QUESTION {questionIndex + 1} / {QUIZ_QUESTIONS.length}</p>
+        <p className="mt-4 text-[11px] font-medium tracking-[0.14em] text-coral">QUESTION {questionIndex + 1} / {questionCount}</p>
         <h2 className="mt-2 font-sans text-lg font-medium tracking-[0.05em] text-ink">{question.question}</h2>
       </section>
 
@@ -66,6 +88,13 @@ export default function QuizPage() {
         <div className="mt-3 rounded-xl border border-line bg-paper p-4">
           <p className="font-medium text-ink">{correct ? "正解！ 記憶がつながったね。" : `正解は「${question.correctChoice}」です。`}</p>
           <p className="mt-1 text-xs leading-5 text-ink/55">{memory.caption}</p>
+          {fruit && <form className="konoha-harvest-form" onSubmit={(event) => {
+            event.preventDefault();
+            if (tree.harvest(memory.id, word)) router.push("/");
+          }}>
+            <input value={word} onChange={(event) => setWord([...event.target.value].slice(0, 12).join(""))} placeholder="一言を残す" aria-label="花びらに書く単語" required autoComplete="off" />
+            <button type="submit" disabled={!word.trim()} aria-label="この言葉で収穫する"><Check size={18} /></button>
+          </form>}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link href={`/memory/${memory.id}`} className="rounded-lg bg-coral px-3 py-3 text-center text-xs font-medium text-white">思い出を見る</Link>
             <button type="button" onClick={nextQuestion} className="flex items-center justify-center gap-1 rounded-lg border border-line bg-ivory px-3 py-3 text-xs font-medium text-ink"><RotateCcw size={14} /> 次の問題</button>

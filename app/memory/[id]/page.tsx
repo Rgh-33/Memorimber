@@ -8,22 +8,25 @@ import { MemoryCard } from "@/components/memory-card";
 import { MemoryPhoto } from "@/components/memory-photo";
 import { formatJapaneseDate, SAMPLE_MEMORIES } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { useTree } from "@/lib/tree-context";
 
 export default function MemoryDetailPage() {
   const params = useParams<{ id: string }>();
   const { memories, getMemory, getRelatedMemories, isLoading, error, warning, refreshMemories } = useMemories();
-  const memory = getMemory(params.id);
+  const tree = useTree();
+  const previewMemory = tree.preview ? tree.memories.find((item) => item.id === params.id) : undefined;
+  const memory = previewMemory ?? getMemory(params.id);
   const sample = SAMPLE_MEMORIES.some((item) => item.id === params.id);
 
-  if (!sample && (isLoading || error)) return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6">{isLoading ? <p role="status">思い出を読み込んでいます…</p> : <div role="alert">{error}<button type="button" onClick={() => void refreshMemories()} className="mt-3 block w-full text-coral underline">再読み込み</button></div>}</div></div>;
+  if (!sample && !previewMemory && (isLoading || error)) return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6">{isLoading ? <p role="status">思い出を読み込んでいます…</p> : <div role="alert">{error}<button type="button" onClick={() => void refreshMemories()} className="mt-3 block w-full text-coral underline">再読み込み</button></div>}</div></div>;
 
   if (!memory) return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center"><p className="font-medium">思い出が見つかりません</p><Link href="/post" className="mt-4 inline-block rounded-lg bg-coral px-5 py-3 text-xs font-medium text-white">思い出を残す</Link></div></div>;
 
-  const sorted = [...(sample ? SAMPLE_MEMORIES : memories)].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...(previewMemory ? tree.memories : sample ? SAMPLE_MEMORIES : memories)].sort((a, b) => a.date.localeCompare(b.date));
   const currentIndex = sorted.findIndex((item) => item.id === memory.id);
   const previous = currentIndex > 0 ? sorted[currentIndex - 1] : undefined;
   const next = currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : undefined;
-  const related = getRelatedMemories(memory);
+  const related = previewMemory ? tree.memories.filter((item) => item.id !== memory.id && item.tags.some((tag) => memory.tags.includes(tag))).slice(0, 3) : getRelatedMemories(memory);
 
   return (
     <div className="page-pad">
