@@ -1,12 +1,10 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { MemoryCard } from "@/components/memory-card";
 import type { Memory } from "@/lib/types";
-import type { MemoryFruitTone, MemoryTreeItem } from "@/lib/tree-data";
+export type FloatingMemoryItem = { id: string; memoryId: string; word: string; wordSlot: number; relatedMemoryIds?: string[] };
 
 const LONG_PRESS_MS = 120;
 const GESTURE_SAMPLE_DISTANCE_PX = 14;
@@ -22,39 +20,20 @@ const WORD_MAX_OPACITY = 0.96;
 const WORD_OPACITY_DISTANCE_PX = 340;
 
 const WORD_SLOTS = [
-  { left: "0%", top: 8, rotate: -3, scale: 0.92, driftX: 4, delay: -1.2 },
-  { left: "70%", top: 20, rotate: 3, scale: 0.95, driftX: -4, delay: -2.7 },
-  { left: "18%", top: 76, rotate: -2, scale: 0.98, driftX: 5, delay: -0.5 },
-  { left: "0%", top: 142, rotate: -3, scale: 1.01, driftX: 4, delay: -3.4 },
-  { left: "68%", top: 150, rotate: 3, scale: 1.02, driftX: -5, delay: -2 },
-  { left: "67%", top: 235, rotate: 2, scale: 1.06, driftX: -4, delay: -4.1 },
-  { left: "39%", top: 4, rotate: 2, scale: 0.9, driftX: -3, delay: -3.8 },
-  { left: "49%", top: 74, rotate: 3, scale: 0.97, driftX: -4, delay: -1.8 },
-  { left: "79%", top: 92, rotate: 3, scale: 0.95, driftX: -3, delay: -4.6 },
-  { left: "34%", top: 145, rotate: 1, scale: 1, driftX: 3, delay: -0.9 },
-  { left: "13%", top: 224, rotate: -3, scale: 1.03, driftX: 4, delay: -3.1 },
-  { left: "44%", top: 233, rotate: 2, scale: 1.05, driftX: -3, delay: -1.4 },
+  { left: "5%", top: 38, rotate: -3, scale: 0.92, driftX: 4, delay: -1.2 },
+  { left: "71%", top: 71, rotate: 3, scale: 0.95, driftX: -4, delay: -2.7 },
+  { left: "32%", top: 3, rotate: -2, scale: 0.98, driftX: 5, delay: -0.5 },
+  { left: "1%", top: 153, rotate: -3, scale: 1.01, driftX: 4, delay: -3.4 },
+  { left: "79%", top: 185, rotate: 3, scale: 1.02, driftX: -5, delay: -2 },
+  { left: "78%", top: 270, rotate: 2, scale: 1.06, driftX: -4, delay: -4.1 },
+  { left: "9%", top: 250, rotate: 2, scale: 0.9, driftX: -3, delay: -3.8 },
+  { left: "37%", top: 65, rotate: 3, scale: 0.97, driftX: -4, delay: -1.8 },
+  { left: "76%", top: 12, rotate: 3, scale: 0.95, driftX: -3, delay: -4.6 },
+  { left: "3%", top: 103, rotate: 1, scale: 1, driftX: 3, delay: -0.9 },
+  { left: "4%", top: 335, rotate: -3, scale: 1.03, driftX: 4, delay: -3.1 },
+  { left: "77%", top: 360, rotate: 2, scale: 1.05, driftX: -3, delay: -1.4 },
 ] as const;
-
-const FRUIT_SLOTS = [
-  { left: "27%", top: "13%" },
-  { left: "66%", top: "15%" },
-  { left: "49%", top: "29%" },
-  { left: "76%", top: "36%" },
-  { left: "23%", top: "43%" },
-  { left: "66%", top: "47%" },
-] as const;
-
-const TONE_CLASS: Record<MemoryFruitTone, string> = {
-  blue: "memory-fruit--blue",
-  mint: "memory-fruit--mint",
-  peach: "memory-fruit--peach",
-  lavender: "memory-fruit--lavender",
-  lemon: "memory-fruit--lemon",
-  rose: "memory-fruit--rose",
-};
-
-type HarvestedTreeItem = Extract<MemoryTreeItem, { stage: "harvested" }>;
+type HarvestedTreeItem = FloatingMemoryItem;
 
 type SceneStyle = CSSProperties & {
   "--word-current-opacity"?: number;
@@ -364,42 +343,10 @@ function FloatingWord({
   );
 }
 
-function Fruit({ item }: { item: MemoryTreeItem }) {
-  if (item.stage === "harvested") return null;
-
-  const slot = FRUIT_SLOTS[item.fruitSlot ?? 0] ?? FRUIT_SLOTS[0];
-  const toneClass = TONE_CLASS[item.fruitTone ?? "blue"];
-  const className = `memory-fruit-hit-area ${item.stage === "quiz-ready" ? "memory-fruit-hit-area--ready" : "memory-fruit-hit-area--growing"}`;
-  const fruit = <span aria-hidden="true" className={`memory-fruit ${toneClass}`} />;
-  const style: SceneStyle = {
-    ...slot,
-    "--fruit-growth": item.growth,
-    "--fruit-width": `${19 + 8 * item.growth}px`,
-    "--fruit-height": `${22 + 8 * item.growth}px`,
-  };
-
-  if (item.stage === "quiz-ready" && item.href) {
-    return (
-      <Link href={item.href} className={className} style={style} aria-label="育った実で思い出クイズに挑戦">
-        {fruit}
-      </Link>
-    );
-  }
-
-  return (
-    <button type="button" className={className} style={style} disabled aria-label={`成長中の思い出の実（${Math.round(item.growth * 100)}%）`}>
-      {fruit}
-    </button>
-  );
-}
-
-export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memories: Memory[] }) {
+export function MemoryWords({ items, memories, getAnchorRect }: { items: FloatingMemoryItem[]; memories: Memory[]; getAnchorRect: () => DOMRect | null }) {
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const treeArtRef = useRef<HTMLDivElement>(null);
-  const harvested = items.filter((item): item is HarvestedTreeItem => item.stage === "harvested");
-  const fruitItems = items.filter((item) => item.stage !== "harvested" && item.fruitSlot !== undefined);
   const memoriesById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory])), [memories]);
   const relatedMemoryIds = revealedItem?.relatedMemoryIds?.length
     ? revealedItem.relatedMemoryIds
@@ -410,7 +357,6 @@ export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memor
     const memory = memoriesById.get(id);
     return memory ? [memory] : [];
   });
-  const getTreeRect = useCallback(() => treeArtRef.current?.getBoundingClientRect() ?? null, []);
 
   useEffect(() => {
     if (!revealedItem) return;
@@ -424,30 +370,18 @@ export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memor
   }, [revealedItem]);
 
   return (
-    <section className="memory-tree-scene" aria-label="思い出の木">
-      <div className="memory-word-field" aria-label="収穫した思い出の言葉">
-        {harvested.map((item) => (
+    <>
+      <div className="memory-word-field tea-word-field" aria-label="味わった思い出の言葉">
+        {items.map((item) => (
           <FloatingWord
             key={item.id}
             item={item}
             isDimmed={activeWordId !== null && activeWordId !== item.id}
-            getTreeRect={getTreeRect}
+            getTreeRect={getAnchorRect}
             onInteractionChange={setActiveWordId}
             onReveal={setRevealedItem}
           />
         ))}
-      </div>
-
-      <div ref={treeArtRef} className="memory-tree-art">
-        <Image
-          src="/images/memory-tree-base-transparent-v2.png"
-          alt="淡い水彩で描かれた思い出の木"
-          width={887}
-          height={1774}
-          priority
-          className="h-auto w-full"
-        />
-        {fruitItems.map((item) => <Fruit key={item.id} item={item} />)}
       </div>
 
       <p className="sr-only" aria-live="polite">
@@ -484,6 +418,6 @@ export function MemoryTree({ items, memories }: { items: MemoryTreeItem[]; memor
           </section>
         </div>
       )}
-    </section>
+    </>
   );
 }

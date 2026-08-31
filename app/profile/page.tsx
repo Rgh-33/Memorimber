@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { CalendarDays, Camera, Check, ChevronRight, Images, Lightbulb, Medal, Pencil, Sprout, UserRound, X } from "lucide-react";
+import { CalendarDays, Camera, Check, ChevronRight, CupSoda, Images, Lightbulb, Medal, Pencil, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type Ref } from "react";
 import { AppHeader } from "@/components/app-header";
 import { useMemories } from "@/lib/memories-context";
@@ -16,11 +16,11 @@ import {
 } from "@/lib/profile-data";
 import { useProcessing } from "@/lib/processing-context";
 import { useProfile } from "@/lib/profile-context";
-import { TREE_PREVIEW_ITEMS } from "@/lib/tree-data";
+import { useTea } from "@/lib/tea-context";
 
 const MEDAL_ICONS = {
   photo: Images,
-  fruit: Sprout,
+  fruit: CupSoda,
   quiz: Lightbulb,
   calendar: CalendarDays,
 } as const;
@@ -56,6 +56,7 @@ function LevelRequirementCard({
 
 export default function ProfilePage() {
   const { memories } = useMemories();
+  const tea = useTea();
   const { nickname, avatarDataUrl, setNickname, setAvatarDataUrl } = useProfile();
   const { startProcessing, stopProcessing } = useProcessing();
   const [selectedMedalId, setSelectedMedalId] = useState(PROFILE_MEDALS[0].id);
@@ -67,12 +68,12 @@ export default function ProfilePage() {
 
   const stats = useMemo<ProfileActivityStats>(() => ({
     uploadedPhotos: memories.length,
-    harvestedFruits: TREE_PREVIEW_ITEMS.filter((item) => item.stage === "harvested").length,
-    correctQuizAnswers: 6,
+    harvestedFruits: tea.state.sips.length,
+    correctQuizAnswers: tea.state.sips.filter((sip) => sip.correct).length,
     activeMonths: new Set(memories.map((memory) => memory.date.slice(0, 7))).size,
     sharedMemories: 1,
     friendQuizSessions: 1,
-  }), [memories]);
+  }), [memories, tea.state.sips]);
   const levelProgress = getProfileLevelProgress(stats, PREVIEW_LEVEL_ACTIVITY_BASELINES);
   const selectedMedal = PROFILE_MEDALS.find((medal) => medal.id === selectedMedalId) ?? PROFILE_MEDALS[0];
   const allLevelRequirements: Array<ProfileLevelRequirement | null> = [null, ...PROFILE_LEVEL_REQUIREMENTS];
@@ -132,6 +133,7 @@ export default function ProfilePage() {
         <h1 className="mt-2 text-[25px] font-semibold tracking-[0.1em] text-ink">プロフィール</h1>
       </section>
 
+      {tea.isPreview && <p className="tea-preview-notice">タピオカ・クイズの記録は、試作用のサンプルです。</p>}
       <section className="mt-7 px-1">
         <label htmlFor="profile-avatar" className="group relative z-10 mx-auto block w-fit cursor-pointer text-center">
           <span className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2 border-coral bg-paper text-coral shadow-card ring-4 ring-coral/10">

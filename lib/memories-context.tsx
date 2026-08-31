@@ -14,6 +14,7 @@ type MemoriesContextValue = {
   error: string | null;
   warning: string | null;
   isDemo: boolean;
+  ownerId: string | null;
   refreshMemories: () => Promise<void>;
   getMemory: (id: string) => Memory | undefined;
   getMonthMemories: (monthKey: string) => Memory[];
@@ -30,6 +31,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(!isDemo);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [ownerId, setOwnerId] = useState<string | null>(isDemo ? "demo" : null);
   const requestVersion = useRef(0);
 
   const refreshMemories = useCallback(async () => {
@@ -41,10 +43,12 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
       const result = await loadMemories(createClient());
       if (version !== requestVersion.current) return;
       setMemories(result.memories);
+      setOwnerId(result.userId);
       setWarning(result.warning);
     } catch (cause) {
       if (version !== requestVersion.current) return;
       setMemories([]);
+      setOwnerId(null);
       setWarning(null);
       setError(cause instanceof Error ? cause.message : "思い出を読み込めませんでした。");
     } finally {
@@ -58,6 +62,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
     const clearPrivateData = () => {
       invalidateRequests();
       setMemories([]);
+      setOwnerId(null);
       setIsLoading(false);
       setError(null);
       setWarning(null);
@@ -94,7 +99,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<MemoriesContextValue>(
     () => ({
       memories,
-      isLoading, error, warning, isDemo, refreshMemories,
+      isLoading, error, warning, isDemo, ownerId, refreshMemories,
       // Tree/quiz integration is a separate issue: existing prototype links
       // still resolve their sample IDs without mixing samples into the album.
       getMemory: (id) => memories.find((memory) => memory.id === id) ?? SAMPLE_MEMORIES.find((memory) => memory.id === id),
@@ -119,7 +124,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
       // This menu action must never delete persisted photos or database rows.
       resetDemo: () => { if (isDemo) setMemories(SAMPLE_MEMORIES); },
     }),
-    [memories, isLoading, error, warning, isDemo, refreshMemories],
+    [memories, isLoading, error, warning, isDemo, ownerId, refreshMemories],
   );
 
   return <MemoriesContext.Provider value={value}>{children}</MemoriesContext.Provider>;

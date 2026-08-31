@@ -1,6 +1,9 @@
 export type Memory = {
   id: string;
   date: string;
+  createdAt?: string;
+  /** Original sample detail for repeated, isolated preview pearls. Not stored in DB. */
+  sourceMemoryId?: string;
   imageUrl: string;
   imagePath?: string;
   caption: string;

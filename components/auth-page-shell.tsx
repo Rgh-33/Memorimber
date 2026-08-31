@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sprout } from "lucide-react";
+import { CupSoda } from "lucide-react";
 
 export function AuthPageShell({
   title,
@@ -17,7 +17,7 @@ export function AuthPageShell({
   return (
     <div className="flex min-h-screen flex-col px-5 py-8">
       <Link href="/login" className="mx-auto flex items-center gap-2 text-coral" aria-label="Memorimberログインへ">
-        <Sprout size={29} strokeWidth={1.7} />
+        <CupSoda size={29} strokeWidth={1.5} />
         <span className="text-base font-semibold">Memorimber</span>
       </Link>
 

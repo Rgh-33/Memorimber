@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, Images, MoreHorizontal, Plus, Trees } from "lucide-react";
+import { CircleHelp, CupSoda, Images, MoreHorizontal, Plus } from "lucide-react";
 
 const items = [
-  { href: "/", label: "木", icon: Trees },
+  { href: "/", label: "カップ", icon: CupSoda },
   { href: "/album", label: "アルバム", icon: Images },
   { href: "/post", label: "追加", icon: Plus, primary: true },
   { href: "/quiz", label: "クイズ", icon: CircleHelp },

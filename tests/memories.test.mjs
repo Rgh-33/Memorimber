@@ -222,6 +222,7 @@ test("save then reload reads durable rows and private signed URLs; other owners 
   const saved = await saveMemory(h.client, makeInput());
   const result = await loadMemories(h.client);
   assert.equal(result.memories.length, 1);
+  assert.equal(result.userId, USER_ID);
   assert.equal(result.memories[0].id, saved.id);
   assert.equal(result.memories[0].caption, "帰り道の思い出");
   assert.match(result.memories[0].imageUrl, /\/object\/sign\/memory-images\//);
@@ -229,6 +230,15 @@ test("save then reload reads durable rows and private signed URLs; other owners 
   const signRequest = h.calls.find((call) => call.url?.pathname.includes("/object/sign/"));
   assert.equal(signRequest.body.expiresIn, 3600);
   assert.equal(result.warning, null);
+});
+
+test("loaded memories preserve upload timestamps for the tapioca FIFO", async () => {
+  const h = harness({ rows: [{ id: "old-photo-new-upload", user_id: USER_ID, image_path: `${USER_ID}/photo.jpg`, memory_date: "2020-01-01", created_at: "2026-08-31T12:34:56Z", caption: "昔の写真", people: [], tags: [] }] });
+  const result = await loadMemories(h.client);
+  assert.equal(result.memories[0].createdAt, "2026-08-31T12:34:56Z");
+  assert.equal(result.memories[0].date, "2020-01-01");
+  const read = h.calls.find((call) => call.url?.pathname === "/rest/v1/memories");
+  assert.match(read.url.searchParams.get("select"), /created_at/);
 });
 
 test("signed-URL failure still returns saved metadata with a warning", async () => {

@@ -209,17 +209,17 @@ export async function saveMemory(
 }
 
 type MemoryRow = {
-  id: string; image_path: string; caption: string; memory_date: string; people: string[]; tags: string[];
+  id: string; image_path: string; caption: string; memory_date: string; created_at?: string; people: string[]; tags: string[];
 };
 
 /** RLS remains authoritative; the owner filter is additional query scoping. */
-export async function loadMemories(client: SupabaseClient): Promise<{ memories: Memory[]; warning: string | null }> {
+export async function loadMemories(client: SupabaseClient): Promise<{ memories: Memory[]; warning: string | null; userId: string }> {
   const user = await requireUser(client);
   const rows: MemoryRow[] = [];
   const pageSize = 100;
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await client.from("memories")
-      .select("id, image_path, caption, memory_date, people, tags")
+      .select("id, image_path, caption, memory_date, created_at, people, tags")
       .eq("user_id", user.id).order("memory_date", { ascending: false })
       .order("created_at", { ascending: false }).order("id", { ascending: false })
       .range(offset, offset + pageSize - 1);
@@ -247,9 +247,10 @@ export async function loadMemories(client: SupabaseClient): Promise<{ memories: 
   }
   if (urls.size !== rows.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
   return {
+    userId: user.id,
     memories: rows.map((row) => ({
       id: row.id, imagePath: row.image_path, imageUrl: urls.get(row.image_path) ?? "",
-      caption: row.caption, date: row.memory_date, people: row.people, tags: row.tags,
+      caption: row.caption, date: row.memory_date, createdAt: row.created_at, people: row.people, tags: row.tags,
     })),
     warning,
   };

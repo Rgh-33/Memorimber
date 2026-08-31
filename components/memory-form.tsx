@@ -4,7 +4,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronRight, ImagePlus, Sprout, Tag, Users } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, CupSoda, ImagePlus, Tag, Users } from "lucide-react";
 import { useMemories } from "@/lib/memories-context";
 import { useProcessing } from "@/lib/processing-context";
 import { createClient } from "@/lib/supabase/client";
@@ -167,11 +167,11 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} aria-busy={busy} className={`rounded-[22px] border border-line bg-ivory p-3 shadow-card ${compact ? "" : "mt-5"}`}>
-      {savedId && <div role="status" className="mb-3 rounded-xl border border-coral/30 bg-coral/10 p-3 text-sm text-ink">思い出を保存しました。<Link href={`/memory/${savedId}`} className="mt-2 block font-medium text-coral underline">保存した思い出を見る</Link></div>}
+      {savedId && <div role="status" className="mb-3 rounded-xl border border-coral/30 bg-coral/10 p-3 text-sm text-ink">思い出を保存しました。カップに、新しいひと粒を。<Link href="/" className="mt-2 block font-medium text-coral underline">カップでひと粒を迎える</Link><Link href={`/memory/${savedId}`} className="mt-2 block text-xs text-ink/70 underline">保存した思い出を見る</Link></div>}
       {!configured && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">Supabaseの接続設定後、ログインすると投稿できます。この画面での一時保存は行いません。</p>}
       <fieldset disabled={busy || Boolean(pending) || !configured} className="min-w-0 disabled:opacity-60">
       <div className="mb-2 flex items-center gap-2 px-1 pb-1">
-        <Sprout size={21} className="text-coral" strokeWidth={1.7} />
+        <CupSoda size={21} className="text-coral" strokeWidth={1.5} />
         <p className="font-sans text-base tracking-[0.08em] text-ink">今日の思い出を残す</p>
       </div>
 

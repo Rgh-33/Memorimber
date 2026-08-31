@@ -38,7 +38,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
   return (
     <AuthPageShell
       title="ログイン"
-      description="登録したメールアドレスとパスワードで、思い出の木へ戻ります。"
+      description="登録したメールアドレスとパスワードで、思い出のカップへ戻ります。"
       notice={notice}
       footer={<>はじめての方は <Link href={`/signup?next=${encodeURIComponent(next)}`} className="font-semibold text-coral hover:underline">新規登録</Link></>}
     >

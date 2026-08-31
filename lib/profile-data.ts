@@ -36,11 +36,11 @@ export type ProfileMedal = {
 
 const LEVEL_ADDITIONAL_CONDITIONS: Partial<Record<number, LevelAdditionalCondition>> = {
   10: { metric: "correctQuizAnswers", target: 3, label: "クイズに3問正解", scope: "since-previous-level" },
-  11: { metric: "harvestedFruits", target: 5, label: "木の実を5個収穫", scope: "since-previous-level" },
+  11: { metric: "harvestedFruits", target: 5, label: "思い出のタピオカを5粒味わう", scope: "since-previous-level" },
   12: { metric: "sharedMemories", target: 1, label: "思い出を1回共有", scope: "since-previous-level" },
   13: { metric: "friendQuizSessions", target: 1, label: "友達とクイズを1回", scope: "since-previous-level" },
   14: { metric: "correctQuizAnswers", target: 10, label: "クイズに10問正解", scope: "since-previous-level" },
-  15: { metric: "harvestedFruits", target: 10, label: "木の実を10個収穫", scope: "since-previous-level" },
+  15: { metric: "harvestedFruits", target: 10, label: "思い出のタピオカを10粒味わう", scope: "since-previous-level" },
   16: { metric: "sharedMemories", target: 3, label: "思い出を3回共有", scope: "since-previous-level" },
   17: { metric: "friendQuizSessions", target: 2, label: "友達とクイズを2回", scope: "since-previous-level" },
   18: { metric: "correctQuizAnswers", target: 20, label: "クイズに20問正解", scope: "since-previous-level" },
@@ -79,9 +79,9 @@ export const PROFILE_MEDALS: ProfileMedal[] = [
   },
   {
     id: "fruit-harvester",
-    label: "実りの収穫者",
+    label: "思い出のテイスター",
     icon: "fruit",
-    describe: (stats) => `今まで${stats.harvestedFruits}個の木の実を収穫しました！`,
+    describe: (stats) => `今まで${stats.harvestedFruits}粒の思い出を味わいました。`,
   },
   {
     id: "quiz-master",
