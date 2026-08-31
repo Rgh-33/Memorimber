@@ -1,7 +1,9 @@
+import type { MemoryTreeItem } from "./tree-data";
+
 type Point = readonly [number, number];
 type TreeBranch = { tip: Point; origin: Point | { branch: number; at: number }; bend: Point; shoulder: Point; width: number };
 
-// A permanent crown, independent of photo count and pagination. Photos occupy
+// A permanent crown, independent of photo count. Photos occupy
 // its tips; they never create extra boughs once the tree is grown.
 const BRANCHES: readonly TreeBranch[] = [
   { tip: [80, 238], origin: [188, 282], bend: [150, 269], shoulder: [129, 242], width: 14 },
@@ -18,8 +20,31 @@ const BRANCHES: readonly TreeBranch[] = [
   { tip: [226, 239], origin: { branch: 1, at: .32 }, bend: [233, 246], shoulder: [232, 249], width: 3 },
 ];
 
-export const TREE_BRANCHES_PER_PAGE = BRANCHES.length;
+export const TREE_NODE_CAPACITY = BRANCHES.length;
 export const TREE_PROPORTION = { x: .98, y: 1.06 } as const;
+
+/** Keep occupied tips still and reuse only vacant tips, oldest waiting photo
+ * first. The full photo queue remains separate from this one tree's display. */
+export function placeTreeItems(items: MemoryTreeItem[], previousSlots: readonly (string | null)[] = []) {
+  const pending = new Map(items.flatMap(item => item.stage === "harvested" ? [] : [[item.id, item] as const]));
+  const assigned = new Set<string>();
+  const slots = Array.from({ length: TREE_NODE_CAPACITY }, (_, index) => {
+    const id = previousSlots[index];
+    if (!id || !pending.has(id) || assigned.has(id)) return null;
+    assigned.add(id);
+    return id;
+  });
+  const waiting = [...pending.keys()].filter(id => !assigned.has(id));
+  let next = 0;
+  for (let slot = 0; slot < slots.length && next < waiting.length; slot++) {
+    if (slots[slot] === null) slots[slot] = waiting[next++];
+  }
+  const visibleItems = slots.flatMap((id, fruitSlot) => {
+    const item = id ? pending.get(id) : undefined;
+    return item ? [{ ...item, fruitSlot }] : [];
+  });
+  return { slots, visibleItems };
+}
 
 function branchOrigin(branch: TreeBranch): Point {
   if (!("branch" in branch.origin)) return branch.origin;

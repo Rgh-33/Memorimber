@@ -17,7 +17,7 @@ export default function HomePage() {
         <p className="mt-2 text-xs leading-6 text-ink/52">何気ない一日を、未来の自分へ。</p>
       </section>
 
-      <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}`} items={tree.items} petals={tree.petals} memories={tree.memories} count={tree.count} month={tree.date.slice(0, 7)} />
+      <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}`} items={tree.visibleItems} petals={tree.petals} memories={tree.memories} count={tree.count} month={tree.date.slice(0, 7)} />
       <TreePreviewControls />
     </div>
   );

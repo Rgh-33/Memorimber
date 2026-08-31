@@ -122,9 +122,6 @@
 .konoha-scene .memory-floating-word[data-gesture="armed"] .memory-floating-word-label,
 .konoha-scene .memory-floating-word[data-gesture="success"] .memory-floating-word-label { opacity: var(--word-current-opacity); }
 .konoha-scene .memory-word-particle { display: none; }
-.konoha-tree-pages { display: flex; align-items: center; justify-content: center; gap: 10px; color: rgb(var(--ink-rgb) / .5); font-size: 10px; }
-.konoha-tree-pages button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
-.konoha-tree-pages button:disabled { opacity: .25; }
 .konoha-preview { max-width: 300px; margin: 6px auto 0; padding-top: 12px; border-top: 1px solid rgb(var(--line-rgb) / .65); color: rgb(var(--ink-rgb) / .55); font-size: 11px; }
 .konoha-preview-toggle { display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; }
 .konoha-preview-toggle input { width: 12px; height: 12px; accent-color: var(--accent); }
@@ -134,7 +131,7 @@
 .konoha-preview-actions { display: flex; justify-content: center; gap: 7px; margin-top: 4px; }
 .konoha-preview-actions button { display: flex; align-items: center; justify-content: center; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
 .konoha-preview-actions button:hover, .konoha-preview-date button:hover { background: rgb(var(--paper-rgb)); color: var(--accent); }
-.konoha-preview button:focus-visible, .konoha-preview input:focus-visible, .konoha-tree-pages button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.konoha-preview button:focus-visible, .konoha-preview input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .konoha-harvest-form { display: flex; gap: 8px; margin-top: 20px; }
 .konoha-harvest-form input { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--ivory); padding: 12px; font-size: 16px; outline-color: var(--accent); }
 .konoha-harvest-form input::placeholder { color: rgb(var(--ink-rgb) / .38); }

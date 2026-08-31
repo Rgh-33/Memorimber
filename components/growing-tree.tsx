@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useId, useState, type CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
-import { getTreeBranch, TREE_BRANCHES_PER_PAGE, TREE_PROPORTION } from "@/lib/tree-branches";
+import { getTreeBranch, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
 import { TreeArtDefs, TreeCanopy, TreeSeedling, TreeWood } from "@/components/tree-art";
 
 function Flower({ x, y, age = 0 }: { x: number; y: number; age?: number }) {
@@ -58,11 +57,8 @@ export function GrowthNode({ stage, harvested = false }: { stage: number; harves
 }
 
 export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; count: number; month: string }) {
-  const [page, setPage] = useState(0);
   const uid = useId().replace(/:/g, "");
-  const pages = Math.max(1, Math.ceil(items.length / TREE_BRANCHES_PER_PAGE));
-  const activePage = Math.min(page, pages - 1);
-  const visible = items.slice(activePage * TREE_BRANCHES_PER_PAGE, (activePage + 1) * TREE_BRANCHES_PER_PAGE);
+  const visible = items.filter(item => item.stage !== "harvested").slice(0, TREE_NODE_CAPACITY);
   const stage = Math.min(7, count);
   const scale = [0.18, 0.18, 0.32, 0.47, 0.61, 0.76, 0.89, 1][stage];
   const monthIndex = Number(month.slice(5, 7));
@@ -84,13 +80,13 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
               <TreeWood uid={uid} stage={stage} />
               {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front /></g>}
             </g>
-            {visible.map((item, index) => {
-              const slot = position(index);
-              return <g key={item.id} className="konoha-photo-node" data-slot-index={index}>
+            {visible.map((item) => {
+              const slot = position(item.fruitSlot);
+              return <g key={item.id} className="konoha-photo-node" data-slot-index={item.fruitSlot} data-memory-id={item.id}>
                 <g className="konoha-branch-tip" transform={`translate(${slot.x} ${slot.y})`}>
                   <g className="konoha-node-size" style={{ transform: `translate(0px, 14px) scale(${1 / scale}) translate(0px, -14px)` }}>
-                    <g className="konoha-node-wind" style={{ animationDelay: `${index * -0.57}s` }}>
-                      <GrowthNode stage={item.growthStage ?? 1} harvested={item.stage === "harvested"} />
+                    <g className="konoha-node-wind" style={{ animationDelay: `${item.fruitSlot * -0.57}s` }}>
+                      <GrowthNode stage={item.growthStage ?? 1} />
                     </g>
                   </g>
                 </g>
@@ -103,9 +99,9 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
           </g>
         </g>
       </svg>
-      {visible.map((item, index) => {
+      {visible.map((item) => {
         if (item.stage !== "quiz-ready") return null;
-        const slot = position(index);
+        const slot = position(item.fruitSlot);
         return <Link key={item.id} href={item.href} className="konoha-fruit-target" data-memory-id={item.id}
           style={{
             left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x) / 380 * 100}%`,
@@ -114,10 +110,5 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
           aria-label="育った実で思い出クイズに挑戦" />;
       })}
     </div>
-    {pages > 1 && <div className="konoha-tree-pages" aria-label="木の枝の切り替え">
-      <button type="button" disabled={activePage === 0} onClick={() => setPage(activePage - 1)} aria-label="前の枝"><ChevronLeft size={16} /></button>
-      <span>{activePage + 1} / {pages}</span>
-      <button type="button" disabled={activePage === pages - 1} onClick={() => setPage(activePage + 1)} aria-label="次の枝"><ChevronRight size={16} /></button>
-    </div>}
   </>;
 }
