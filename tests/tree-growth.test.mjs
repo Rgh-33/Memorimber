@@ -1,19 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advanceDate, buildPetals, buildTreeItems, memoryQuestion, monthlyQueue, recordHarvest } from "../lib/tree-growth.ts";
+import { advanceDate, buildPetals, buildTreeItems, getFruitQuiz, memoryQuestion, monthlyQueue, recordHarvest } from "../lib/tree-growth.ts";
 
 const memory = (index, changes = {}) => ({ id: `photo-${String(index).padStart(3, "0")}`, date: "2020-01-01",
   createdAt: `2026-08-01T12:00:${String(index).padStart(2, "0")}`, imageUrl: "test.jpg", caption: "思い出", people: [], tags: [], ...changes });
 const photos = (length) => Array.from({ length }, (_, index) => memory(index));
 
-test("each later upload advances older photos once; the seventh unlocks only the oldest", () => {
-  for (let count = 1; count <= 7; count++) {
+test("a photo starts as its own leaf and ripens only after seven later uploads", () => {
+  const oldestStages = [1, 2, 3, 4, 5, 6, 6, 7];
+  for (let count = 1; count <= 8; count++) {
     const items = buildTreeItems(photos(count), "2026-08-01", {});
-    assert.deepEqual(items.map((item) => item.growthStage), Array.from({ length: count }, (_, index) => count - index));
-    assert.equal(items.filter((item) => item.stage === "quiz-ready").length, count === 7 ? 1 : 0);
+    assert.equal(items[0].memoryId, "photo-000");
+    assert.equal(items[0].growthStage, oldestStages[count - 1]);
+    assert.equal(items.filter((item) => item.stage === "quiz-ready").length, count === 8 ? 1 : 0);
     assert.equal(items.at(-1).growthStage, 1);
+    assert.equal(items.at(-1).memoryId, memory(count - 1).id);
   }
-  assert.equal(buildTreeItems(photos(8), "2026-08-01", {})[1].stage, "quiz-ready");
+  assert.equal(buildTreeItems(photos(8), "2026-08-01", {})[1].stage, "growing");
+  assert.equal(buildTreeItems(photos(9), "2026-08-01", {})[1].stage, "quiz-ready");
 });
 
 test("growth follows uploads, remains stable after refresh and does not double count", () => {
@@ -26,8 +30,8 @@ test("growth follows uploads, remains stable after refresh and does not double c
 });
 
 test("month rollover starts a separate tree, preserves old queue, excludes future uploads", () => {
-  const source = [...photos(7), memory(8, { createdAt: "2026-09-01T12:00:00" }), memory(9, { createdAt: "2026-09-02T12:00:00" })];
-  assert.equal(buildTreeItems(source, "2026-08-31", {}).length, 7);
+  const source = [...photos(8), memory(8, { createdAt: "2026-09-01T12:00:00" }), memory(9, { createdAt: "2026-09-02T12:00:00" })];
+  assert.equal(buildTreeItems(source, "2026-08-31", {}).length, 8);
   const september = buildTreeItems(source, "2026-09-01", {});
   assert.equal(september.length, 1);
   assert.equal(september[0].growthStage, 1);
@@ -36,7 +40,7 @@ test("month rollover starts a separate tree, preserves old queue, excludes futur
 });
 
 test("only ripe fruit can be harvested and each harvest keeps its exact memory and word", () => {
-  const source = photos(7);
+  const source = photos(8);
   const empty = {};
   assert.equal(recordHarvest(source, "2026-08-01", empty, source[1].id, "まだ葉"), empty);
   assert.equal(recordHarvest(source, "2026-08-01", empty, "missing", "test"), empty);
@@ -68,9 +72,41 @@ test("quiz uses the selected photo date, not upload date; choices remain distinc
 });
 
 test("harvested petals survive month rollover without showing future words or another account's photos", () => {
-  const source = photos(7);
+  const source = photos(8);
   const harvests = recordHarvest(source, "2026-08-01", {}, source[0].id, "夏の日");
   assert.equal(buildPetals(source, "2026-09-01", harvests)[0].word, "夏の日");
   assert.equal(buildPetals(source, "2026-07-31", harvests).length, 0);
   assert.equal(buildPetals([], "2026-09-01", harvests).length, 0);
+});
+
+test("each ripe fruit opens exactly its own photo's question, even when multiple fruits are ripe", () => {
+  const source = photos(10).map((photo, index) => ({ ...photo, date: `202${index}-01-02`, imageUrl: `photo-${index}.jpg`, caption: `caption-${index}` }));
+  const items = buildTreeItems(source, "2026-08-01", {});
+  assert.equal(items.filter((item) => item.stage === "quiz-ready").length, 3);
+  for (const index of [0, 1, 2]) {
+    const fruit = items[index];
+    const requestedId = new URL(fruit.href, "https://example.test").searchParams.get("memory");
+    const quiz = getFruitQuiz(source, items, requestedId);
+    assert.equal(quiz.memory.id, source[index].id);
+    assert.equal(quiz.memory.imageUrl, `photo-${index}.jpg`);
+    assert.equal(quiz.question.memoryId, source[index].id);
+    assert.equal(quiz.question.correctChoice, `202${index}年1月`);
+    assert.equal(quiz.question.hint, `caption-${index}`);
+    assert.equal(Array.isArray(quiz.question), false);
+  }
+  const selected = getFruitQuiz(source, items, source[1].id);
+  assert.deepEqual(getFruitQuiz([...source].reverse(), [...items].reverse(), source[1].id), selected);
+});
+
+test("missing, immature and harvested fruits never fall back to another question", () => {
+  const source = photos(9);
+  const items = buildTreeItems(source, "2026-08-01", {});
+  for (const id of [null, "", "missing", source[2].id, "memory-ice-cream"]) {
+    assert.equal(getFruitQuiz(source, items, id), null);
+  }
+  assert.equal(getFruitQuiz(source.slice(1), items, source[0].id), null);
+  const harvests = recordHarvest(source, "2026-08-01", {}, source[0].id, "最初の写真");
+  const after = buildTreeItems(source, "2026-08-01", harvests);
+  assert.equal(getFruitQuiz(source, after, source[0].id), null);
+  assert.equal(getFruitQuiz(source, after, source[1].id).question.memoryId, source[1].id);
 });

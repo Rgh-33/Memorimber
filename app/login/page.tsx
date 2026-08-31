@@ -9,6 +9,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   configuration: "Supabaseの接続情報がまだ設定されていません。バックエンド担当から公開URLと公開キーを受け取った後に利用できます。",
   missing_fields: "メールアドレスとパスワードを入力してください。",
   invalid_credentials: "メールアドレスまたはパスワードを確認してください。",
+  network_error: "認証サーバーに接続できませんでした。通信環境を確認して、もう一度お試しください。",
+  email_not_confirmed: "メールアドレスの確認がまだ完了していません。登録時の確認メール内のリンクを開いてからログインしてください。",
+  rate_limited: "ログインの試行回数が多くなっています。少し時間を置いてからもう一度お試しください。",
+  service_unavailable: "認証サーバーが一時的に利用できません。時間を置いてもう一度お試しください。",
+  login_failed: "ログインできませんでした。時間を置いてもう一度お試しください。",
   confirmation_failed: "メール確認リンクを確認できませんでした。もう一度ログインをお試しください。",
 };
 

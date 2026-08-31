@@ -3,20 +3,28 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSafeAuthRedirect } from "@/lib/auth-redirect";
+import { getLoginErrorCode } from "@/lib/login-error";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
 export async function login(formData: FormData) {
-  if (!isSupabaseConfigured()) redirect("/login?error=configuration");
+  const next = getSafeAuthRedirect(formData.get("next"));
+  const failurePath = (code: string) => `/login?${new URLSearchParams({ error: code, next })}`;
+  if (!isSupabaseConfigured()) redirect(failurePath("configuration"));
 
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = getSafeAuthRedirect(formData.get("next"));
-  if (!email || !password) redirect("/login?error=missing_fields");
+  if (!email || !password) redirect(failurePath("missing_fields"));
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect("/login?error=invalid_credentials");
+  let loginError: unknown = null;
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    loginError = error;
+  } catch (error) {
+    loginError = error;
+  }
+  if (loginError) redirect(failurePath(getLoginErrorCode(loginError)));
 
   redirect(next);
 }

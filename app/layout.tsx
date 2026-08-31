@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { Providers } from "./providers";
 import "./globals.css";
 import "./konoha.css";
+import "./harvest.css";
 
 const themeBootstrapScript = `try{const accent=localStorage.getItem("memorimber-theme");const mode=localStorage.getItem("memorimber-color-mode");if(["light-blue","orange","blue","black","green","purple"].includes(accent)){document.documentElement.dataset.accent=accent}if(["light","dark"].includes(mode)){document.documentElement.dataset.mode=mode}}catch{}`;
 

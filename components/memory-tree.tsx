@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { MemoryCard } from "@/components/memory-card";
 import { GrowingTree } from "@/components/growing-tree";
+import { MemoryPetal } from "@/components/memory-petal";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 
@@ -20,14 +21,12 @@ const WORD_MIN_OPACITY = 0.72;
 const WORD_MAX_OPACITY = 0.96;
 const WORD_OPACITY_DISTANCE_PX = 340;
 
-const WORD_SLOTS = [
-  { left: "1%", top: 8, rotate: -9, scale: 0.94, driftX: 8, delay: -1.2 },
-  { left: "57%", top: 18, rotate: 7, scale: 0.96, driftX: -7, delay: -2.7 },
-  { left: "8%", top: 66, rotate: -4, scale: 0.98, driftX: 9, delay: -0.5 },
-  { left: "53%", top: 80, rotate: 9, scale: 0.94, driftX: -8, delay: -3.4 },
-  { left: "0%", top: 131, rotate: -7, scale: 0.96, driftX: 7, delay: -2 },
-  { left: "60%", top: 141, rotate: 5, scale: 0.98, driftX: -8, delay: -4.1 },
-] as const;
+const WORD_MOTION = [
+  { rotate: -6, scale: 0.94, driftX: 3, delay: -1.2 },
+  { rotate: 4, scale: 0.96, driftX: -3, delay: -2.7 },
+  { rotate: -3, scale: 0.98, driftX: 3, delay: -0.5 },
+  { rotate: 6, scale: 0.94, driftX: -3, delay: -3.4 },
+];
 
 type HarvestedTreeItem = Extract<MemoryTreeItem, { stage: "harvested" }>;
 
@@ -40,6 +39,8 @@ type SceneStyle = CSSProperties & {
   "--word-x"?: string;
   "--word-y"?: string;
   "--word-blur"?: string;
+  "--petal-width"?: string;
+  "--petal-height"?: string;
   "--shake-glow-opacity"?: number;
   "--fruit-growth"?: number;
   "--fruit-width"?: string;
@@ -61,7 +62,7 @@ function FloatingWord({
   onInteractionChange: (id: string | null) => void;
   onReveal: (item: HarvestedTreeItem) => void;
 }) {
-  const slot = WORD_SLOTS[item.wordSlot % WORD_SLOTS.length];
+  const motion = WORD_MOTION[item.wordSlot % WORD_MOTION.length];
   const [gestureState, setGestureState] = useState<GestureState>("idle");
   const [shakeCount, setShakeCount] = useState(0);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -85,22 +86,25 @@ function FloatingWord({
   const successRef = useRef(false);
 
   const progress = shakeCount / GESTURE_STEPS_REQUIRED;
+  const wordLength = [...item.word].length;
+  const wordRows = wordLength > 6 ? 2 : 1;
+  const petalWidth = Math.max(76, Math.ceil(wordLength / wordRows) * 15 + 24);
   const restingOpacity = proximityOpacity * (isDimmed ? 0.82 : 1);
   const currentOpacity = gestureState === "armed" || gestureState === "success"
     ? Math.max(0.16, restingOpacity * (1 - progress * 0.84))
     : restingOpacity;
 
   const style: SceneStyle = {
-    left: slot.left,
-    top: slot.top,
     "--word-current-opacity": currentOpacity,
-    "--word-scale": slot.scale,
-    "--word-rotate": `${slot.rotate}deg`,
-    "--word-drift-x": `${slot.driftX}px`,
-    "--float-delay": `${slot.delay}s`,
+    "--word-scale": motion.scale,
+    "--word-rotate": `${motion.rotate}deg`,
+    "--word-drift-x": `${motion.driftX}px`,
+    "--float-delay": `${motion.delay}s`,
     "--word-x": `${dragOffset.x}px`,
     "--word-y": `${dragOffset.y}px`,
     "--word-blur": `${progress * 0.75}px`,
+    "--petal-width": `${petalWidth}px`,
+    "--petal-height": `${Math.max(wordRows === 2 ? 66 : 44, petalWidth / 1.8)}px`,
     "--shake-glow-opacity": progress * 0.82,
   };
 
@@ -314,6 +318,7 @@ function FloatingWord({
       ref={buttonRef}
       type="button"
       className="memory-floating-word"
+      data-memory-id={item.memoryId ?? item.id}
       style={style}
       data-gesture={gestureState}
       data-dimmed={isDimmed || undefined}
@@ -335,11 +340,10 @@ function FloatingWord({
         ))}
       </span>
       <span className="konoha-petal-arrive">
-        <svg className="konoha-word-petal" viewBox="0 0 140 65" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M3 43 C0 20 18 1 47 5 Q65 -2 77 8 C102 -1 133 11 137 32 C145 54 109 63 82 59 Q39 68 3 43Z" />
-          <path d="M9 42 Q64 26 128 34" fill="none" stroke="currentColor" strokeOpacity=".08" />
-        </svg>
-        <span className="memory-floating-word-label">{item.word}</span>
+        <span className="konoha-petal-sway">
+          <MemoryPetal />
+          <span className="memory-floating-word-label">{item.word}</span>
+        </span>
       </span>
     </button>
   );
@@ -350,11 +354,9 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const treeArtRef = useRef<HTMLDivElement>(null);
-  const harvested = petals;
-  const [wordPage, setWordPage] = useState(0);
-  const wordPages = Math.max(1, Math.ceil(harvested.length / WORD_SLOTS.length));
-  const currentWordPage = Math.min(wordPage, wordPages - 1);
-  const shownWords = harvested.slice().reverse().slice(currentWordPage * WORD_SLOTS.length, (currentWordPage + 1) * WORD_SLOTS.length);
+  // Keep every word in the page. New harvests arrive first; wrapping the field
+  // moves the tree down instead of hiding older words behind a page control.
+  const shownWords = useMemo(() => [...petals].reverse(), [petals]);
   const memoriesById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory])), [memories]);
   const relatedMemoryIds = revealedItem?.relatedMemoryIds?.length
     ? revealedItem.relatedMemoryIds
@@ -379,12 +381,12 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
   }, [revealedItem]);
 
   return (
-    <section className="memory-tree-scene konoha-scene" data-has-petals={harvested.length > 0} aria-label="思い出の木">
+    <section className="memory-tree-scene konoha-scene" aria-label="思い出の木" tabIndex={-1}>
       <div className="memory-word-field" aria-label="収穫した思い出の言葉">
-        {shownWords.map((item, index) => (
+        {shownWords.map((item) => (
           <FloatingWord
             key={item.id}
-            item={{ ...item, wordSlot: index }}
+            item={item}
             isDimmed={activeWordId !== null && activeWordId !== item.id}
             getTreeRect={getTreeRect}
             onInteractionChange={setActiveWordId}
@@ -393,11 +395,6 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
         ))}
       </div>
 
-      {wordPages > 1 && <div className="konoha-word-pages konoha-tree-pages" aria-label="花びらの切り替え">
-        <button type="button" disabled={currentWordPage === 0} onClick={() => setWordPage(currentWordPage - 1)} aria-label="前の花びら"><ChevronLeft size={14} /></button>
-        <span>{currentWordPage + 1} / {wordPages}</span>
-        <button type="button" disabled={currentWordPage === wordPages - 1} onClick={() => setWordPage(currentWordPage + 1)} aria-label="次の花びら"><ChevronRight size={14} /></button>
-      </div>}
       <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
         <GrowingTree items={items} count={count} month={month} />
       </div>

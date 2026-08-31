@@ -5,6 +5,7 @@ export type GrowthStage = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type Harvest = { word: string; harvestedAt: string };
 export type Harvests = Record<string, Harvest>;
 export type HarvestedItem = Extract<MemoryTreeItem, { stage: "harvested" }>;
+const LATER_UPLOADS_TO_HARVEST = 7;
 
 export function buildPetals(memories: Memory[], date: string, harvests: Harvests): HarvestedItem[] {
   return [...new Map(memories.map((memory) => [memory.id, memory])).values()]
@@ -42,14 +43,18 @@ export function monthlyQueue(memories: Memory[], date: string) {
 export function buildTreeItems(memories: Memory[], date: string, harvests: Harvests): MemoryTreeItem[] {
   const queue = monthlyQueue(memories, date);
   return queue.map((memory, index) => {
-    const growthStage = Math.min(7, queue.length - index) as GrowthStage;
+    const laterUploads = queue.length - index - 1;
+    const ripe = laterUploads >= LATER_UPLOADS_TO_HARVEST;
+    // The original upload creates this photo's leaf. Seven *later* uploads
+    // ripen it; until then it remains at most a small fruit (visual stage 6).
+    const growthStage = (ripe ? 7 : Math.min(6, laterUploads + 1)) as GrowthStage;
     const harvest = harvests[memory.id];
     if (harvest && harvest.harvestedAt.slice(0, 10) <= date) {
       return { id: memory.id, memoryId: memory.id, stage: "harvested", word: harvest.word,
         wordSlot: index, relatedMemoryIds: [memory.id] };
     }
     const common = { id: memory.id, memoryId: memory.id, fruitSlot: index, fruitTone: "peach" as const, growthStage };
-    return growthStage === 7
+    return ripe
       ? { ...common, stage: "quiz-ready", growth: 1, href: `/quiz?memory=${encodeURIComponent(memory.id)}` }
       : { ...common, stage: "growing", growth: (growthStage - 1) / 6 };
   });
@@ -70,4 +75,12 @@ export function memoryQuestion(memory: Memory): QuizQuestion {
   const offset = [...memory.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % choices.length;
   return { id: `quiz-${memory.id}`, memoryId: memory.id, question: "これはいつの思い出？",
     choices: [...choices.slice(offset), ...choices.slice(0, offset)], correctChoice, hint: memory.caption };
+}
+
+/** One selected fruit resolves to one photo and one question. Never substitute
+ * another ripe fruit or a sample if the requested fruit cannot be harvested. */
+export function getFruitQuiz(memories: Memory[], items: MemoryTreeItem[], memoryId: string | null) {
+  if (!memoryId || !items.some((item) => item.stage === "quiz-ready" && item.memoryId === memoryId)) return null;
+  const memory = memories.find((candidate) => candidate.id === memoryId);
+  return memory ? { memory, question: memoryQuestion(memory) } : null;
 }
