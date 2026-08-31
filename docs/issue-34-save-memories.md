@@ -1,0 +1,122 @@
+# Issue #34: 思い出の永続保存
+
+## 作業範囲
+
+最新 `origin/main`（作業開始時 `1fc10a5`）を取得し、一致していることを確認した `main` から `feature/issue-34-save-memories` を作成。
+投稿の永続保存と、その確認に必要なアルバム・詳細画面の読み込みだけを接続した。
+DBマイグレーション、RLS、Auth設定、プロフィール編集、画像変換、木・クイズの連携処理は変更していない。
+
+## 変更ファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| `lib/supabase/memories.ts` | 入力検証、認証、Storage保存、INSERT、補償削除、復旧確認、DB取得、署名URL |
+| `components/memory-form.tsx` | File保持、非同期投稿、処理段階・成功・エラー表示、二重送信防止、成功時の初期化、復旧導線 |
+| `lib/memories-context.tsx` | 一時保存の廃止、DB読み込みと表示キャッシュ、再取得、ログアウト時の破棄 |
+| `lib/types.ts` | 投稿用File型、表示用imagePath |
+| `app/album/page.tsx` | 保存された月への切り替え、読み込み・失敗・再取得表示 |
+| `app/memory/[id]/page.tsx` | 再読み込み後の詳細表示、読み込み・失敗・再取得表示 |
+| `components/memory-photo.tsx` | 未対応画像／読み込み失敗時の代替表示、元画像への導線 |
+| `components/memory-card.tsx` | アルバム写真に共通の代替表示を使用 |
+| `tests/memories.test.mjs` | 実Supabase JSクライアント＋メモリ内の模擬HTTP応答による保存・取得テスト |
+| `package.json` | `npm test` を追加（追加依存なし） |
+| `README.md` | 永続保存とプロトタイプ部分の区別、テスト案内 |
+| `docs/issue-34-save-memories.md` | 本引き継ぎ・確認手順 |
+
+## Storageへの保存
+
+1. `auth.getUser()` でログインユーザーを確認。未ログインや確認失敗ならアップロードしない。
+2. UUIDを生成し、`memory-images/<本人ID>/<UUID>.<拡張子>` に `upsert: false` でアップロード。
+3. JPEG／PNG／WebP／HEIC／HEIF、空ファイル、20MB上限を検証。
+4. iPhoneでMIMEが空の場合は拡張子から補完。multipart内のFileのMIMEも正規化する。写真のバイト列は一切変換しない。
+
+既存の公開URL・publishable key・Cookieセッション用クライアントを利用する。
+新たな秘密鍵、API、DB所有者パラメータは追加していない。
+
+## memoriesへのINSERT
+
+画像アップロード成功後のみ、以下をINSERTする。
+
+```text
+id           = 投稿試行ごとのUUID（通信結果を後から照合するため固定）
+image_path   = 本人ID/UUID.拡張子
+caption      = 前後の空白を除去した1〜80文字
+memory_date  = 選択した日付（YYYY-MM-DD）
+people       = string[]
+tags         = string[]
+```
+
+`user_id` は送信せず、既存DBの `default auth.uid()` に任せる。
+INSERTにSELECTを連結していないため、登録成功後の読み取り失敗を「登録失敗」と誤判定して写真を消すことはない。
+成功時はフォームを初期化し、成功メッセージと詳細画面へのリンクを表示する。
+
+## 失敗時・中断時
+
+- Storageがアップロードを拒否 → DB INSERTをしない。Storageのエラー内容を添えて表示。
+- DBがINSERTを明示的に拒否 → その試行でアップロードした画像だけを `remove([imagePath])` で補償削除。
+- 削除も失敗 → 成功扱いにせず、復旧ボタンを表示。入力を維持し、新しい投稿を止める。
+- INSERTの応答が失われた → 固定UUIDで本人のレコードを確認。存在する場合は成功扱いにし、画像を消さない。
+- 結果不明でレコードがまだ見えない → サーバーで処理中の可能性があるため直ちに削除せず、時間をおいて再確認するよう案内。
+- 復旧ボタン → 本人であることと保存パスを確認し、レコードがあれば成功表示、なければ今回の画像を削除。再INSERTはしない。
+- 同じタブでページを再読み込み／投稿画面を開き直した場合に備え、アップロード開始前にID・本人ID・画像パスだけを `sessionStorage` に保存する。
+
+**保証範囲:** StorageとDBは別リクエストで、完全なトランザクションではない。タブを完全に閉じて復旧情報が失われた場合、通信が長期に途絶えた場合、RLSで削除自体が拒否された場合の自動清掃はフロントだけでは保証できない。取り残しの完全な回収保証が必要なら、バックエンドで未参照画像の定期清掃や投稿処理の管理を別途検討する。今回はサーバー設定の追加・変更はしていない。
+
+## 読み込み
+
+- ログイン本人に絞ったSELECTをRLS下で実行し、100件ずつページングして取得。
+- 非公開画像を1時間の署名URLで表示し、30分ごと・タブ復帰時・画面遷移時に更新する。
+- DBのエラーを「思い出0件」と見せず、再読み込みボタン付きで表示する。
+- 画像URL取得だけが失敗しても本文などのDBレコードは表示する。
+- 木・クイズの既存サンプルIDは継続利用できるが、実ユーザーのアルバムへサンプルを混在させない。サンプル詳細には明示ラベルを付ける。
+- 「デモデータを初期化」はDB・Storageを操作しない。
+
+## 自動テスト
+
+`npm test`：29件成功。実アカウント・実画像・実DBへの書き込みなし。以下のiPhone互換性の回帰テスト6件を含む。
+
+`npm run lint`、`npx tsc --noEmit`、`npm run build` も成功。最初のビルドは `.next` の生成物不整合で失敗したため、生成キャッシュのみを削除してクリーンビルドを実施した。その後、同じプロジェクトの既存開発サーバーが起動したままだったことを確認し、対象プロセスだけを再起動した。ソースや環境設定はその対応で変更していない。
+
+ローカルHTTP確認：未ログインの `/post` は **307 → `/login?next=%2Fpost`**、`/login` は **200**。ブラウザでもログインフォームへの遷移と表示を確認した。ログイン済み投稿フォームの画面操作は、テストアカウント未使用のため未実施。開発サーバーは `http://localhost:3000` で起動したままにしている。
+
+- 5形式のパス・MIME・元バイト列保持、MIMEが空のHEIC／HEIF
+- caption／日付／人物・タグ配列、空画像・形式・20MB境界
+- 未ログイン時の拒否、Storage失敗時にINSERTしない
+- INSERT拒否時の対象限定削除、削除失敗と再試行
+- INSERT応答喪失時に保存済み画像を消さない
+- 不明な結果・認証切れ・他ユーザーでの復旧を安全側で止める
+- 再取得、署名URL、署名失敗でも本文保持、ページング、DB取得エラー
+- アップロード前の復旧情報記録と同じタブでの復旧、復旧情報を記録できなければアップロードしない
+
+このテストのユーザー絞り込みは**リクエスト内容の検証**であり、実環境のRLS検証の代わりではない。
+
+### iPhoneのローカルIP接続でのID生成エラー
+
+`crypto.randomUUID is not a function` は画像の形式やStorageの拒否ではなく、アップロード前のID生成で発生する。`randomUUID()` はセキュアコンテキスト限定のため、PCの `localhost` では動いても、iPhoneからHTTPでLAN内IPへアクセスすると利用できない場合がある。
+
+`randomUUID()` がない場合は `crypto.getRandomValues()` の16バイトからバージョン・variantを正しく設定したUUID v4を生成する。`Math.random()` や日時による代用はしない。どちらも使えなければ、日本語の案内を表示してアップロード前に停止する。保存パス・DBスキーマ・RLS・画像形式は変更しない。
+
+回帰テストでは `randomUUID` を未定義にして元のエラーを再現したうえで、UUIDのゼロ埋め・バージョン・variant、新しい乱数の使用、保存・補償削除・復旧が機能することと、安全な乱数がなければ送信しないことを検証する。iPhone実機での再テストは別途必要。
+
+HTTP対応はローカル検証の互換性対策であり、実際の写真・認証情報を扱う共有環境はHTTPSで利用する。
+仕様：[MDN randomUUID](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID)、[MDN getRandomValues](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)。
+
+## 実環境で必要な確認（未実施）
+
+テスト用プロジェクト・テスト用ユーザーA/Bを用い、個人の実写真ではなくテスト画像で確認する。共有／本番環境のRLSや制約を故意に壊して失敗テストをしない。
+
+1. Aでログインし、写真・一言・日付・人物・タグを投稿。成功表示とフォーム初期化を確認。
+2. `memory-images/AのID/UUID.拡張子` に画像1件、`memories` に対応レコード1件が作成されることを確認。
+3. `image_path` とStorageパス、全投稿項目、`user_id = AのID` が一致することを確認。
+4. 詳細・アルバムを再読み込みし、ログインし直しても投稿が残ることを確認。
+5. JPEG／PNG／WebP／HEIC／HEIFで各1回。特にiPhone実機のファイル選択・MIME・プレビュー・Storage許可形式を確認。
+6. 未ログインで `/post` に入るとログインへ戻ること、直接のStorage／DB書き込みもRLSで拒否されることを確認。
+7. **ローカル／専用テスト環境のみ**で、Storage成功後にDB登録が制約違反となる投稿を実行し、アップロード画像が削除されることを確認。さらに削除失敗からの復旧も確認。
+8. AのセッションでBのStorageフォルダへのアップロード／閲覧／削除が拒否されることを確認。
+9. Bでログインし、Aのmemory IDのSELECTが0件、UPDATE／DELETEが対象0件または拒否となることを確認（成功ステータスでも0件の場合がある）。Aのデータが不変であることもA側から確認。
+10. BのセッションでAを所有者に指定したINSERTやAの画像パスを使ったINSERTが拒否されることを確認。
+11. 長い処理、通信切断、二重クリック、再読み込み、署名URL更新、ダーク／ライト表示を実ブラウザで確認。
+
+実プロジェクトにテストユーザーを作成したり、DB／Storageの設定を変更したり、写真を投稿したりする操作は今回行っていない。
+
+参考：Supabase公式の [upload](https://supabase.com/docs/reference/javascript/file-buckets-upload)、[insert](https://supabase.com/docs/reference/javascript/insert)、[署名URL](https://supabase.com/docs/reference/javascript/file-buckets-createsignedurls) の仕様に合わせている。

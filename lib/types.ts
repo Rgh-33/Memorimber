@@ -2,6 +2,7 @@ export type Memory = {
   id: string;
   date: string;
   imageUrl: string;
+  imagePath?: string;
   caption: string;
   people: string[];
   tags: string[];
@@ -22,4 +23,6 @@ export type AlbumMonth = {
   message: string;
 };
 
-export type MemoryInput = Omit<Memory, "id">;
+export type MemoryInput = Omit<Memory, "id" | "imageUrl" | "imagePath"> & {
+  image: File;
+};
