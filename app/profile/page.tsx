@@ -56,12 +56,14 @@ function LevelRequirementCard({
 
 export default function ProfilePage() {
   const { memories } = useMemories();
-  const { nickname, avatarDataUrl, setNickname, setAvatarDataUrl } = useProfile();
+  const { nickname, avatarDataUrl, setNickname, setAvatarFile } = useProfile();
   const { startProcessing, stopProcessing } = useProcessing();
   const [selectedMedalId, setSelectedMedalId] = useState(PROFILE_MEDALS[0].id);
   const [levelDetailsOpen, setLevelDetailsOpen] = useState(false);
   const [nicknameEditing, setNicknameEditing] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(nickname);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
   const levelListRef = useRef<HTMLDivElement>(null);
   const currentLevelRef = useRef<HTMLElement>(null);
 
@@ -95,20 +97,19 @@ export default function ProfilePage() {
     };
   }, [levelDetailsOpen]);
 
-  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-
-    startProcessing();
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") setAvatarDataUrl(reader.result);
-      stopProcessing();
-    });
-    reader.addEventListener("error", stopProcessing);
-    reader.addEventListener("abort", stopProcessing);
-    reader.readAsDataURL(file);
     event.target.value = "";
+    if (!file) return;
+    setProfileError(null);
+    startProcessing();
+    try {
+      await setAvatarFile(file);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "プロフィール写真を保存できませんでした。");
+    } finally {
+      stopProcessing();
+    }
   };
 
   const startNicknameEditing = () => {
@@ -116,11 +117,19 @@ export default function ProfilePage() {
     setNicknameEditing(true);
   };
 
-  const saveNickname = () => {
+  const saveNickname = async () => {
     const nextNickname = nicknameDraft.trim();
-    if (!nextNickname) return;
-    setNickname(nextNickname);
-    setNicknameEditing(false);
+    if (!nextNickname || profileSaving) return;
+    setProfileError(null);
+    setProfileSaving(true);
+    try {
+      await setNickname(nextNickname);
+      setNicknameEditing(false);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "ユーザー名を保存できませんでした。");
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   return (
@@ -176,7 +185,7 @@ export default function ProfilePage() {
               className="relative flex min-h-[58px] items-center justify-center border-b border-coral/35 px-11"
               onSubmit={(event) => {
                 event.preventDefault();
-                saveNickname();
+                void saveNickname();
               }}
             >
               <input
@@ -193,7 +202,7 @@ export default function ProfilePage() {
               />
               <button
                 type="submit"
-                disabled={!nicknameDraft.trim()}
+                disabled={!nicknameDraft.trim() || profileSaving}
                 className="absolute right-0 grid h-9 w-9 place-items-center rounded-full bg-coral text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
                 aria-label="ニックネームを確定"
               >
@@ -214,6 +223,7 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
+        {profileError && <p role="alert" className="mt-3 text-center text-xs font-medium text-red-500">{profileError}</p>}
       </section>
 
       <div className="profile-record-divider mx-auto mt-8" aria-hidden="true" />
