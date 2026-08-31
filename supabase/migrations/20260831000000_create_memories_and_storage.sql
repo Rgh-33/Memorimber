@@ -78,7 +78,7 @@ values (
   'memory-images',
   'memory-images',
   false,
-  10485760,
+  20971520,
   array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
 )
 on conflict (id) do update set
