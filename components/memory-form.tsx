@@ -2,44 +2,79 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { ChangeEvent, FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, Check, ChevronRight, ImagePlus, Sprout, Tag, Users } from "lucide-react";
-import { SAMPLE_MEMORIES } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
 import { useProcessing } from "@/lib/processing-context";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getMemoryImageType, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
 
 const PEOPLE = ["友達", "家族", "クラスのみんな", "部活の仲間"];
 const TAGS = ["放課後", "帰り道", "教室", "行事", "昼休み", "8月"];
+const STAGE_LABELS: Record<MemorySaveStage, string> = {
+  auth: "ログインを確認しています…", upload: "写真をアップロードしています…",
+  insert: "思い出を保存しています…", cleanup: "保存状態を確認・後片付けしています…",
+};
+const today = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
 
 export function MemoryForm({ compact = false }: { compact?: boolean }) {
-  const router = useRouter();
-  const { addMemory } = useMemories();
+  const { refreshMemories } = useMemories();
   const { startProcessing, stopProcessing } = useProcessing();
+  const configured = isSupabaseConfigured();
+  const formRef = useRef<HTMLFormElement>(null);
+  const submittingRef = useRef(false);
+  const [image, setImage] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [caption, setCaption] = useState("");
-  const [date, setDate] = useState("2026-08-25");
+  const [date, setDate] = useState(today);
   const [people, setPeople] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [errors, setErrors] = useState<{ image?: string; caption?: string }>({});
+  const [stage, setStage] = useState<MemorySaveStage | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingMemoryUpload | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const busy = stage !== null;
 
-  const readFile = (file: File) => {
-    startProcessing();
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      setImageUrl(String(reader.result));
-      stopProcessing();
-    });
-    reader.addEventListener("error", stopProcessing);
-    reader.addEventListener("abort", stopProcessing);
-    reader.readAsDataURL(file);
-  };
+  useEffect(() => {
+    try {
+      const interrupted = readPendingMemoryUpload(window.sessionStorage);
+      if (interrupted) {
+        setPending(interrupted);
+        setSaveError("前回の投稿処理が中断されています。再投稿の前に「保存状態を確認・後片付け」を押してください。");
+      }
+    } catch { /* Storage-disabled browsers are handled before any upload. */ }
+  }, []);
+  useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
+  useEffect(() => {
+    if (!busy && !pending) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [busy, pending]);
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      readFile(file);
-      setErrors((current) => ({ ...current, image: undefined }));
+      try {
+        getMemoryImageType(file);
+        setImage(file);
+        setImageUrl(URL.createObjectURL(file));
+        setPreviewFailed(false);
+        setSavedId(null);
+        setErrors((current) => ({ ...current, image: undefined }));
+      } catch (cause) {
+        setImage(null);
+        setImageUrl("");
+        event.target.value = "";
+        setErrors((current) => ({ ...current, image: cause instanceof Error ? cause.message : "写真を読み込めませんでした。" }));
+      }
     }
   };
 
@@ -47,31 +82,105 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setter((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]));
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSaved = (id: string) => {
+    setSavedId(id);
+    setSaveError(null);
+    clearPending();
+    setImage(null);
+    setImageUrl("");
+    setCaption("");
+    setDate(today());
+    setPeople([]);
+    setTags([]);
+    setErrors({});
+    formRef.current?.reset();
+    void refreshMemories();
+  };
+
+  const clearPending = () => {
+    setPending(null);
+    try { window.sessionStorage.removeItem(PENDING_MEMORY_STORAGE_KEY); } catch { /* Retry on next visit is safe. */ }
+  };
+
+  const rememberPending = (attempt: PendingMemoryUpload) => {
+    try {
+      window.sessionStorage.setItem(PENDING_MEMORY_STORAGE_KEY, JSON.stringify(attempt));
+    } catch {
+      throw new Error("投稿の復旧情報をブラウザに記録できません。ブラウザのストレージ設定を確認してください。まだ写真は送信していません。");
+    }
+    setPending(attempt);
+  };
+
+  const showSaveError = (cause: unknown) => {
+    setSaveError(cause instanceof Error ? cause.message : "保存できませんでした。通信状態を確認してください。");
+    if (cause instanceof MemorySaveError && cause.pending) setPending(cause.pending);
+    else clearPending();
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submittingRef.current || pending || !configured) return;
     const nextErrors = {
-      image: imageUrl ? undefined : "写真を1枚選んでください",
+      image: image ? undefined : "写真を1枚選んでください",
       caption: caption.trim() ? undefined : "一言を入力してください",
     };
     setErrors(nextErrors);
-    if (nextErrors.image || nextErrors.caption) return;
+    if (nextErrors.image || nextErrors.caption || !image) return;
 
-    const id = addMemory({ imageUrl, caption: caption.trim(), date, people, tags });
+    submittingRef.current = true;
+    setSaveError(null);
+    setSavedId(null);
+    setStage("auth");
     startProcessing();
-    router.push(`/memory/${id}?new=1`);
+    try {
+      const result = await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
+      onSaved(result.id);
+    } catch (cause) {
+      showSaveError(cause);
+    } finally {
+      submittingRef.current = false;
+      setStage(null);
+      stopProcessing();
+    }
+  };
+
+  const handleRecovery = async () => {
+    if (!pending || submittingRef.current) return;
+    submittingRef.current = true;
+    setStage("cleanup");
+    startProcessing();
+    try {
+      const result = await recoverMemorySave(createClient(), pending);
+      if (result.saved) onSaved(result.id);
+      else {
+        clearPending();
+        setSaveError("未保存の画像を取り消しました。入力内容を確認して、もう一度投稿できます。");
+      }
+    } catch (cause) {
+      showSaveError(cause);
+    } finally {
+      submittingRef.current = false;
+      setStage(null);
+      stopProcessing();
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`rounded-[22px] border border-line bg-ivory p-3 shadow-card ${compact ? "" : "mt-5"}`}>
+    <form ref={formRef} onSubmit={handleSubmit} aria-busy={busy} className={`rounded-[22px] border border-line bg-ivory p-3 shadow-card ${compact ? "" : "mt-5"}`}>
+      {savedId && <div role="status" className="mb-3 rounded-xl border border-coral/30 bg-coral/10 p-3 text-sm text-ink">思い出を保存しました。<Link href={`/memory/${savedId}`} className="mt-2 block font-medium text-coral underline">保存した思い出を見る</Link></div>}
+      {!configured && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">Supabaseの接続設定後、ログインすると投稿できます。この画面での一時保存は行いません。</p>}
+      <fieldset disabled={busy || Boolean(pending) || !configured} className="min-w-0 disabled:opacity-60">
       <div className="mb-2 flex items-center gap-2 px-1 pb-1">
         <Sprout size={21} className="text-coral" strokeWidth={1.7} />
         <p className="font-sans text-base tracking-[0.08em] text-ink">今日の思い出を残す</p>
       </div>
 
       <label htmlFor="memory-photo" className={`photo-picker relative block overflow-hidden rounded-xl border border-dashed ${errors.image ? "border-red-400 bg-red-50" : "border-coral/45 bg-ivory"}`}>
-        {imageUrl ? (
+        {image && previewFailed ? (
+          <div className="flex min-h-[168px] flex-col items-center justify-center gap-2 px-5 text-center text-xs text-ink/70"><ImagePlus className="text-coral" size={32} /><p className="max-w-full break-all">{image.name}</p><p>このブラウザではプレビューできませんが、<br />元の写真をそのまま保存できます。</p><span className="text-coral">タップして写真を変更</span></div>
+        ) : imageUrl ? (
           <div className="relative aspect-[16/10]">
-            <img src={imageUrl} alt="投稿する写真のプレビュー" className="h-full w-full object-cover" />
+            <img src={imageUrl} alt="投稿する写真のプレビュー" onError={() => setPreviewFailed(true)} className="h-full w-full object-cover" />
             <span className="absolute right-3 top-3 rounded-full bg-ivory/90 px-3 py-1 text-[11px] font-medium text-ink shadow-sm">写真を変更</span>
           </div>
         ) : (
@@ -81,11 +190,11 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
             <p className="mt-1 text-[11px] text-ink/38">タップして今日の一枚を選択</p>
           </div>
         )}
-        <input id="memory-photo" type="file" accept="image/*" className="sr-only" onChange={handleFile} />
+        <input id="memory-photo" type="file" accept={MEMORY_IMAGE_ACCEPT} className="sr-only" onChange={handleFile} />
       </label>
       <div className="mt-1.5 flex min-h-5 items-center justify-between px-1">
         {errors.image ? <p className="text-[11px] font-medium text-red-500">{errors.image}</p> : <span />}
-        <button type="button" onClick={() => { setImageUrl(SAMPLE_MEMORIES[0].imageUrl); setErrors((current) => ({ ...current, image: undefined })); }} className="text-[11px] font-medium text-coral hover:underline">サンプル写真を使う</button>
+        <span className="text-[10px] text-ink/55">JPEG / PNG / WebP / HEIC / HEIF・20MBまで</span>
       </div>
 
       <div className="relative mt-1">
@@ -107,7 +216,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
           <CalendarDays size={18} className="text-ink" strokeWidth={1.6} />
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-ink">日付</span>
-            <input id="memory-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="min-w-0 bg-transparent text-right text-xs text-ink/70 outline-none" />
+            <input id="memory-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} className="min-w-0 bg-transparent text-right text-xs text-ink/70 outline-none" />
           </div>
         </label>
 
@@ -140,9 +249,13 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
         </details>
       </div>
 
-      <button type="submit" className="accent-gradient mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition hover:-translate-y-0.5 active:translate-y-0">
-        思い出を追加する
+      </fieldset>
+      {saveError && <p role="alert" className="mt-3 break-words rounded-lg border border-red-400/40 p-3 text-xs leading-6 text-ink">{saveError}</p>}
+      {pending && !busy && <button type="button" onClick={handleRecovery} className="mt-2 w-full rounded-lg border border-coral px-3 py-2 text-xs text-coral">保存状態を確認・後片付け</button>}
+      <button type="submit" disabled={busy || Boolean(pending) || !configured} className="accent-gradient mt-3 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+        <span role="status">{stage ? STAGE_LABELS[stage] : "思い出を追加する"}</span>
       </button>
+      {busy && <p className="mt-2 text-center text-[11px] text-ink/60">完了するまで、この画面を閉じずにお待ちください。</p>}
     </form>
   );
 }

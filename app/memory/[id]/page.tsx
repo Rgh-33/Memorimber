@@ -1,23 +1,25 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, Tag, Users } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { MemoryCard } from "@/components/memory-card";
-import { formatJapaneseDate } from "@/lib/data";
+import { MemoryPhoto } from "@/components/memory-photo";
+import { formatJapaneseDate, SAMPLE_MEMORIES } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
 
 export default function MemoryDetailPage() {
   const params = useParams<{ id: string }>();
-  const { memories, getMemory, getRelatedMemories } = useMemories();
+  const { memories, getMemory, getRelatedMemories, isLoading, error, warning, refreshMemories } = useMemories();
   const memory = getMemory(params.id);
+  const sample = SAMPLE_MEMORIES.some((item) => item.id === params.id);
+
+  if (!sample && (isLoading || error)) return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6">{isLoading ? <p role="status">思い出を読み込んでいます…</p> : <div role="alert">{error}<button type="button" onClick={() => void refreshMemories()} className="mt-3 block w-full text-coral underline">再読み込み</button></div>}</div></div>;
 
   if (!memory) return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center"><p className="font-medium">思い出が見つかりません</p><Link href="/post" className="mt-4 inline-block rounded-lg bg-coral px-5 py-3 text-xs font-medium text-white">思い出を残す</Link></div></div>;
 
-  const sorted = [...memories].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...(sample ? SAMPLE_MEMORIES : memories)].sort((a, b) => a.date.localeCompare(b.date));
   const currentIndex = sorted.findIndex((item) => item.id === memory.id);
   const previous = currentIndex > 0 ? sorted[currentIndex - 1] : undefined;
   const next = currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : undefined;
@@ -27,10 +29,12 @@ export default function MemoryDetailPage() {
     <div className="page-pad">
       <AppHeader />
       <h1 className="pt-7 text-center font-sans text-[25px] font-medium tracking-[0.1em] text-ink">思い出詳細</h1>
+      {sample && <p className="mt-2 text-center text-xs text-ink/55">サンプルの思い出です</p>}
+      {!sample && warning && <p role="status" className="mt-3 text-xs leading-5 text-ink/70">{warning}<button type="button" onClick={() => void refreshMemories()} className="ml-2 text-coral underline">再読み込み</button></p>}
 
       <article className="mt-4">
         <div className="overflow-hidden rounded-xl border border-dashed border-coral/45 bg-ivory p-2">
-          <img src={memory.imageUrl} alt={memory.caption} className="aspect-[4/3] w-full rounded-lg object-cover" />
+          <div className="aspect-[4/3] overflow-hidden rounded-lg"><MemoryPhoto src={memory.imageUrl} alt={memory.caption} detailed className="h-full w-full object-cover" /></div>
         </div>
         <p className="mt-4 flex items-center gap-2 text-xs text-ink/65"><CalendarDays size={16} className="text-ink" /> {formatJapaneseDate(memory.date)}</p>
         <h2 className="mt-3 text-[15px] font-medium leading-6 text-ink">{memory.caption}</h2>
