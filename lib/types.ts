@@ -3,6 +3,7 @@ export type Memory = {
   date: string;
   imageUrl: string;
   imagePath?: string;
+  createdAt?: string;
   caption: string;
   people: string[];
   tags: string[];

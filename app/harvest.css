@@ -1,0 +1,112 @@
+.konoha-harvest-flight {
+  --harvest-curtain: #000;
+  --harvest-sky-top: #abcbd7;
+  --harvest-sky-mid: #dce6df;
+  --harvest-sky-low: #f3eee1;
+  --harvest-canopy: #314e41;
+  position: fixed;
+  inset: 0 auto 0 50%;
+  z-index: 200;
+  width: min(100%, 430px);
+  height: 100dvh;
+  overflow: hidden;
+  transform: translateX(-50%);
+  isolation: isolate;
+  background: var(--ivory);
+  outline: none;
+  touch-action: none;
+}
+html[data-mode="dark"] .konoha-harvest-flight {
+  --harvest-curtain: #fff;
+  --harvest-sky-top: #294858;
+  --harvest-sky-mid: #182f3c;
+  --harvest-sky-low: #0c181e;
+  --harvest-canopy: #020c11;
+}
+.konoha-harvest-sky {
+  position: absolute;
+  inset: -45% 0 -25%;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--harvest-sky-top), var(--harvest-sky-mid) 47%, var(--harvest-sky-low) 91%);
+  transform: translateY(-10%);
+}
+.konoha-sky-light {
+  position: absolute;
+  inset: 5% -35% 15%;
+  background: radial-gradient(ellipse at 56% 28%, #fffcdfb3, #fffbe732 26%, transparent 58%);
+  filter: blur(14px);
+  opacity: .75;
+}
+html[data-mode="dark"] .konoha-sky-light {
+  background: radial-gradient(ellipse at 56% 28%, #e5f2ee55, #ccdce816 25%, transparent 56%);
+}
+.konoha-sky-cloud {
+  position: absolute;
+  width: 90%;
+  height: 12%;
+  background: radial-gradient(ellipse, #fffef67a, transparent 68%);
+  filter: blur(13px);
+  transform: rotate(-13deg);
+}
+.konoha-sky-cloud--one { left: -23%; top: 23%; }
+.konoha-sky-cloud--two { right: -32%; top: 36%; opacity: .5; }
+html[data-mode="dark"] .konoha-sky-cloud { opacity: .12; }
+.konoha-camera-canopy { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--harvest-canopy); opacity: .27; filter: blur(3px); transform: translateY(22%); }
+.konoha-sky-mote { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #fff7d4; box-shadow: 0 0 12px 3px #fff2c933; opacity: .6; }
+.konoha-sky-mote--one { left: 29%; top: 51%; }
+.konoha-sky-mote--two { left: 74%; top: 32%; width: 2px; height: 2px; opacity: .4; }
+.konoha-flight-perspective { position: absolute; inset: 0; perspective: 950px; }
+.konoha-flight-path { position: absolute; left: 8%; top: 34%; width: 84%; aspect-ratio: 9 / 5; transform-style: preserve-3d; }
+.konoha-flight-flutter { position: relative; width: 100%; height: 100%; transform: rotateZ(-9deg) rotateY(-9deg) rotateX(10deg); transform-style: preserve-3d; }
+.konoha-flight-petal { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(6px 18px 16px #263e3626); }
+.konoha-flight-writing { position: absolute; inset: 26% 9% 20% 15%; display: flex; align-items: center; justify-content: center; color: var(--konoha-petal-ink); }
+.konoha-pencil-word { font-family: "Yu Kyokasho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: clamp(24px, 7.5vw, 32px); line-height: 1.5; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.konoha-flight-writing[data-long="true"] .konoha-pencil-word { font-size: clamp(16px, 5vw, 21px); letter-spacing: .015em; }
+.konoha-pencil-letter { display: inline-block; opacity: 0; animation: konoha-pencil-mark 260ms linear both; }
+.konoha-pencil-track { position: absolute; top: 53%; left: calc((100% - var(--ink-width)) / 2); width: var(--ink-width); height: 1px; }
+.konoha-pencil { position: absolute; top: -3px; width: 107px; height: 24px; animation: konoha-pencil-travel var(--write-ms) linear both; }
+.konoha-pencil svg { width: 100%; height: 100%; transform-origin: 3px 12px; filter: drop-shadow(2px 5px 2px #26372d25); animation: konoha-pencil-scribble 150ms ease-in-out infinite; }
+.konoha-harvest-flight:not([data-phase="writing"]) .konoha-pencil { display: none; }
+.konoha-harvest-flight:not([data-phase="writing"]) .konoha-flight-path { animation: konoha-petal-lift 2400ms cubic-bezier(.3,.05,.26,1) both; }
+.konoha-harvest-flight:not([data-phase="writing"]) .konoha-flight-flutter { animation: konoha-petal-flutter 2400ms ease-in-out both; }
+.konoha-harvest-flight:not([data-phase="writing"]) .konoha-harvest-sky { animation: konoha-look-up 2400ms cubic-bezier(.3,.05,.3,1) both; }
+.konoha-harvest-flight:not([data-phase="writing"]) .konoha-camera-canopy { animation: konoha-canopy-below 2400ms ease-in-out both; }
+.konoha-harvest-curtain { position: absolute; inset: 0; z-index: 5; background: var(--harvest-curtain); opacity: 0; transition: opacity var(--fade-ms) ease-in; }
+.konoha-harvest-flight:is([data-phase="fading"], [data-phase="holding"], [data-phase="returning"]) .konoha-harvest-curtain { opacity: 1; }
+.konoha-harvest-flight[data-phase="returning"] { animation: konoha-harvest-return var(--reveal-ms) ease-out both; }
+
+@keyframes konoha-pencil-mark {
+  from { opacity: .1; clip-path: inset(0 100% 0 0); }
+  45% { opacity: .85; }
+  to { opacity: 1; clip-path: inset(0); }
+}
+@keyframes konoha-pencil-travel {
+  0%,12% { left: -2%; opacity: 0; }
+  19% { left: 0; opacity: 1; }
+  77% { left: 98%; opacity: 1; transform: translateY(0); }
+  92%,100% { left: 110%; opacity: 0; transform: translateY(-25px); }
+}
+@keyframes konoha-pencil-scribble {
+  0%,100% { transform: translateY(-2px) rotate(-38deg); }
+  50% { transform: translateY(2px) rotate(-42deg); }
+}
+@keyframes konoha-petal-lift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  18% { transform: translate3d(-18px, -3vh, 10px) scale(.96); }
+  43% { transform: translate3d(38px, -13vh, -55px) scale(.74); }
+  70% { transform: translate3d(-26px, -25vh, -150px) scale(.4); }
+  100% { transform: translate3d(16px, -36vh, -260px) scale(.09); }
+}
+@keyframes konoha-petal-flutter {
+  0% { transform: rotateZ(-9deg) rotateY(-9deg) rotateX(10deg); }
+  22% { transform: rotateZ(12deg) rotateY(34deg) rotateX(-15deg); }
+  46% { transform: rotateZ(-21deg) rotateY(-65deg) rotateX(18deg); }
+  70% { transform: rotateZ(24deg) rotateY(62deg) rotateX(-20deg); }
+  100% { transform: rotateZ(-16deg) rotateY(-24deg) rotateX(25deg); }
+}
+@keyframes konoha-look-up { from { transform: translateY(-10%); } to { transform: translateY(18%); } }
+@keyframes konoha-canopy-below { from { transform: translateY(22%); opacity: .27; } to { transform: translateY(59%); opacity: .12; } }
+@keyframes konoha-harvest-return { from { opacity: 1; } to { opacity: 0; } }
+.konoha-harvest-flight[data-reduced="true"] :is(.konoha-flight-path, .konoha-flight-flutter, .konoha-harvest-sky, .konoha-camera-canopy, .konoha-pencil-letter) { animation: none; }
+.konoha-harvest-flight[data-reduced="true"] .konoha-pencil-letter { opacity: 1; }
+.konoha-harvest-flight[data-reduced="true"] .konoha-pencil { display: none; }

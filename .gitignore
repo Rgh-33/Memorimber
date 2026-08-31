@@ -1,5 +1,7 @@
 node_modules/
 .next/
+.next-dev/
+.next-konohaan-dev/
 out/
 tsconfig.tsbuildinfo
 .env*.local
