@@ -66,6 +66,18 @@ export function TreeArtDefs({ uid }: { uid: string }) {
     <radialGradient id={`${uid}-ground`}>
       <stop stopColor="#344630" stopOpacity=".3" /><stop offset=".45" stopColor="#667851" stopOpacity=".13" /><stop offset="1" stopColor="#83916c" stopOpacity="0" />
     </radialGradient>
+    <linearGradient id={`${uid}-soil-back`} x1="0" y1="0" x2=".25" y2="1">
+      <stop stopColor="#9a8763" /><stop offset=".35" stopColor="#76664c" />
+      <stop offset=".72" stopColor="#554a3a" /><stop offset="1" stopColor="#3d3b31" />
+    </linearGradient>
+    <linearGradient id={`${uid}-soil-front`} x1=".15" y1="0" x2=".8" y2="1">
+      <stop stopColor="#8f7956" /><stop offset=".45" stopColor="#65553f" />
+      <stop offset="1" stopColor="#454036" />
+    </linearGradient>
+    <radialGradient id={`${uid}-seed`} cx=".28" cy=".2" r=".9">
+      <stop stopColor="#d8b77d" /><stop offset=".38" stopColor="#a97c45" />
+      <stop offset=".78" stopColor="#725033" /><stop offset="1" stopColor="#46372c" />
+    </radialGradient>
     {Array.from({ length: 8 }, (_, i) => <linearGradient key={i} id={`${uid}-leaf-${i}`} x1="0" y1="0" x2=".6" y2="1">
       <stop stopColor={`var(--konoha-leaf-${i})`} /><stop offset="1" stopColor={`var(--konoha-leaf-${Math.max(0, i - 1)})`} />
     </linearGradient>)}
@@ -91,6 +103,56 @@ export const TreeCanopy = memo(function TreeCanopy({ uid, front, stage }: { uid:
     </g>)}
   </g>;
 });
+
+export function TreeGround({ uid, stage, front }: { uid: string; stage: number; front: boolean }) {
+  const radius = stage <= 2 ? 34 + stage * 8 : 50 + stage * 10;
+  const left = 190 - radius;
+  const right = 190 + radius;
+  if (!front) return <g className="konoha-soil konoha-soil--back" data-soil-layer="back">
+    <ellipse cx="190" cy="394" rx={radius + 13} ry={stage <= 2 ? 15 : 19} fill={`url(#${uid}-ground)`} />
+    <path d={`M${left} 392 C${190 - radius * .88} 384 ${190 - radius * .7} 386 ${190 - radius * .53} 382
+      C${190 - radius * .35} 378 ${190 - radius * .17} 384 190 381
+      C${190 + radius * .18} 378 ${190 + radius * .33} 384 ${190 + radius * .51} 382
+      C${190 + radius * .68} 380 ${190 + radius * .84} 386 ${right} 392
+      L${right - 3} 399 Q190 ${stage <= 2 ? 404 : 407} ${left + 3} 399Z`} fill={`url(#${uid}-soil-back)`} />
+    <path d={`M${left + radius * .18} 390 Q${190 - radius * .55} 384 ${190 - radius * .37} 387
+      M${190 + radius * .28} 385 Q${190 + radius * .52} 381 ${right - radius * .13} 391`}
+      className="konoha-soil-ridge" />
+    <g className="konoha-soil-specks">
+      <ellipse cx={190 - radius * .58} cy="390" rx="3.4" ry="1.8" />
+      <ellipse cx={190 + radius * .62} cy="391" rx="2.8" ry="1.5" />
+      <circle cx={190 - radius * .26} cy="385" r="1.25" />
+      <circle cx={190 + radius * .34} cy="386" r="1" />
+    </g>
+  </g>;
+
+  return <g className="konoha-soil konoha-soil--front" data-soil-layer="front">
+    <path d={`M${left + 3} 391 C${190 - radius * .76} 389 ${190 - radius * .56} 386 ${190 - radius * .38} 389
+      C${190 - radius * .2} 392 ${190 - radius * .1} 384 190 387
+      C${190 + radius * .13} 383 ${190 + radius * .23} 392 ${190 + radius * .4} 388
+      C${190 + radius * .6} 385 ${190 + radius * .78} 390 ${right - 3} 391
+      Q${right - 5} 400 190 ${stage <= 2 ? 404 : 407} Q${left + 5} 400 ${left + 3} 391Z`}
+      fill={`url(#${uid}-soil-front)`} />
+    <path d={`M${left + 8} 392 Q${190 - radius * .68} 387 ${190 - radius * .47} 390
+      M${190 + radius * .43} 389 Q${190 + radius * .65} 386 ${right - 8} 392`}
+      className="konoha-soil-front-ridge" />
+    {stage === 1 && <path d="M177 388 Q183 383 190 386 Q196 382 203 388" className="konoha-seed-gap" />}
+    <g className="konoha-soil-pebbles">
+      <ellipse cx={190 - radius * .7} cy="395" rx="3.2" ry="1.5" />
+      <ellipse cx={190 + radius * .52} cy="396" rx="2.3" ry="1.15" />
+      {stage >= 3 && <><circle cx={190 - radius * .34} cy="399" r="1.25" /><circle cx={190 + radius * .73} cy="393" r=".9" /></>}
+    </g>
+  </g>;
+}
+
+export function TreeSeed({ uid }: { uid: string }) {
+  return <g className="konoha-seed" transform="translate(190 388) rotate(-8)" data-seed-visible="true">
+    <ellipse rx="8.5" ry="8.2" fill={`url(#${uid}-seed)`} stroke="#4f3d2d" strokeWidth=".65" />
+    <path d="M-6 -2 Q-1 -7 5 -4" fill="none" stroke="#e5c892" strokeWidth="1.1" strokeLinecap="round" opacity=".7" />
+    <path d="M0 -7 Q-2 -4 -1 -1 M0 -7 Q2 -4 1 -1" fill="none" stroke="#5c432f" strokeWidth=".75" strokeLinecap="round" opacity=".72" />
+    <path d="M1 -7 Q3 -9 5 -10" fill="none" stroke="#6d7e4d" strokeWidth="1.2" strokeLinecap="round" />
+  </g>;
+}
 
 export function TreeSeedling({ uid, stage }: { uid: string; stage: number }) {
   const opened = stage >= 2;

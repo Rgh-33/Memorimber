@@ -36,6 +36,13 @@
   aspect-ratio: 380 / 420;
 }
 .konoha-tree-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.konoha-soil--back { filter: drop-shadow(0 3px 2.5px #26332938); }
+.konoha-soil-ridge { fill: none; stroke: #b09a70; stroke-width: 1; stroke-linecap: round; opacity: .5; }
+.konoha-soil-front-ridge { fill: none; stroke: #bda477; stroke-width: .85; stroke-linecap: round; opacity: .42; }
+.konoha-soil-specks { fill: #3e3c32; opacity: .58; }
+.konoha-soil-pebbles { fill: #ab9874; stroke: #4c4638; stroke-width: .35; opacity: .7; }
+.konoha-seed { filter: drop-shadow(0 1px 1px #2b302a66); }
+.konoha-seed-gap { fill: none; stroke: #302f29; stroke-width: 1.5; stroke-linecap: round; opacity: .82; }
 .konoha-tree-size { transition: transform 1.3s cubic-bezier(.2,.65,.25,1), opacity .6s ease; }
 .konoha-seedling { transition: opacity .45s ease; }
 .konoha-seedling-stem, .konoha-cotyledon-joint, .konoha-cotyledon { transition: transform 1.2s cubic-bezier(.22,.61,.36,1), opacity .8s ease; transform-origin: 0 0; }

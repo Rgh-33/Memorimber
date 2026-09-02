@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 import { getTreeBranch, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
-import { TreeArtDefs, TreeCanopy, TreeSeedling, TreeWood } from "@/components/tree-art";
+import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeed, TreeSeedling, TreeWood } from "@/components/tree-art";
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
 
@@ -112,8 +112,8 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
     <div className="konoha-tree-canvas" data-tree-growth={stage} data-month={month} style={{ "--leaf-color": leafColor } as CSSProperties}>
       <svg viewBox="0 0 380 420" className="konoha-tree-svg" aria-hidden="true">
         <defs><TreeArtDefs uid={uid} /></defs>
-        <ellipse cx="190" cy="390" rx={stage <= 2 ? 24 + stage * 7 : 38 + stage * 10} ry="14" fill={`url(#${uid}-ground)`} />
-        <path d="M180 387 Q190 383 200 387" fill="none" stroke="#b3ae97" strokeWidth="1.6" strokeLinecap="round" opacity={count === 0 ? 1 : 0} />
+        <TreeGround uid={uid} stage={stage} front={false} />
+        {stage === 1 && <TreeSeed uid={uid} />}
         {stage === 1 || stage === 2 ? <g key={`seedling-${count}`} className="konoha-stage-enter" style={{ "--growth-delay": "0ms" } as CSSProperties}>
           <g className="konoha-growth-result"><TreeSeedling uid={uid} stage={stage} /></g>
           <GrowthMagic x={190} y={stage === 1 ? 356 : 339} golden />
@@ -153,6 +153,7 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
           </g>
           </g>
         </g>
+        <TreeGround uid={uid} stage={stage} front />
       </svg>
       {visible.map((item) => {
         if (item.stage !== "quiz-ready") return null;
