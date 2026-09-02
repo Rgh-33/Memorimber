@@ -1,14 +1,14 @@
 import type { FruitAppearance } from "@/lib/tree-fruit-layout";
 
-export function TreeFruit({ uid, appearance, mature, x, y: hangY }: {
-  uid: string; appearance: FruitAppearance; mature: boolean; x: number; y: number;
+export function TreeFruit({ uid, appearance, mature, newlyFormed = false, justRipened = false, x, y: hangY }: {
+  uid: string; appearance: FruitAppearance; mature: boolean; newlyFormed?: boolean; justRipened?: boolean; x: number; y: number;
 }) {
   const { variety, tilt, size } = appearance;
   const scale = (mature ? 1 : .52) * size;
   const y = mature ? 23 : 19;
   const fill = `${uid}-${variety}`;
 
-  return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}`} data-fruit-variety={variety}
+  return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}${newlyFormed ? " konoha-fruit--new" : ""}${justRipened ? " konoha-fruit--just-ripe" : ""}`} data-fruit-variety={variety}
     transform={`translate(${x} ${y + hangY}) rotate(${tilt}) scale(${scale})`}>
     <defs>
       <radialGradient id={`${uid}-le-lectier`} cx=".3" cy=".22" r=".82">
@@ -21,8 +21,11 @@ export function TreeFruit({ uid, appearance, mature, x, y: hangY }: {
         <stop stopColor="#d6d87d" /><stop offset=".45" stopColor="#8ba653" /><stop offset="1" stopColor="#405f39" />
       </radialGradient>
       <radialGradient id={`${uid}-dragon-fruit`} cx=".32" cy=".18" r=".84">
-        <stop stopColor="#ff9ab2" /><stop offset=".42" stopColor="#e94c7d" /><stop offset="1" stopColor="#9c2857" />
+        <stop stopColor="#ffabc0" /><stop offset=".34" stopColor="#f14f87" /><stop offset=".72" stopColor="#cf286d" /><stop offset="1" stopColor="#861f50" />
       </radialGradient>
+      <linearGradient id={`${uid}-dragon-bract`} x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#e63e79" /><stop offset=".48" stopColor="#d53270" /><stop offset=".58" stopColor="#a8c85e" /><stop offset="1" stopColor="#4f8248" />
+      </linearGradient>
       <radialGradient id={`${uid}-jatropha-curcas`} cx=".35" cy=".22" r=".84">
         <stop stopColor="#e1db79" /><stop offset=".48" stopColor="#91a957" /><stop offset="1" stopColor="#4f6538" />
       </radialGradient>
@@ -31,6 +34,16 @@ export function TreeFruit({ uid, appearance, mature, x, y: hangY }: {
       </radialGradient>
     </defs>
 
+    {newlyFormed && <g className="konoha-new-fruit-emphasis" aria-hidden="true">
+      <ellipse className="konoha-new-fruit-halo" cx="0" cy="1" rx="18" ry="19" />
+      <path className="konoha-new-fruit-glint" d="M0 -23V-16 M-3.5 -19.5H3.5 M18 -12V-7 M15.5 -9.5H20.5" />
+    </g>}
+    {justRipened && <g className="konoha-just-ripe-celebration" aria-hidden="true">
+      <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--one" cx="0" cy="1" rx="20" ry="21" />
+      <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--two" cx="0" cy="1" rx="24" ry="25" />
+      <path className="konoha-just-ripe-burst" d="M0 -29V-21 M0 23V31 M-28 1H-20 M20 1H28 M-20 -19L-14 -13 M14 15L20 21 M20 -19L14 -13 M-14 15L-20 21" />
+    </g>}
+    {mature && <ellipse className="konoha-ripe-aura" cx="0" cy="1" rx="20" ry="21" />}
     <path d="M0 -15 Q-1 -11 1 -8" fill="none" stroke="#5b4a2d" strokeWidth="2" strokeLinecap="round" />
 
     {variety === "le-lectier" && <>
@@ -54,11 +67,20 @@ export function TreeFruit({ uid, appearance, mature, x, y: hangY }: {
     </>}
 
     {variety === "dragon-fruit" && <>
-      <path d="M0 -12 C-8 -13 -12 -6 -11 3 C-10 12 -5 16 1 15 C8 15 12 9 11 1 C11 -7 7 -12 0 -12Z" fill={`url(#${fill})`} stroke="#922a57" strokeWidth=".8" />
-      <g fill="#7ea553" stroke="#4e7546" strokeWidth=".45">
-        <path d="M-4 -10 Q-9 -15 -8 -7Z M4 -10 Q10 -14 7 -6Z M-9 -4 Q-15 -5 -10 1Z M9 -2 Q15 -5 10 3Z M-9 6 Q-14 8 -7 10Z M8 7 Q14 10 7 11Z M-2 14 Q0 20 3 14Z" />
+      <path d="M0 -13 C-8 -14 -13 -7 -12 1 C-13 9 -8 15 -1 16 C7 17 12 12 12 3 C13 -5 8 -12 0 -13Z" fill={`url(#${fill})`} stroke="#8f2354" strokeWidth=".85" />
+      <g fill={`url(#${uid}-dragon-bract)`} stroke="#477842" strokeWidth=".48" strokeLinejoin="round">
+        <path d="M-3 -11 C-7 -15 -7 -19 -5 -21 C-1 -17 1 -14 2 -11Z" />
+        <path d="M-8 -8 C-13 -10 -15 -13 -14 -16 C-10 -13 -6 -12 -4 -9Z" />
+        <path d="M6 -9 C11 -12 14 -13 15 -11 C12 -7 9 -5 7 -4Z" />
+        <path d="M-11 -2 C-16 -3 -18 -6 -18 -9 C-14 -7 -10 -6 -7 -3Z" />
+        <path d="M10 -1 C15 -4 18 -4 19 -1 C15 2 12 3 9 3Z" />
+        <path d="M-10 6 C-15 7 -17 5 -18 3 C-14 2 -10 1 -7 2Z" />
+        <path d="M9 7 C14 5 17 7 18 9 C14 11 10 11 7 10Z" />
+        <path d="M-5 12 C-8 16 -7 20 -5 21 C-2 18 -1 15 0 13Z" />
+        <path d="M3 13 C5 18 8 19 10 17 C8 13 6 11 4 10Z" />
       </g>
-      <path d="M-6 -6 Q-9 1 -6 7" fill="none" stroke="#ffd0d9" strokeWidth="2" strokeLinecap="round" opacity=".48" />
+      <path d="M-7 -7 Q-10 0 -7 8" fill="none" stroke="#ffd7e2" strokeWidth="2.2" strokeLinecap="round" opacity=".58" />
+      <path d="M1 -10 Q5 -7 7 -3" fill="none" stroke="#ffb1c8" strokeWidth=".8" opacity=".55" />
     </>}
 
     {variety === "jatropha-curcas" && <>
@@ -75,5 +97,7 @@ export function TreeFruit({ uid, appearance, mature, x, y: hangY }: {
       <path d="M-8 -6 Q-12 1 -9 8" fill="none" stroke="#ffedaa" strokeWidth="2.5" strokeLinecap="round" opacity=".48" />
       {mature && <g fill="#74512f" opacity=".55"><circle cx="4" cy="-4" r=".55" /><circle cx="8" cy="1" r=".6" /><circle cx="5" cy="9" r=".45" /><circle cx="-1" cy="12" r=".6" /><circle cx="-4" cy="4" r=".45" /><circle cx="10" cy="7" r=".45" /></g>}
     </>}
+    {mature && <path className="konoha-ripe-sparkles" aria-hidden="true"
+      d="M-18 -10V-4 M-21 -7H-15 M17 -3V3 M14 0H20 M-12 15V19 M-14 17H-10" />}
   </g>;
 }

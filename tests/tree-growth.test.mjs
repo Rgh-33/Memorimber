@@ -20,6 +20,21 @@ test("a photo starts as its own leaf and ripens only after seven later uploads",
   assert.equal(buildTreeItems(photos(9), "2026-08-01", {})[1].stage, "quiz-ready");
 });
 
+test("only the latest photo and the fruit formed or ripened by it are marked for emphasis", () => {
+  for (let count = 1; count <= 20; count++) {
+    const items = buildTreeItems(photos(count), "2026-08-01", {});
+    const newlyAdded = items.filter(item => item.newlyAdded);
+    const newlyFruited = items.filter(item => item.newlyFruited);
+    const newlyRipened = items.filter(item => item.newlyRipened);
+    assert.deepEqual(newlyAdded.map(item => item.memoryId), [`photo-${String(count - 1).padStart(3, "0")}`]);
+    assert.deepEqual(newlyFruited.map(item => item.memoryId), count >= 6 ? [`photo-${String(count - 6).padStart(3, "0")}`] : []);
+    assert.deepEqual(newlyRipened.map(item => item.memoryId), count >= 8 ? [`photo-${String(count - 8).padStart(3, "0")}`] : []);
+    assert.ok(newlyAdded.every(item => item.growthStage === 1 && item.stage === "growing"));
+    assert.ok(newlyFruited.every(item => item.growthStage === 6 && item.stage === "growing"));
+    assert.ok(newlyRipened.every(item => item.growthStage === 7 && item.stage === "quiz-ready"));
+  }
+});
+
 test("growth follows uploads, remains stable after refresh and does not double count", () => {
   const source = photos(8);
   const expected = buildTreeItems(source, "2026-08-01", {});

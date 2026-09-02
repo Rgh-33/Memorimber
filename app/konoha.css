@@ -4,6 +4,10 @@
   --konoha-petal-ink: #19271f;
   --konoha-petal-fold: color-mix(in srgb, var(--accent) 28%, #d3cdb2);
   --konoha-petal-light: color-mix(in srgb, var(--accent) 11%, #f5ead4);
+  --konoha-blossom: color-mix(in srgb, var(--accent) 12%, #fff7dc);
+  --konoha-blossom-edge: color-mix(in srgb, var(--accent) 34%, #f0b6a2);
+  --konoha-magic: color-mix(in srgb, var(--accent) 24%, #ffe98b);
+  --konoha-calm-magic: color-mix(in srgb, var(--accent) 8%, #d9e2d3);
 }
 .konoha-scene {
   outline: none;
@@ -51,12 +55,37 @@
 .konoha-bark-ridge { fill: none; stroke: #c0b48b; stroke-width: .8; stroke-linecap: round; opacity: .65; }
 .konoha-light-dust { animation: konoha-light-dust 7s ease-in-out infinite; }
 .konoha-leaf { opacity: .9; }
-.konoha-flower > path { fill: var(--konoha-petal-fill); stroke: var(--konoha-petal-edge); stroke-width: .65; }
-.konoha-flower--1 > path { fill: #dfbfb8; stroke: #bd9c8c; }
-.konoha-flower--2 > path { fill: #c6ad99; stroke: #a48c78; }
-.konoha-flower--3 > path { fill: #b6a185; stroke: #958772; opacity: .85; }
-.konoha-stage-enter { animation: konoha-stage-enter .8s ease-out both; }
-.konoha-fruit--ripe { filter: drop-shadow(0 2px 1.5px #182d2b66); }
+.konoha-flower--open > path { fill: var(--konoha-blossom); stroke: var(--konoha-blossom-edge); stroke-width: .72; }
+.konoha-flower--setting > path { fill: color-mix(in srgb, var(--konoha-blossom) 78%, #f3bdad); stroke: var(--konoha-blossom-edge); stroke-width: .68; }
+.konoha-flower-center { fill: #ffd86a; stroke: #d49b3e; stroke-width: .45; }
+.konoha-fruit-ovary { fill: #91b65b; stroke: #587b42; stroke-width: .65; }
+.konoha-falling-blossom-petal { opacity: .82; }
+.konoha-flower-bud > path:first-child { fill: var(--konoha-blossom); stroke: var(--konoha-blossom-edge); stroke-width: .7; }
+.konoha-flower-bud--small { transform-box: fill-box; transform-origin: center; }
+.konoha-bud-sepal { fill: #8fac62; stroke: #597947; stroke-width: .5; }
+.konoha-bud-vein { fill: none; stroke: color-mix(in srgb, var(--konoha-blossom-edge) 65%, white); stroke-width: .75; }
+.konoha-stage-enter { --growth-delay: 0ms; }
+.konoha-growth-result { transform-box: fill-box; transform-origin: center; animation: konoha-growth-result .5s cubic-bezier(.16,.72,.3,1) calc(var(--growth-delay) + 750ms) both; }
+.konoha-growth-magic { pointer-events: none; }
+.konoha-magic-orbit { fill: none; stroke: var(--konoha-magic); stroke-width: 1.35; stroke-linecap: round; stroke-dasharray: 9 5; transform-box: fill-box; transform-origin: center; filter: drop-shadow(0 0 2px color-mix(in srgb, var(--konoha-magic) 68%, transparent)); animation: konoha-magic-orbit .92s cubic-bezier(.18,.7,.28,1) var(--growth-delay) both; }
+.konoha-magic-orbit--tall { animation-delay: calc(var(--growth-delay) + 70ms); animation-direction: reverse; }
+.konoha-magic-core { fill: #fff8c7; filter: drop-shadow(0 0 4px var(--konoha-magic)); animation: konoha-magic-core .94s ease-out var(--growth-delay) both; }
+.konoha-magic-burst { fill: none; stroke: #fff4a8; stroke-width: 1.65; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--konoha-magic)); transform-box: fill-box; transform-origin: center; animation: konoha-magic-burst .52s ease-out calc(var(--growth-delay) + 650ms) both; }
+.konoha-calm-mote { fill: var(--konoha-calm-magic); filter: drop-shadow(0 0 1.5px color-mix(in srgb, var(--konoha-calm-magic) 60%, transparent)); transform-box: fill-box; transform-origin: center; animation: konoha-calm-mote .82s ease-out var(--growth-delay) both; }
+.konoha-calm-mote--two { animation-delay: calc(var(--growth-delay) + 110ms); }
+.konoha-calm-mote--three { animation-delay: calc(var(--growth-delay) + 190ms); }
+.konoha-calm-glint { fill: none; stroke: var(--konoha-calm-magic); stroke-width: .8; stroke-linecap: round; filter: drop-shadow(0 0 1.4px color-mix(in srgb, var(--konoha-calm-magic) 55%, transparent)); transform-box: fill-box; transform-origin: center; animation: konoha-calm-glint .72s ease-out calc(var(--growth-delay) + 220ms) both; }
+.konoha-fruit--ripe { filter: drop-shadow(0 2px 1.5px #182d2b66) drop-shadow(0 0 6px rgb(var(--accent-rgb) / .58)); }
+.konoha-ripe-aura { fill: rgb(var(--accent-rgb) / .3); stroke: none; filter: blur(2.8px) drop-shadow(0 0 4px rgb(var(--accent-rgb) / .62)); transform-box: fill-box; transform-origin: center; animation: konoha-ripe-aura 2.2s ease-in-out infinite; }
+.konoha-ripe-sparkles { fill: none; stroke: #fff4a8; stroke-width: 1.35; stroke-linecap: round; filter: drop-shadow(0 0 2.5px rgb(var(--accent-rgb) / .8)); animation: konoha-ripe-sparkles 2.2s ease-in-out infinite; }
+.konoha-new-fruit-emphasis, .konoha-just-ripe-celebration { pointer-events: none; }
+.konoha-new-fruit-halo { fill: color-mix(in srgb, var(--konoha-magic) 46%, transparent); stroke: color-mix(in srgb, var(--konoha-magic) 78%, white); stroke-width: .85; filter: blur(1.2px) drop-shadow(0 0 3px var(--konoha-magic)); transform-box: fill-box; transform-origin: center; animation: konoha-new-fruit-halo 2.6s ease-out calc(var(--growth-delay) + 1280ms) both; }
+.konoha-new-fruit-glint { fill: none; stroke: #fff6b5; stroke-width: 1.35; stroke-linecap: round; filter: drop-shadow(0 0 2px var(--konoha-magic)); transform-box: fill-box; transform-origin: center; animation: konoha-new-fruit-glint 1.7s ease-out calc(var(--growth-delay) + 1340ms) both; }
+.konoha-just-ripe-pop { transform-box: fill-box; transform-origin: center; animation: konoha-just-ripe-pop .92s cubic-bezier(.17,.75,.25,1) calc(var(--growth-delay) + 1500ms) both; }
+.konoha-fruit--just-ripe { filter: drop-shadow(0 2px 1.5px #182d2b66) drop-shadow(0 0 9px rgb(var(--accent-rgb) / .78)); }
+.konoha-just-ripe-ring { fill: none; stroke: color-mix(in srgb, var(--accent) 58%, #fff3a4); stroke-width: 1.45; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 3px rgb(var(--accent-rgb) / .75)); transform-box: fill-box; transform-origin: center; animation: konoha-just-ripe-ring 1.1s ease-out calc(var(--growth-delay) + 1480ms) both; }
+.konoha-just-ripe-ring--two { animation-delay: calc(var(--growth-delay) + 1610ms); }
+.konoha-just-ripe-burst { fill: none; stroke: #fff2a0; stroke-width: 1.7; stroke-linecap: round; filter: drop-shadow(0 0 3px rgb(var(--accent-rgb) / .82)); transform-box: fill-box; transform-origin: center; animation: konoha-just-ripe-burst .82s ease-out calc(var(--growth-delay) + 1510ms) both; }
 .konoha-fruit--young { filter: saturate(.58) hue-rotate(-8deg); opacity: .88; }
 .konoha-photo-node .konoha-node-art { filter: drop-shadow(0 1px 1px #213b302e); }
 .konoha-fruit-target {
@@ -145,6 +174,10 @@ html[data-mode="dark"] .konoha-scene, html[data-mode="dark"] .konoha-petal-color
   --konoha-petal-ink: #fff8e9;
   --konoha-petal-fold: color-mix(in srgb, var(--accent) 19%, #354134);
   --konoha-petal-light: color-mix(in srgb, var(--accent) 18%, #3b4739);
+  --konoha-blossom: color-mix(in srgb, var(--accent) 13%, #fff1ca);
+  --konoha-blossom-edge: color-mix(in srgb, var(--accent) 35%, #edaa9d);
+  --konoha-magic: color-mix(in srgb, var(--accent) 22%, #ffea8d);
+  --konoha-calm-magic: color-mix(in srgb, var(--accent) 10%, #d7e1d3);
 }
 html[data-mode="dark"] .konoha-tree-svg { filter: brightness(1.13) saturate(.85); }
 html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha-petal-ink); text-shadow: none; }
@@ -153,6 +186,74 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
 @keyframes konoha-light-dust { 0%,100% { opacity: .3; transform: translateY(2px); } 50% { opacity: .75; transform: translateY(-3px); } }
 @keyframes konoha-leaf-wind { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(5deg); } }
 @keyframes konoha-stage-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes konoha-growth-result {
+  from { opacity: 0; transform: scale(.66) translateY(3px); filter: brightness(1.65); }
+  65% { opacity: 1; transform: scale(1.06) translateY(-1px); filter: brightness(1.18); }
+  to { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+}
+@keyframes konoha-magic-orbit {
+  0% { opacity: 0; stroke-dashoffset: 30; transform: rotate(-35deg) scale(.45); }
+  28% { opacity: .92; }
+  72% { opacity: .78; transform: rotate(145deg) scale(1); }
+  100% { opacity: 0; stroke-dashoffset: -18; transform: rotate(235deg) scale(.25); }
+}
+@keyframes konoha-magic-core {
+  0%, 28% { opacity: 0; transform: scale(.25); }
+  62% { opacity: .95; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.1); }
+}
+@keyframes konoha-magic-burst {
+  from { opacity: 0; transform: scale(.25) rotate(-12deg); }
+  34% { opacity: 1; }
+  to { opacity: 0; transform: scale(1.35) rotate(4deg); }
+}
+@keyframes konoha-calm-mote {
+  0% { opacity: 0; transform: translateY(3px) scale(.5); }
+  45% { opacity: .62; }
+  100% { opacity: 0; transform: translateY(-4px) scale(1); }
+}
+@keyframes konoha-calm-glint {
+  0%, 20% { opacity: 0; transform: scale(.55); }
+  52% { opacity: .55; }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+@keyframes konoha-ripe-aura {
+  0%,100% { opacity: .28; transform: scale(.92); }
+  50% { opacity: .68; transform: scale(1.11); }
+}
+@keyframes konoha-ripe-sparkles {
+  0%,100% { opacity: .28; }
+  45% { opacity: .95; }
+  65% { opacity: .48; }
+}
+@keyframes konoha-new-fruit-halo {
+  0% { opacity: 0; transform: scale(.35); }
+  24% { opacity: .92; transform: scale(1); }
+  58% { opacity: .58; transform: scale(1.3); }
+  100% { opacity: .32; transform: scale(1.08); }
+}
+@keyframes konoha-new-fruit-glint {
+  0% { opacity: 0; transform: scale(.45) rotate(-12deg); }
+  24% { opacity: 1; }
+  100% { opacity: .28; transform: scale(1.18) rotate(5deg); }
+}
+@keyframes konoha-just-ripe-pop {
+  0% { transform: scale(.8); filter: brightness(1); }
+  30% { transform: scale(1.28); filter: brightness(1.55); }
+  54% { transform: scale(.94); filter: brightness(1.18); }
+  76% { transform: scale(1.1); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes konoha-just-ripe-ring {
+  0% { opacity: 0; transform: scale(.4); stroke-width: 2.2; }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.7); stroke-width: .55; }
+}
+@keyframes konoha-just-ripe-burst {
+  0% { opacity: 0; transform: scale(.35) rotate(-10deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.38) rotate(4deg); }
+}
 @keyframes konoha-petal-float {
   0%,100% { transform: translate3d(var(--word-x), var(--word-y), 0) rotate(var(--word-rotate)) scale(var(--word-scale)); }
   40% { transform: translate3d(calc(var(--word-x) + var(--word-drift-x)), calc(var(--word-y) - 5px), 0) rotate(calc(var(--word-rotate) + 3deg)) scale(var(--word-scale)); }
@@ -170,7 +271,15 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
 }
 @media (prefers-reduced-motion: reduce) {
   .konoha-tree-size, .konoha-seedling, .konoha-seedling-stem, .konoha-cotyledon-joint, .konoha-cotyledon, .konoha-trunk-detail, .konoha-young-wood, .konoha-young-trunk, .konoha-node-size { transition: none; }
-  .konoha-tree-wind, .konoha-node-wind, .konoha-stage-enter, .konoha-petal-arrive, .konoha-petal-sway,
+  .konoha-tree-wind, .konoha-node-wind, .konoha-stage-enter, .konoha-growth-result, .konoha-magic-orbit,
+  .konoha-magic-core, .konoha-magic-burst, .konoha-calm-mote, .konoha-calm-glint, .konoha-ripe-aura, .konoha-ripe-sparkles,
+  .konoha-new-fruit-halo, .konoha-new-fruit-glint, .konoha-just-ripe-pop, .konoha-just-ripe-ring,
+  .konoha-just-ripe-burst, .konoha-petal-arrive, .konoha-petal-sway,
   .konoha-crown, .konoha-canopy-clump, .konoha-canopy-drift, .konoha-light-dust, .konoha-bough, .konoha-branch-tip,
   .konoha-scene .memory-floating-word { animation: none !important; }
+  .konoha-growth-magic { display: none; }
+  .konoha-ripe-aura { opacity: .55; }
+  .konoha-ripe-sparkles { opacity: .78; }
+  .konoha-new-fruit-halo { opacity: .42; }
+  .konoha-new-fruit-glint, .konoha-just-ripe-ring, .konoha-just-ripe-burst { opacity: .55; }
 }
