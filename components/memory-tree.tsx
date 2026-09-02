@@ -5,6 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { MemoryCard } from "@/components/memory-card";
 import { GrowingTree } from "@/components/growing-tree";
 import { MemoryPetal } from "@/components/memory-petal";
+import { QuizSession } from "@/components/quiz-session";
+import { useHarvest } from "@/lib/harvest-context";
+import { getFruitQuiz } from "@/lib/tree-growth";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 
@@ -55,12 +58,16 @@ function FloatingWord({
   getTreeRect,
   onInteractionChange,
   onReveal,
+  isJustHarvested,
+  onArrivalComplete,
 }: {
   item: HarvestedTreeItem;
   isDimmed: boolean;
   getTreeRect: () => DOMRect | null;
   onInteractionChange: (id: string | null) => void;
   onReveal: (item: HarvestedTreeItem) => void;
+  isJustHarvested: boolean;
+  onArrivalComplete: (id: string) => void;
 }) {
   const motion = WORD_MOTION[item.wordSlot % WORD_MOTION.length];
   const [gestureState, setGestureState] = useState<GestureState>("idle");
@@ -339,7 +346,14 @@ function FloatingWord({
           <span key={index} className={`memory-word-shake-particle ${index < activeParticleCount ? "memory-word-shake-particle--active" : ""}`} />
         ))}
       </span>
-      <span className="konoha-petal-arrive">
+      <span
+        className={`konoha-petal-arrive${isJustHarvested ? " konoha-petal-arrive--just-harvested" : ""}`}
+        onAnimationEnd={(event) => {
+          if (isJustHarvested && event.currentTarget === event.target) {
+            onArrivalComplete(item.memoryId ?? item.id);
+          }
+        }}
+      >
         <span className="konoha-petal-sway">
           <MemoryPetal />
           <span className="memory-floating-word-label">{item.word}</span>
@@ -350,7 +364,9 @@ function FloatingWord({
 }
 
 export function MemoryTree({ items, petals, memories, count, month }: { items: MemoryTreeItem[]; petals: HarvestedTreeItem[]; memories: Memory[]; count: number; month: string }) {
+  const harvest = useHarvest();
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
+  const [quizMemoryId, setQuizMemoryId] = useState<string | null>(null);
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const treeArtRef = useRef<HTMLDivElement>(null);
@@ -358,6 +374,7 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
   // moves the tree down instead of hiding older words behind a page control.
   const shownWords = useMemo(() => [...petals].reverse(), [petals]);
   const memoriesById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory])), [memories]);
+  const fruitQuiz = useMemo(() => getFruitQuiz(memories, items, quizMemoryId), [items, memories, quizMemoryId]);
   const relatedMemoryIds = revealedItem?.relatedMemoryIds?.length
     ? revealedItem.relatedMemoryIds
     : revealedItem?.memoryId
@@ -391,12 +408,17 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
             getTreeRect={getTreeRect}
             onInteractionChange={setActiveWordId}
             onReveal={setRevealedItem}
+            isJustHarvested={harvest.arrivingMemoryId === (item.memoryId ?? item.id)}
+            onArrivalComplete={harvest.completeArrival}
           />
         ))}
       </div>
 
       <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
-        <GrowingTree items={items} count={count} month={month} />
+        <GrowingTree items={items} memories={memories} count={count} month={month} onFruitSelect={(memoryId) => {
+          setRevealedItem(null);
+          setQuizMemoryId(memoryId);
+        }} />
       </div>
 
       <p className="sr-only" aria-live="polite">
@@ -431,6 +453,18 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
               )}
             </div>
           </section>
+        </div>
+      )}
+
+      {fruitQuiz && (
+        <div className="konoha-quiz-overlay" onClick={() => setQuizMemoryId(null)}>
+          <QuizSession
+            key={fruitQuiz.memory.id}
+            quiz={fruitQuiz}
+            variant="dialog"
+            onClose={() => setQuizMemoryId(null)}
+            onHarvest={() => setQuizMemoryId(null)}
+          />
         </div>
       )}
     </section>

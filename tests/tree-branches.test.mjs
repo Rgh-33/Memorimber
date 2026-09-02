@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getTreeBranch, getTreeStructure, placeTreeItems, TREE_NODE_CAPACITY, TREE_PROPORTION } from "../lib/tree-branches.ts";
+import {
+  getTreeBranch,
+  getTreeCanvasMetrics,
+  getTreeStructure,
+  placeTreeItems,
+  TREE_NODE_CAPACITY,
+  TREE_PROPORTION,
+} from "../lib/tree-branches.ts";
 import { fruitHangAt } from "../lib/tree-fruit-layout.ts";
 
 test("photo tips stay in the leafy crown, away from the bare lower trunk", () => {
@@ -40,6 +47,34 @@ test("all ripe fruit touch areas remain separate at 320px and 430px screen width
   }
 });
 
+test("additional crown rows keep every fruit touch area separate and inside the canvas", () => {
+  for (const count of [13, 18, 19, 36, 72, 120]) {
+    const canvas = getTreeCanvasMetrics(count);
+    assert.equal(getTreeStructure(count, false).length, count);
+    for (const width of [320, 430]) {
+      const viewportScale = (width - 40) / 380;
+      for (const mirrored of [false, true]) {
+        const fruit = Array.from({ length: count }, (_, index) => {
+          const branch = getTreeBranch(index, mirrored);
+          const hang = fruitHangAt(index, mirrored);
+          const x = 190 + (branch.x - 190) * TREE_PROPORTION.x + hang.x;
+          const y = 383 + (branch.y - 383) * TREE_PROPORTION.y + hang.y;
+          assert.ok(x >= 22 && x <= 358, `fruit ${index + 1} is outside the horizontal canvas`);
+          assert.ok(y >= canvas.minY + 22 && y <= 398, `fruit ${index + 1} is outside the vertical canvas`);
+          return { x: x * viewportScale, y: y * viewportScale };
+        });
+        for (let i = 0; i < fruit.length; i++) {
+          for (let j = i + 1; j < fruit.length; j++) {
+            const dx = Math.abs(fruit[i].x - fruit[j].x);
+            const dy = Math.abs(fruit[i].y - fruit[j].y);
+            assert.ok(dx >= 44 || dy >= 52, `fruit ${i + 1} and ${j + 1} overlap at ${width}px with ${count} photos`);
+          }
+        }
+      }
+    }
+  }
+});
+
 test("twigs meet a parent branch curve without a visible gap, including mirrored months", () => {
   const pointAt = (path, t) => {
     const p = path.match(/-?\d+(?:\.\d+)?/g).map(Number);
@@ -63,24 +98,40 @@ test("twigs meet a parent branch curve without a visible gap, including mirrored
   }
 });
 
-test("the grown tree keeps its skeleton even when more photos are added", () => {
+test("the first twelve branches never move while later branches are created only as needed", () => {
   for (const mirrored of [false, true]) {
     const grown = getTreeStructure(7, mirrored);
-    assert.ok(grown.length > 0);
+    assert.equal(grown.length, TREE_NODE_CAPACITY);
     for (const count of [8, 12, 13, 31, 120, 365]) {
-      assert.deepEqual(getTreeStructure(count, mirrored), grown);
+      const expanded = getTreeStructure(count, mirrored);
+      assert.equal(expanded.length, Math.max(TREE_NODE_CAPACITY, count));
+      assert.deepEqual(expanded.slice(0, TREE_NODE_CAPACITY), grown);
     }
   }
 });
 
+test("the canvas grows one crown row at a time after the twelfth photo", () => {
+  assert.deepEqual(getTreeCanvasMetrics(12), { extensionRows: 0, extraHeight: 0, minY: 0, height: 420 });
+  assert.deepEqual(getTreeCanvasMetrics(13), { extensionRows: 1, extraHeight: 137, minY: -137, height: 557 });
+  assert.deepEqual(getTreeCanvasMetrics(18), getTreeCanvasMetrics(13));
+  assert.deepEqual(getTreeCanvasMetrics(19), { extensionRows: 2, extraHeight: 232, minY: -232, height: 652 });
+  assert.equal(getTreeCanvasMetrics(365).extensionRows, 59);
+});
+
 test("the sapling adds forks gradually before reaching the unchanged mature skeleton", () => {
   const expectedCounts = [0, 0, 0, 3, 6, 8, 10, 12];
+  const expectedWidthScales = [0, 0, 0, .28, .33, .38, .42, 1];
   for (const mirrored of [false, true]) {
     const mature = getTreeStructure(7, mirrored);
     expectedCounts.forEach((count, stage) => {
       const growing = getTreeStructure(stage, mirrored);
       assert.equal(growing.length, count);
-      assert.deepEqual(growing, mature.slice(0, count));
+      growing.forEach((branch, index) => {
+        assert.equal(branch.path, mature[index].path);
+        assert.ok(Math.abs(branch.width / mature[index].width - expectedWidthScales[stage]) < 1e-9);
+        if (stage < 7) assert.notEqual(branch.surface, mature[index].surface);
+      });
+      if (stage === 7) assert.deepEqual(growing, mature);
     });
   }
 });
@@ -90,27 +141,30 @@ const collect = (items, id) => items.map(item => item.id === id
   ? { id, memoryId: id, stage: "harvested", word: "思い出", wordSlot: 0 }
   : item);
 
-test("a full tree keeps the oldest photos and never expands or mutates the waiting queue", () => {
+test("every active photo receives a stable visible tip as the tree expands", () => {
   for (const count of [0, 1, 7, 12, 13, 120, 365]) {
     const items = Array.from({ length: count }, (_, i) => photo(i));
     const original = structuredClone(items);
     const placed = placeTreeItems(items);
-    assert.equal(placed.slots.length, TREE_NODE_CAPACITY);
-    assert.deepEqual(placed.visibleItems.map(item => item.id), items.slice(0, TREE_NODE_CAPACITY).map(item => item.id));
+    assert.equal(placed.slots.length, Math.max(TREE_NODE_CAPACITY, count));
+    assert.deepEqual(placed.visibleItems.map(item => item.id), items.map(item => item.id));
     assert.equal(new Set(placed.visibleItems.map(item => item.fruitSlot)).size, placed.visibleItems.length);
     assert.deepEqual(items, original);
   }
 });
 
-test("harvesting arbitrary fruit reuses that exact tip for the oldest waiting photo", () => {
+test("a later upload reuses a harvested tip without moving the other fruit", () => {
   let items = Array.from({ length: 16 }, (_, i) => photo(i));
   let placed = placeTreeItems(items);
-  for (const [removed, slot, replacement] of [[5, 5, 12], [2, 2, 13]]) {
+  for (const [removed, slot, replacement] of [[5, 5, 16], [2, 2, 17]]) {
     const before = [...placed.slots];
     items = collect(items, `photo-${removed}`);
     placed = placeTreeItems(items, placed.slots);
-    assert.equal(placed.slots[slot], `photo-${replacement}`);
+    assert.equal(placed.slots[slot], null);
     before.forEach((id, i) => { if (i !== slot) assert.equal(placed.slots[i], id); });
+    items.push(photo(replacement));
+    placed = placeTreeItems(items, placed.slots);
+    assert.equal(placed.slots[slot], `photo-${replacement}`);
     const next = placed.visibleItems.find(item => item.fruitSlot === slot);
     assert.equal(next.memoryId, `photo-${replacement}`);
     assert.equal(next.href, `/quiz?memory=photo-${replacement}`);
@@ -142,7 +196,9 @@ test("saved placements survive reload, and stale or repeated IDs cannot duplicat
   assert.deepEqual(placeTreeItems(items, JSON.parse(JSON.stringify(placed.slots))), placed);
   const repaired = placeTreeItems(items, ["missing", "photo-5", "photo-0", "photo-0"]);
   assert.equal(repaired.slots[2], "photo-0");
-  assert.equal(new Set(repaired.slots).size, TREE_NODE_CAPACITY);
+  const occupied = repaired.slots.filter(Boolean);
+  assert.equal(occupied.length, 15);
+  assert.equal(new Set(occupied).size, occupied.length);
   assert.ok(!repaired.slots.includes("photo-5"));
 });
 
@@ -156,7 +212,7 @@ test("a backlog can be fully harvested from one tree without losing or repeating
     harvested.add(item.id);
     items = collect(items, item.id);
     placed = placeTreeItems(items, placed.slots);
-    assert.ok(placed.visibleItems.length <= TREE_NODE_CAPACITY);
+    assert.equal(placed.visibleItems.length, 365 - harvested.size);
   }
   assert.equal(harvested.size, 365);
   assert.equal(items.length, 365);

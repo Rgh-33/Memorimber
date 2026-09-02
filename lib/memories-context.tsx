@@ -31,6 +31,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const requestVersion = useRef(0);
+  const lastSuccessfulRefresh = useRef(0);
 
   const refreshMemories = useCallback(async () => {
     if (isDemo) return;
@@ -42,6 +43,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
       if (version !== requestVersion.current) return;
       setMemories(result.memories);
       setWarning(result.warning);
+      lastSuccessfulRefresh.current = Date.now();
     } catch (cause) {
       if (version !== requestVersion.current) return;
       setMemories([]);
@@ -61,12 +63,16 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
       setError(null);
       setWarning(null);
+      lastSuccessfulRefresh.current = 0;
     };
     if (["/login", "/signup"].includes(pathname)) {
       clearPrivateData();
       return;
     }
-    void refreshMemories();
+    // A successful post explicitly refreshes before returning to the tree.
+    // Do not immediately clear and reload that fresh result on route change,
+    // or the requested growth sequence flashes twice.
+    if (Date.now() - lastSuccessfulRefresh.current > 1_500) void refreshMemories();
     // Renew signed URLs before expiry, and after returning from a sleeping tab.
     const onVisible = () => {
       if (document.visibilityState === "visible") void refreshMemories();

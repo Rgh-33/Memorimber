@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { SAMPLE_MEMORIES } from "./data";
 import { useMemories } from "./memories-context";
 import { advanceDate, buildPetals, buildTreeItems, localDate, monthlyQueue, recordHarvest, type Harvests } from "./tree-growth";
-import { placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
+import { placeTreeItems, TREE_SLOT_STORAGE_LIMIT } from "./tree-branches";
 import type { Memory } from "./types";
 
 type TreeState = { preview: boolean; date: string; uploads: Memory[]; harvests: Harvests; previewHarvests: Harvests; serial: number; slots: Record<string, (string | null)[]> };
@@ -28,7 +28,7 @@ function readState(raw: string | null, preview: boolean): TreeState {
       // and allocate positions on first use instead of resetting the preview.
       slots: Object.fromEntries(Object.entries(value.slots && typeof value.slots === "object" ? value.slots : {})
         .filter(([key, ids]) => /^(preview|real):\d{4}-(0[1-9]|1[0-2])$/.test(key) && Array.isArray(ids))
-        .map(([key, ids]) => [key, (ids as unknown[]).slice(0, TREE_NODE_CAPACITY).map(id => typeof id === "string" ? id : null)])) };
+        .map(([key, ids]) => [key, (ids as unknown[]).slice(0, TREE_SLOT_STORAGE_LIMIT).map(id => typeof id === "string" ? id : null)])) };
   } catch { return fallback; }
 }
 
