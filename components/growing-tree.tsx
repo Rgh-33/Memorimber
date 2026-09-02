@@ -5,6 +5,8 @@ import { useId, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 import { getTreeBranch, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
 import { TreeArtDefs, TreeCanopy, TreeSeedling, TreeWood } from "@/components/tree-art";
+import { TreeFruit } from "@/components/tree-fruit";
+import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
 
 function Flower({ x, y, age = 0 }: { x: number; y: number; age?: number }) {
   if (age >= 2) return <g transform={`translate(${x} ${y}) scale(.82)`} className={`konoha-flower konoha-flower--${age}`}>
@@ -20,13 +22,12 @@ function Flower({ x, y, age = 0 }: { x: number; y: number; age?: number }) {
   </g>;
 }
 
-export function GrowthNode({ stage, harvested = false }: { stage: number; harvested?: boolean }) {
+export function GrowthNode({ stage, fruitAppearance, fruitHang }: {
+  stage: number; fruitAppearance: FruitAppearance; fruitHang: { x: number; y: number };
+}) {
   const uid = useId().replace(/:/g, "");
   return <g className="konoha-node-art" data-growth-stage={stage}>
     <defs>
-      <radialGradient id={`${uid}-fruit`} cx=".3" cy=".23" r=".8">
-        <stop stopColor="#ffe3a2" /><stop offset=".3" stopColor="#e5b45f" /><stop offset=".72" stopColor="#ba7c35" /><stop offset="1" stopColor="#765126" />
-      </radialGradient>
       <linearGradient id={`${uid}-leaf`} x1="0" y1="0" x2="1" y2="1">
         <stop stopColor="#a2b77a" /><stop offset=".48" stopColor="var(--leaf-color)" /><stop offset="1" stopColor="#3d593a" />
       </linearGradient>
@@ -36,23 +37,22 @@ export function GrowthNode({ stage, harvested = false }: { stage: number; harves
       <path d="M-1 9 C-16 8 -24 -1 -28 -14 C-11 -12 3 -3 -1 9Z" fill={`url(#${uid}-leaf)`} stroke="#536a44" strokeWidth=".5" />
       <path d="M-2 8 Q-12 -5 -25 -12 M-9 0 L-17 0 M-14 -5 L-15 -9" fill="none" stroke="#f4f4d9" strokeOpacity=".48" strokeWidth=".7" />
     </g>
-    {!harvested && <g key={stage} className="konoha-stage-enter">
+    <g key={stage} className="konoha-stage-enter">
       {stage === 2 && <g><path d="M0 6 Q5 0 2 -7" fill="none" stroke="#839969" /><ellipse cx="2" cy="-6" rx="3.5" ry="5" fill="var(--konoha-petal-edge)" /><path d="M-1 -3 L2 0 5 -4" fill="#97ab7d" /></g>}
       {stage === 3 && <g><path d="M0 8 Q8 0 3 -6" fill="none" stroke="#839969" /><path d="M3 1 C-10 -3 -6 -17 3 -20 C13 -17 16 -4 3 1Z" fill="var(--konoha-petal-fill)" /><path d="M3 -17 Q0 -8 3 0 M-4 -6 L3 1 10 -6" fill="none" stroke="var(--konoha-petal-edge)" strokeWidth=".8" /></g>}
       {stage === 4 && <Flower x={2} y={-5} />}
-      {stage >= 5 && <>
+      {stage === 5 && <>
         <path d="M0 12 Q10 5 13 -9 M0 9 Q-6 0 -10 -8" fill="none" stroke="#859a6d" strokeWidth="1.1" />
-        <Flower x={-10} y={stage >= 6 ? -10 : -6} age={stage - 4} />
+        <Flower x={-10} y={-6} age={1} />
         <Flower x={14} y={-9} />
       </>}
-      {stage >= 6 && <g className={stage === 7 ? "konoha-ripe-fruit" : ""}>
-        <path d="M0 8 L0 15" stroke="#859469" strokeWidth="1.2" />
-        <ellipse cx="0" cy={stage === 7 ? 23 : 19} rx={stage === 7 ? 10 : 4.5} ry={stage === 7 ? 11 : 5}
-          fill={stage === 7 ? `url(#${uid}-fruit)` : "#acbc85"} stroke={stage === 7 ? "#edce87" : "#93a975"} strokeWidth=".7" />
-        <path d={stage === 7 ? "M-4 18 Q-7 21 -5 25" : "M-1 17 L-2 19"} fill="none" stroke="#fff7dc" strokeWidth={stage === 7 ? 2.4 : 1.3} strokeLinecap="round" opacity=".65" />
-        <path d="M-3 13 L0 16 3 13" fill="#799766" />
-      </g>}
-    </g>}
+      {stage >= 6 && <>
+        <path d={`M0 8 Q${fruitHang.x * .3} 11 ${fruitHang.x} ${(stage === 7 ? 8 : 4) + fruitHang.y}`}
+          fill="none" stroke="#859469" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M-3 13 L0 16 3 13" fill="#799766" transform={`translate(${fruitHang.x} ${fruitHang.y})`} />
+        <TreeFruit uid={uid} appearance={fruitAppearance} mature={stage === 7} x={fruitHang.x} y={fruitHang.y} />
+      </>}
+    </g>
   </g>;
 }
 
@@ -60,11 +60,15 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
   const uid = useId().replace(/:/g, "");
   const visible = items.filter(item => item.stage !== "harvested").slice(0, TREE_NODE_CAPACITY);
   const stage = Math.min(7, count);
-  const scale = [0.18, 0.18, 0.32, 0.47, 0.61, 0.76, 0.89, 1][stage];
+  const scale = [0.18, 0.18, 0.32, 0.34, 0.52, 0.69, 0.85, 1][stage];
+  const spread = [1, 1, 1, .5, .66, .8, .91, 1][stage];
   const monthIndex = Number(month.slice(5, 7));
   const mirrored = monthIndex % 2 === 0;
   const leafColor = ["#55724d", "#527366", "#79734a", "#586e54"][monthIndex % 4];
-  const position = (index: number) => getTreeBranch(index, mirrored);
+  const position = (index: number) => {
+    const branch = getTreeBranch(index, mirrored);
+    return { ...branch, x: 190 + (branch.x - 190) * spread };
+  };
   return <>
     <div className="konoha-tree-canvas" data-tree-growth={stage} data-month={month} style={{ "--leaf-color": leafColor } as CSSProperties}>
       <svg viewBox="0 0 380 420" className="konoha-tree-svg" aria-hidden="true">
@@ -76,17 +80,21 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
           <g transform={`translate(190 383) scale(${TREE_PROPORTION.x} ${TREE_PROPORTION.y}) translate(-190 -383)`}>
           <g className="konoha-tree-wind">
             <g transform={mirrored ? "translate(380 0) scale(-1 1)" : undefined}>
-              {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} /></g>}
-              <TreeWood uid={uid} stage={stage} />
-              {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front /></g>}
+              <g transform={`translate(190 0) scale(${spread} 1) translate(-190 0)`}>
+                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} stage={stage} /></g>}
+                <TreeWood uid={uid} stage={stage} />
+                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front stage={stage} /></g>}
+              </g>
             </g>
             {visible.map((item) => {
               const slot = position(item.fruitSlot);
+              const memoryId = item.memoryId ?? item.id;
+              const fruitHang = fruitHangAt(item.fruitSlot, mirrored);
               return <g key={item.id} className="konoha-photo-node" data-slot-index={item.fruitSlot} data-memory-id={item.id}>
                 <g className="konoha-branch-tip" transform={`translate(${slot.x} ${slot.y})`}>
                   <g className="konoha-node-size" style={{ transform: `translate(0px, 14px) scale(${1 / scale}) translate(0px, -14px)` }}>
                     <g className="konoha-node-wind" style={{ animationDelay: `${item.fruitSlot * -0.57}s` }}>
-                      <GrowthNode stage={item.growthStage ?? 1} />
+                      <GrowthNode stage={item.growthStage ?? 1} fruitAppearance={fruitAppearanceFor(memoryId)} fruitHang={fruitHang} />
                     </g>
                   </g>
                 </g>
@@ -102,10 +110,11 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
       {visible.map((item) => {
         if (item.stage !== "quiz-ready") return null;
         const slot = position(item.fruitSlot);
+        const fruitHang = fruitHangAt(item.fruitSlot, mirrored);
         return <Link key={item.id} href={item.href} className="konoha-fruit-target" data-memory-id={item.id}
           style={{
-            left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x) / 380 * 100}%`,
-            top: `${(383 + (slot.y + 23 - 383) * scale * TREE_PROPORTION.y) / 420 * 100}%`,
+            left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x + fruitHang.x) / 380 * 100}%`,
+            top: `${(383 + (slot.y + 23 - 383) * scale * TREE_PROPORTION.y + fruitHang.y) / 420 * 100}%`,
           }}
           aria-label="育った実で思い出クイズに挑戦" />;
       })}

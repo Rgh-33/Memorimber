@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getTreeBranch, getTreeStructure, placeTreeItems, TREE_NODE_CAPACITY, TREE_PROPORTION } from "../lib/tree-branches.ts";
+import { fruitHangAt } from "../lib/tree-fruit-layout.ts";
 
 test("photo tips stay in the leafy crown, away from the bare lower trunk", () => {
   for (const mirrored of [false, true]) {
@@ -18,13 +19,22 @@ test("photo tips stay in the leafy crown, away from the bare lower trunk", () =>
 
 test("all ripe fruit touch areas remain separate at 320px and 430px screen widths", () => {
   for (const width of [320, 430]) {
-    const scale = (width - 40) / 380;
-    const branches = Array.from({ length: TREE_NODE_CAPACITY }, (_, i) => getTreeBranch(i, false));
-    for (let i = 0; i < branches.length; i++) {
-      for (let j = i + 1; j < branches.length; j++) {
-        const dx = Math.abs(branches[i].x - branches[j].x) * scale * TREE_PROPORTION.x;
-        const dy = Math.abs(branches[i].y - branches[j].y) * scale * TREE_PROPORTION.y;
-        assert.ok(dx >= 44 || dy >= 52, `fruit ${i + 1} and ${j + 1} overlap at ${width}px`);
+    const viewportScale = (width - 40) / 380;
+    for (const mirrored of [false, true]) {
+      const fruit = Array.from({ length: TREE_NODE_CAPACITY }, (_, index) => {
+        const branch = getTreeBranch(index, mirrored);
+        const hang = fruitHangAt(index, mirrored);
+        return {
+          x: ((branch.x - 190) * TREE_PROPORTION.x + hang.x) * viewportScale,
+          y: ((branch.y - 383) * TREE_PROPORTION.y + hang.y) * viewportScale,
+        };
+      });
+      for (let i = 0; i < fruit.length; i++) {
+        for (let j = i + 1; j < fruit.length; j++) {
+          const dx = Math.abs(fruit[i].x - fruit[j].x);
+          const dy = Math.abs(fruit[i].y - fruit[j].y);
+          assert.ok(dx >= 44 || dy >= 52, `fruit ${i + 1} and ${j + 1} overlap at ${width}px`);
+        }
       }
     }
   }
@@ -60,6 +70,18 @@ test("the grown tree keeps its skeleton even when more photos are added", () => 
     for (const count of [8, 12, 13, 31, 120, 365]) {
       assert.deepEqual(getTreeStructure(count, mirrored), grown);
     }
+  }
+});
+
+test("the sapling adds forks gradually before reaching the unchanged mature skeleton", () => {
+  const expectedCounts = [0, 0, 0, 3, 6, 8, 10, 12];
+  for (const mirrored of [false, true]) {
+    const mature = getTreeStructure(7, mirrored);
+    expectedCounts.forEach((count, stage) => {
+      const growing = getTreeStructure(stage, mirrored);
+      assert.equal(growing.length, count);
+      assert.deepEqual(growing, mature.slice(0, count));
+    });
   }
 });
 
