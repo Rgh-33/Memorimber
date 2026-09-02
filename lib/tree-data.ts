@@ -6,6 +6,9 @@ type MemoryTreeItemBase = {
   id: string;
   memoryId?: string;
   growthStage?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  newlyAdded?: boolean;
+  newlyFruited?: boolean;
+  newlyRipened?: boolean;
 };
 
 export type MemoryTreeItem =

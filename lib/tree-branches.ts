@@ -91,6 +91,8 @@ export function getTreeBranch(index: number, mirrored: boolean) {
 
 export function getTreeStructure(count: number, mirrored: boolean) {
   const stage = Math.max(0, Math.min(7, Math.floor(count)));
-  const boughCount = [0, 0, 0, 5, 8, 10, 12, 12][stage];
+  // A young tree forks a little at a time. Seven uploads still reveal the
+  // exact same twelve-bough mature skeleton used by every later upload.
+  const boughCount = [0, 0, 0, 3, 6, 8, 10, 12][stage];
   return Array.from({ length: boughCount }, (_, index) => getTreeBranch(index, mirrored));
 }

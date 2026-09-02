@@ -53,7 +53,16 @@ export function buildTreeItems(memories: Memory[], date: string, harvests: Harve
       return { id: memory.id, memoryId: memory.id, stage: "harvested", word: harvest.word,
         wordSlot: index, relatedMemoryIds: [memory.id] };
     }
-    const common = { id: memory.id, memoryId: memory.id, fruitSlot: index, fruitTone: "peach" as const, growthStage };
+    const common = {
+      id: memory.id,
+      memoryId: memory.id,
+      fruitSlot: index,
+      fruitTone: "peach" as const,
+      growthStage,
+      newlyAdded: laterUploads === 0,
+      newlyFruited: laterUploads === 5,
+      newlyRipened: laterUploads === LATER_UPLOADS_TO_HARVEST,
+    };
     return ripe
       ? { ...common, stage: "quiz-ready", growth: 1, href: `/quiz?memory=${encodeURIComponent(memory.id)}` }
       : { ...common, stage: "growing", growth: (growthStage - 1) / 6 };
