@@ -6,8 +6,10 @@ import { MemoryCard } from "@/components/memory-card";
 import { GrowingTree } from "@/components/growing-tree";
 import { MemoryPetal } from "@/components/memory-petal";
 import { FruitQuizDialog } from "@/components/fruit-quiz-dialog";
+import { useHarvest } from "@/lib/harvest-context";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
+import type { TreeDisplayMode } from "@/lib/tree-preferences";
 
 const LONG_PRESS_MS = 120;
 const GESTURE_SAMPLE_DISTANCE_PX = 14;
@@ -56,12 +58,16 @@ function FloatingWord({
   getTreeRect,
   onInteractionChange,
   onReveal,
+  isJustHarvested,
+  onArrivalComplete,
 }: {
   item: HarvestedTreeItem;
   isDimmed: boolean;
   getTreeRect: () => DOMRect | null;
   onInteractionChange: (id: string | null) => void;
   onReveal: (item: HarvestedTreeItem) => void;
+  isJustHarvested: boolean;
+  onArrivalComplete: (id: string) => void;
 }) {
   const motion = WORD_MOTION[item.wordSlot % WORD_MOTION.length];
   const [gestureState, setGestureState] = useState<GestureState>("idle");
@@ -340,7 +346,14 @@ function FloatingWord({
           <span key={index} className={`memory-word-shake-particle ${index < activeParticleCount ? "memory-word-shake-particle--active" : ""}`} />
         ))}
       </span>
-      <span className="konoha-petal-arrive">
+      <span
+        className={`konoha-petal-arrive${isJustHarvested ? " konoha-petal-arrive--just-harvested" : ""}`}
+        onAnimationEnd={(event) => {
+          if (isJustHarvested && event.currentTarget === event.target) {
+            onArrivalComplete(item.memoryId ?? item.id);
+          }
+        }}
+      >
         <span className="konoha-petal-sway">
           <MemoryPetal />
           <span className="memory-floating-word-label">{item.word}</span>
@@ -350,7 +363,16 @@ function FloatingWord({
   );
 }
 
-export function MemoryTree({ items, petals, memories, count, month }: { items: MemoryTreeItem[]; petals: HarvestedTreeItem[]; memories: Memory[]; count: number; month: string }) {
+export function MemoryTree({ items, petals, memories, count, totalCount, month, mode }: {
+  items: MemoryTreeItem[];
+  petals: HarvestedTreeItem[];
+  memories: Memory[];
+  count: number;
+  totalCount: number;
+  month: string;
+  mode: TreeDisplayMode;
+}) {
+  const harvest = useHarvest();
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
   const [fruitMemoryId, setFruitMemoryId] = useState<string | null>(null);
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
@@ -395,12 +417,17 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
             getTreeRect={getTreeRect}
             onInteractionChange={setActiveWordId}
             onReveal={setRevealedItem}
+            isJustHarvested={harvest.arrivingMemoryId === (item.memoryId ?? item.id)}
+            onArrivalComplete={harvest.completeArrival}
           />
         ))}
       </div>
 
       <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
-        <GrowingTree items={items} count={count} month={month} onQuizSelect={setFruitMemoryId} />
+        <GrowingTree items={items} memories={memories} count={count} totalCount={totalCount} month={month} mode={mode} onFruitSelect={(memoryId) => {
+          setRevealedItem(null);
+          setFruitMemoryId(memoryId);
+        }} />
       </div>
 
       <p className="sr-only" aria-live="polite">

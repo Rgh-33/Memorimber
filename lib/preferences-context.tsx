@@ -21,6 +21,12 @@ export type {
   AlbumPattern,
   AlbumTextColor,
 } from "./album-appearance";
+import {
+  DEFAULT_TREE_DISPLAY_MODE,
+  parseTreeDisplayMode,
+  TREE_DISPLAY_MODE_STORAGE_KEY,
+  type TreeDisplayMode,
+} from "./tree-preferences";
 
 export type AppTheme = "light-blue" | "orange" | "blue" | "black" | "green" | "purple";
 export type AppColorMode = "light" | "dark";
@@ -90,6 +96,8 @@ type PreferencesContextValue = {
   albumAppearance: AlbumAppearance;
   bgmVolume: number;
   soundEffectVolume: number;
+  treeMode: TreeDisplayMode;
+  preferencesReady: boolean;
   setTheme: (theme: AppTheme) => void;
   setColorMode: (mode: AppColorMode) => void;
   setAlbumFont: (font: AlbumFont) => void;
@@ -101,6 +109,7 @@ type PreferencesContextValue = {
   setAlbumAppearance: (appearance: AlbumAppearance) => void;
   setBgmVolume: (volume: number) => void;
   setSoundEffectVolume: (volume: number) => void;
+  setTreeMode: (mode: TreeDisplayMode) => void;
 };
 
 const THEME_STORAGE_KEY = "memorimber-theme";
@@ -163,18 +172,34 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [albumOrientation, setAlbumOrientationState] = useState<AlbumOrientation>(DEFAULT_ALBUM_APPEARANCE.orientation);
   const [bgmVolume, setBgmVolumeState] = useState(55);
   const [soundEffectVolume, setSoundEffectVolumeState] = useState(70);
+  const [treeMode, setTreeModeState] = useState<TreeDisplayMode>(DEFAULT_TREE_DISPLAY_MODE);
+  const [preferencesReady, setPreferencesReady] = useState(false);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const savedColorMode = window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
-    const savedAlbumFont = window.localStorage.getItem(ALBUM_FONT_STORAGE_KEY);
-    const savedAlbumLayout = window.localStorage.getItem(ALBUM_LAYOUT_STORAGE_KEY);
-    const savedAlbumTextColor = window.localStorage.getItem(ALBUM_TEXT_COLOR_STORAGE_KEY);
-    const savedAlbumBackground = window.localStorage.getItem(ALBUM_BACKGROUND_STORAGE_KEY);
-    const savedAlbumPattern = window.localStorage.getItem(ALBUM_PATTERN_STORAGE_KEY);
-    const savedAlbumOrientation = window.localStorage.getItem(ALBUM_ORIENTATION_STORAGE_KEY);
-    const savedBgmVolume = window.localStorage.getItem(BGM_VOLUME_STORAGE_KEY);
-    const savedSoundEffectVolume = window.localStorage.getItem(SOUND_EFFECT_VOLUME_STORAGE_KEY);
+    let savedTheme: string | null = null;
+    let savedColorMode: string | null = null;
+    let savedAlbumFont: string | null = null;
+    let savedAlbumLayout: string | null = null;
+    let savedAlbumTextColor: string | null = null;
+    let savedAlbumBackground: string | null = null;
+    let savedAlbumPattern: string | null = null;
+    let savedAlbumOrientation: string | null = null;
+    let savedBgmVolume: string | null = null;
+    let savedSoundEffectVolume: string | null = null;
+    let savedTreeMode: string | null = null;
+    try {
+      savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      savedColorMode = window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
+      savedAlbumFont = window.localStorage.getItem(ALBUM_FONT_STORAGE_KEY);
+      savedAlbumLayout = window.localStorage.getItem(ALBUM_LAYOUT_STORAGE_KEY);
+      savedAlbumTextColor = window.localStorage.getItem(ALBUM_TEXT_COLOR_STORAGE_KEY);
+      savedAlbumBackground = window.localStorage.getItem(ALBUM_BACKGROUND_STORAGE_KEY);
+      savedAlbumPattern = window.localStorage.getItem(ALBUM_PATTERN_STORAGE_KEY);
+      savedAlbumOrientation = window.localStorage.getItem(ALBUM_ORIENTATION_STORAGE_KEY);
+      savedBgmVolume = window.localStorage.getItem(BGM_VOLUME_STORAGE_KEY);
+      savedSoundEffectVolume = window.localStorage.getItem(SOUND_EFFECT_VOLUME_STORAGE_KEY);
+      savedTreeMode = window.localStorage.getItem(TREE_DISPLAY_MODE_STORAGE_KEY);
+    } catch { /* Keep all defaults when browser storage is unavailable. */ }
 
     if (isAppTheme(savedTheme)) {
       setThemeState(savedTheme);
@@ -198,6 +223,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     if (savedSoundEffectVolume !== null && Number.isFinite(Number(savedSoundEffectVolume))) {
       setSoundEffectVolumeState(clampVolume(Number(savedSoundEffectVolume)));
     }
+    setTreeModeState(parseTreeDisplayMode(savedTreeMode));
+    setPreferencesReady(true);
   }, []);
 
   const setTheme = useCallback((nextTheme: AppTheme) => {
@@ -269,6 +296,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     window.localStorage.setItem(SOUND_EFFECT_VOLUME_STORAGE_KEY, String(nextVolume));
   }, []);
 
+  const setTreeMode = useCallback((mode: TreeDisplayMode) => {
+    setTreeModeState(mode);
+    try { window.localStorage.setItem(TREE_DISPLAY_MODE_STORAGE_KEY, mode); } catch { /* In-memory choice still works. */ }
+  }, []);
+
   const albumAppearance = useMemo<AlbumAppearance>(() => ({
     font: albumFont,
     layout: albumLayout,
@@ -290,6 +322,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     albumAppearance,
     bgmVolume,
     soundEffectVolume,
+    treeMode,
+    preferencesReady,
     setTheme,
     setColorMode,
     setAlbumFont,
@@ -301,7 +335,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     setAlbumAppearance,
     setBgmVolume,
     setSoundEffectVolume,
-  }), [theme, colorMode, albumFont, albumLayout, albumTextColor, albumBackground, albumPattern, albumOrientation, albumAppearance, bgmVolume, soundEffectVolume, setTheme, setColorMode, setAlbumFont, setAlbumLayout, setAlbumTextColor, setAlbumBackground, setAlbumPattern, setAlbumOrientation, setAlbumAppearance, setBgmVolume, setSoundEffectVolume]);
+    setTreeMode,
+  }), [theme, colorMode, albumFont, albumLayout, albumTextColor, albumBackground, albumPattern,
+    albumOrientation, albumAppearance, bgmVolume, soundEffectVolume, treeMode, preferencesReady,
+    setTheme, setColorMode, setAlbumFont, setAlbumLayout, setAlbumTextColor, setAlbumBackground,
+    setAlbumPattern, setAlbumOrientation, setAlbumAppearance, setBgmVolume, setSoundEffectVolume, setTreeMode]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }
