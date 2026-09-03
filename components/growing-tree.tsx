@@ -1,8 +1,8 @@
 "use client";
 
-import { memo, useEffect, useId, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
-import { getTreeAppearanceStage, getTreeBranch, getTreeCanvasMetrics, getTreeShapeScale, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
+import { getTreeGrowthModel, getTreeSlot, TREE_PROPORTION } from "@/lib/tree-branches";
 import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeedling, TreeWood } from "@/components/tree-art";
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
@@ -196,63 +196,47 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
   onFruitSelect: (memoryId: string) => void;
 }) {
   const uid = useId().replace(/:/g, "");
-  const visible = items.filter(item => item.stage !== "harvested");
-  const stage = Math.min(7, count);
-  const appearanceStage = getTreeAppearanceStage(totalCount);
-  const shapeScale = getTreeShapeScale(appearanceStage);
-  const canvas = getTreeCanvasMetrics(count);
-  const scale = [0.18, 0.18, 0.32, 0.34, 0.52, 0.69, 0.85, 1][stage];
-  const spread = shapeScale.x;
-  const heightSpread = shapeScale.y;
+  const visible = useMemo(() => items.filter(item => item.stage !== "harvested"), [items]);
+  const nodeTreeStage = Math.min(7, count);
+  const model = useMemo(() => getTreeGrowthModel(totalCount), [totalCount]);
+  const canvas = model.canvas;
   const monthIndex = Number(month.slice(5, 7));
   const mirrored = monthIndex % 2 === 0;
   const leafColor = ["#55724d", "#527366", "#79734a", "#586e54"][monthIndex % 4];
-  const imageById = new Map(memories.map((memory) => [memory.id, memory.imageUrl]));
+  const imageById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory.imageUrl])), [memories]);
   const latestItem = visible.find((item) => item.newlyAdded);
   const latestImageUrl = latestItem ? imageById.get(latestItem.memoryId ?? latestItem.id) : undefined;
-  const position = (index: number) => {
-    const branch = getTreeBranch(index, mirrored);
-    return {
-      ...branch,
-      x: 190 + (branch.x - 190) * spread,
-      y: 383 + (branch.y - 383) * heightSpread,
-    };
-  };
-  const growthTransform = `translate(190 383) scale(${spread} ${heightSpread}) translate(-190 -383)`;
   return <>
-    <div className="konoha-tree-canvas" data-tree-growth={stage} data-tree-appearance={appearanceStage}
+    <div className="konoha-tree-canvas" data-tree-growth={nodeTreeStage} data-tree-appearance={model.stage}
       data-tree-photos={totalCount} data-tree-visible-fruits={count} data-tree-added-tips={canvas.addedTips}
       data-month={month} style={{ "--leaf-color": leafColor, aspectRatio: `${canvas.width} / ${canvas.height}` } as CSSProperties}>
       <svg viewBox={`${canvas.minX} ${canvas.minY} ${canvas.width} ${canvas.height}`} className="konoha-tree-svg" aria-hidden="true">
         <defs><TreeArtDefs uid={uid} /></defs>
-        <TreeGround uid={uid} stage={appearanceStage} front={false} />
-        {stage === 1 || stage === 2
-          ? <GrowingSeedling uid={uid} stage={stage} count={count} imageUrl={latestImageUrl} />
-          : <TreeSeedling uid={uid} stage={stage} />}
-        <g className="konoha-tree-size" style={{ transform: `translate(190px, 383px) scale(${scale}) translate(-190px, -383px)`, opacity: stage >= 3 ? 1 : 0 }}>
+        <TreeGround uid={uid} stage={model.soilStage} front={false} />
+        {nodeTreeStage === 1 || nodeTreeStage === 2
+          ? <GrowingSeedling uid={uid} stage={nodeTreeStage} count={count} imageUrl={latestImageUrl} />
+          : <TreeSeedling uid={uid} stage={nodeTreeStage} />}
+        <g className="konoha-tree-size" style={{ opacity: model.stage >= 3 ? 1 : 0 }}>
           <g transform={`translate(190 383) scale(${TREE_PROPORTION.x} ${TREE_PROPORTION.y}) translate(-190 -383)`}>
           <g className="konoha-tree-wind">
             <g transform={mirrored ? "translate(380 0) scale(-1 1)" : undefined}>
-              <g transform={growthTransform}>
-                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} stage={appearanceStage} count={count} /></g>}
-                <TreeWood uid={uid} stage={stage} totalCount={totalCount} />
-                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front stage={appearanceStage} count={count} /></g>}
-              </g>
+              {model.stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} model={model} /></g>}
+              <TreeWood uid={uid} model={model} />
+              {model.stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front model={model} /></g>}
             </g>
             {visible.map((item) => {
-              const slot = position(item.fruitSlot);
+              const slot = getTreeSlot(model, item.fruitSlot, mirrored);
               const memoryId = item.memoryId ?? item.id;
               const fruitHang = fruitHangAt(item.fruitSlot, mirrored);
               return <g key={item.id} className="konoha-photo-node" data-slot-index={item.fruitSlot} data-memory-id={item.id}
                 data-newly-added={item.newlyAdded || undefined} data-newly-fruited={item.newlyFruited || undefined}
                 data-newly-ripened={item.newlyRipened || undefined}>
                 <g className="konoha-branch-tip" transform={`translate(${slot.x} ${slot.y})`}>
-                  <g className="konoha-node-size" style={{ transform: `translate(0px, 14px) scale(${1 / scale}) translate(0px, -14px)` }}>
+                  <g className="konoha-node-size">
                     <g className="konoha-node-wind" style={{ animationDelay: `${item.fruitSlot * -0.57}s` }}>
-                      <GrowthNode stage={item.growthStage ?? 1} treeStage={stage} fruitAppearance={fruitAppearanceFor(memoryId)} fruitHang={fruitHang}
+                      <GrowthNode stage={item.growthStage ?? 1} treeStage={nodeTreeStage} fruitAppearance={fruitAppearanceFor(memoryId)} fruitHang={fruitHang}
                         eventKey={`${item.id}-${item.growthStage ?? 1}-${item.newlyAdded ? "added" : item.newlyFruited ? "fruited" : item.newlyRipened ? "ripened" : "stable"}`} delay={Math.min(item.fruitSlot, 7) * 42}
                         newPhotoUrl={item.newlyAdded ? imageById.get(memoryId) : undefined}
-                        concealBaseTwig={item.fruitSlot >= TREE_NODE_CAPACITY}
                         newlyAdded={item.newlyAdded === true} newlyFruited={item.newlyFruited === true}
                         newlyRipened={item.newlyRipened === true} />
                     </g>
@@ -260,23 +244,23 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
                 </g>
               </g>;
             })}
-            {stage >= 5 && <g className="konoha-light-dust" fill="#f3e9bd" aria-hidden="true">
+            {model.stage >= 5 && <g className="konoha-light-dust" fill="#f3e9bd" aria-hidden="true">
               <circle cx="153" cy="213" r="1.2" /><circle cx="228" cy="248" r=".9" /><circle cx="119" cy="162" r="1" /><circle cx="262" cy="114" r=".8" />
             </g>}
           </g>
           </g>
         </g>
-        <TreeGround uid={uid} stage={appearanceStage} front />
+        <TreeGround uid={uid} stage={model.soilStage} front />
       </svg>
       {visible.map((item) => {
         if (item.stage !== "quiz-ready") return null;
-        const slot = position(item.fruitSlot);
+        const slot = getTreeSlot(model, item.fruitSlot, mirrored);
         const fruitHang = fruitHangAt(item.fruitSlot, mirrored);
         const memoryId = item.memoryId ?? item.id;
         return <button key={item.id} type="button" onClick={() => onFruitSelect(memoryId)} className="konoha-fruit-target" data-memory-id={memoryId}
           style={{
-            left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x + fruitHang.x - canvas.minX) / canvas.width * 100}%`,
-            top: `${(383 + (slot.y + 23 - 383) * scale * TREE_PROPORTION.y + fruitHang.y - canvas.minY) / canvas.height * 100}%`,
+            left: `${(190 + (slot.x - 190) * TREE_PROPORTION.x + fruitHang.x - canvas.minX) / canvas.width * 100}%`,
+            top: `${(383 + (slot.y + 23 - 383) * TREE_PROPORTION.y + fruitHang.y - canvas.minY) / canvas.height * 100}%`,
           }}
           aria-label="育った実で思い出クイズに挑戦" aria-haspopup="dialog" />;
       })}

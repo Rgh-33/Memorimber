@@ -6,7 +6,7 @@ import { useMemories } from "./memories-context";
 import { createClient } from "./supabase/client";
 import { completeMemoryHarvest, loadMemoryFruits, type MemoryFruits } from "./supabase/memory-fruits";
 import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
-import { getTreeVisibleCount, placeTreeItems, TREE_SLOT_STORAGE_LIMIT } from "./tree-branches";
+import { getTreeVisibleCount, placeTreeItems } from "./tree-branches";
 import type { Memory } from "./types";
 
 type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; serial: number; slots: Record<string, (string | null)[]> };
@@ -30,7 +30,7 @@ function readState(raw: string | null, preview: boolean): TreeState {
       // and allocate positions on first use instead of resetting the preview.
       slots: Object.fromEntries(Object.entries(value.slots && typeof value.slots === "object" ? value.slots : {})
         .filter(([key, ids]) => /^(preview|real):\d{4}-(0[1-9]|1[0-2])$/.test(key) && Array.isArray(ids))
-        .map(([key, ids]) => [key, (ids as unknown[]).slice(0, TREE_SLOT_STORAGE_LIMIT).map(id => typeof id === "string" ? id : null)])) };
+        .map(([key, ids]) => [key, (ids as unknown[]).map(id => typeof id === "string" ? id : null)])) };
   } catch { return fallback; }
 }
 
