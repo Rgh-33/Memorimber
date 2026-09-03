@@ -6,6 +6,7 @@ import { getTreeGrowthModel, getTreeSlot, TREE_PROPORTION } from "@/lib/tree-bra
 import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeedling, TreeWood } from "@/components/tree-art";
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
+import type { TreeDisplayMode } from "@/lib/tree-preferences";
 import type { Memory } from "@/lib/types";
 
 function Blossom({ x, y, scale, setting = false }: { x: number; y: number; scale: number; setting?: boolean }) {
@@ -187,19 +188,21 @@ export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppe
   && previous.fruitHang.x === next.fruitHang.x
   && previous.fruitHang.y === next.fruitHang.y);
 
-export function GrowingTree({ items, memories, count, totalCount, month, onFruitSelect }: {
+export function GrowingTree({ items, memories, count, totalCount, month, mode, onFruitSelect }: {
   items: MemoryTreeItem[];
   memories: Memory[];
   count: number;
   totalCount: number;
   month: string;
+  mode: TreeDisplayMode;
   onFruitSelect: (memoryId: string) => void;
 }) {
   const uid = useId().replace(/:/g, "");
   const visible = useMemo(() => items.filter(item => item.stage !== "harvested"), [items]);
   const nodeTreeStage = Math.min(7, count);
-  const model = useMemo(() => getTreeGrowthModel(totalCount), [totalCount]);
+  const model = useMemo(() => getTreeGrowthModel(totalCount, mode), [totalCount, mode]);
   const canvas = model.canvas;
+  const treeScale = model.contentScale;
   const monthIndex = Number(month.slice(5, 7));
   const mirrored = monthIndex % 2 === 0;
   const leafColor = ["#55724d", "#527366", "#79734a", "#586e54"][monthIndex % 4];
@@ -208,6 +211,7 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
   const latestImageUrl = latestItem ? imageById.get(latestItem.memoryId ?? latestItem.id) : undefined;
   return <>
     <div className="konoha-tree-canvas" data-tree-growth={nodeTreeStage} data-tree-appearance={model.stage}
+      data-tree-mode={mode}
       data-tree-photos={totalCount} data-tree-visible-fruits={count} data-tree-added-tips={canvas.addedTips}
       data-month={month} style={{ "--leaf-color": leafColor, aspectRatio: `${canvas.width} / ${canvas.height}` } as CSSProperties}>
       <svg viewBox={`${canvas.minX} ${canvas.minY} ${canvas.width} ${canvas.height}`} className="konoha-tree-svg" aria-hidden="true">
@@ -216,7 +220,10 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
         {nodeTreeStage === 1 || nodeTreeStage === 2
           ? <GrowingSeedling uid={uid} stage={nodeTreeStage} count={count} imageUrl={latestImageUrl} />
           : <TreeSeedling uid={uid} stage={nodeTreeStage} />}
-        <g className="konoha-tree-size" style={{ opacity: model.stage >= 3 ? 1 : 0 }}>
+        <g className="konoha-tree-size" style={{
+          opacity: model.stage >= 3 ? 1 : 0,
+          transform: treeScale === 1 ? undefined : `translate(190px, 383px) scale(${treeScale}) translate(-190px, -383px)`,
+        }}>
           <g transform={`translate(190 383) scale(${TREE_PROPORTION.x} ${TREE_PROPORTION.y}) translate(-190 -383)`}>
           <g className="konoha-tree-wind">
             <g transform={mirrored ? "translate(380 0) scale(-1 1)" : undefined}>
@@ -232,7 +239,9 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
                 data-newly-added={item.newlyAdded || undefined} data-newly-fruited={item.newlyFruited || undefined}
                 data-newly-ripened={item.newlyRipened || undefined}>
                 <g className="konoha-branch-tip" transform={`translate(${slot.x} ${slot.y})`}>
-                  <g className="konoha-node-size">
+                  <g className="konoha-node-size" style={{
+                    transform: treeScale === 1 ? undefined : `translate(0px, 14px) scale(${1 / treeScale}) translate(0px, -14px)`,
+                  }}>
                     <g className="konoha-node-wind" style={{ animationDelay: `${item.fruitSlot * -0.57}s` }}>
                       <GrowthNode stage={item.growthStage ?? 1} treeStage={nodeTreeStage} fruitAppearance={fruitAppearanceFor(memoryId)} fruitHang={fruitHang}
                         eventKey={`${item.id}-${item.growthStage ?? 1}-${item.newlyAdded ? "added" : item.newlyFruited ? "fruited" : item.newlyRipened ? "ripened" : "stable"}`} delay={Math.min(item.fruitSlot, 7) * 42}
@@ -257,10 +266,16 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
         const slot = getTreeSlot(model, item.fruitSlot, mirrored);
         const fruitHang = fruitHangAt(item.fruitSlot, mirrored);
         const memoryId = item.memoryId ?? item.id;
+        const localX = slot.x + fruitHang.x / treeScale;
+        const localY = slot.y + 14 + (9 + fruitHang.y) / treeScale;
+        const proportionalX = 190 + (localX - 190) * TREE_PROPORTION.x;
+        const proportionalY = 383 + (localY - 383) * TREE_PROPORTION.y;
+        const targetX = 190 + (proportionalX - 190) * treeScale;
+        const targetY = 383 + (proportionalY - 383) * treeScale;
         return <button key={item.id} type="button" onClick={() => onFruitSelect(memoryId)} className="konoha-fruit-target" data-memory-id={memoryId}
           style={{
-            left: `${(190 + (slot.x - 190) * TREE_PROPORTION.x + fruitHang.x - canvas.minX) / canvas.width * 100}%`,
-            top: `${(383 + (slot.y + 23 - 383) * TREE_PROPORTION.y + fruitHang.y - canvas.minY) / canvas.height * 100}%`,
+            left: `${(targetX - canvas.minX) / canvas.width * 100}%`,
+            top: `${(targetY - canvas.minY) / canvas.height * 100}%`,
           }}
           aria-label="育った実で思い出クイズに挑戦" aria-haspopup="dialog" />;
       })}

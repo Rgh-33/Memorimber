@@ -23,8 +23,8 @@ export default function HomePage() {
           <button type="button" onClick={() => void tree.refresh()} className="mt-2 block text-coral underline">再読み込み</button>
         </div>
       ) : tree.ready ? (
-        <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}`} items={tree.visibleItems} petals={tree.petals} memories={tree.memories}
-          count={tree.count} totalCount={tree.totalCount} month={tree.date.slice(0, 7)} />
+        <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}-${tree.treeMode}`} items={tree.visibleItems} petals={tree.petals} memories={tree.memories}
+          count={tree.count} totalCount={tree.totalCount} month={tree.date.slice(0, 7)} mode={tree.treeMode} />
       ) : (
         <p role="status" className="py-12 text-center text-sm text-ink/65">思い出の木を読み込んでいます…</p>
       )}

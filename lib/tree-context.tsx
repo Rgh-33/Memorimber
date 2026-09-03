@@ -3,10 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SAMPLE_MEMORIES } from "./data";
 import { useMemories } from "./memories-context";
+import { usePreferences } from "./preferences-context";
 import { createClient } from "./supabase/client";
 import { completeMemoryHarvest, loadMemoryFruits, type MemoryFruits } from "./supabase/memory-fruits";
 import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
-import { getTreeVisibleCount, placeTreeItems } from "./tree-branches";
+import { getTreeVisibleCount, placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
 
 type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; serial: number; slots: Record<string, (string | null)[]> };
@@ -29,13 +30,14 @@ function readState(raw: string | null, preview: boolean): TreeState {
       // Older saved previews have no placements. Preserve their photos/words
       // and allocate positions on first use instead of resetting the preview.
       slots: Object.fromEntries(Object.entries(value.slots && typeof value.slots === "object" ? value.slots : {})
-        .filter(([key, ids]) => /^(preview|real):\d{4}-(0[1-9]|1[0-2])$/.test(key) && Array.isArray(ids))
+        .filter(([key, ids]) => /^(preview|real):\d{4}-(0[1-9]|1[0-2])(?::(classic|expanding))?$/.test(key) && Array.isArray(ids))
         .map(([key, ids]) => [key, (ids as unknown[]).map(id => typeof id === "string" ? id : null)])) };
   } catch { return fallback; }
 }
 
 function useTreeState() {
   const { memories, isDemo, isLoading } = useMemories();
+  const { treeMode, preferencesReady } = usePreferences();
   const [now, setNow] = useState(() => Date.now());
   const [state, setState] = useState<TreeState>(() => emptyState(isDemo));
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
@@ -104,7 +106,7 @@ function useTreeState() {
 
   const date = state.preview ? state.date : tokyoDate(new Date(now));
   const source = state.preview ? state.uploads : memories;
-  const ready = loadedKey === storageKey && !isLoading
+  const ready = preferencesReady && loadedKey === storageKey && !isLoading
     && (state.preview || isDemo || (!fruitsLoading && !fruitError));
   const items = useMemo(() => {
     if (!ready) return [];
@@ -119,9 +121,15 @@ function useTreeState() {
       : buildPersistedPetals(source, date, fruits, now);
   }, [ready, state.preview, state.previewHarvests, source, date, fruits, now]);
   const totalCount = ready ? monthlyQueue(source, date).length : 0;
-  const count = getTreeVisibleCount(totalCount);
-  const slotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
-  const placement = useMemo(() => placeTreeItems(items, state.slots[slotKey]), [items, state.slots, slotKey]);
+  const count = getTreeVisibleCount(totalCount, treeMode);
+  const legacySlotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
+  const slotKey = `${legacySlotKey}:${treeMode}`;
+  const storedSlots = state.slots[slotKey] ?? state.slots[legacySlotKey];
+  const placement = useMemo(() => placeTreeItems(
+    items,
+    storedSlots,
+    treeMode === "classic" ? TREE_NODE_CAPACITY : undefined,
+  ), [items, storedSlots, treeMode]);
 
   useEffect(() => {
     if (!ready) return;
@@ -135,7 +143,7 @@ function useTreeState() {
 
   return {
     ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
-    date, preview: state.preview, items, visibleItems: placement.visibleItems, petals, memories: source, count, totalCount,
+    date, preview: state.preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source, count, totalCount,
     setPreview: (preview: boolean) => setState((current) => ({ ...current, preview })),
     setDate: (next: string) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));

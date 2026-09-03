@@ -10,6 +10,7 @@ import { useHarvest } from "@/lib/harvest-context";
 import { getFruitQuiz } from "@/lib/tree-growth";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
+import type { TreeDisplayMode } from "@/lib/tree-preferences";
 
 const LONG_PRESS_MS = 120;
 const GESTURE_SAMPLE_DISTANCE_PX = 14;
@@ -363,13 +364,14 @@ function FloatingWord({
   );
 }
 
-export function MemoryTree({ items, petals, memories, count, totalCount, month }: {
+export function MemoryTree({ items, petals, memories, count, totalCount, month, mode }: {
   items: MemoryTreeItem[];
   petals: HarvestedTreeItem[];
   memories: Memory[];
   count: number;
   totalCount: number;
   month: string;
+  mode: TreeDisplayMode;
 }) {
   const harvest = useHarvest();
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
@@ -422,7 +424,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month }
       </div>
 
       <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
-        <GrowingTree items={items} memories={memories} count={count} totalCount={totalCount} month={month} onFruitSelect={(memoryId) => {
+        <GrowingTree items={items} memories={memories} count={count} totalCount={totalCount} month={month} mode={mode} onFruitSelect={(memoryId) => {
           setRevealedItem(null);
           setQuizMemoryId(memoryId);
         }} />

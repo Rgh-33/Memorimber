@@ -45,6 +45,15 @@ function leafMesh(rx: number, ry: number, seed: number, front: boolean) {
 
 const LEAF_MESHES = CLUMPS.map(([, , rx, ry, front], index) =>
   leafMesh(rx, ry, index + 1, Boolean(front)));
+const CLASSIC_CANOPY = CLUMPS.map(([x, y, , , front], index) => ({
+  id: `classic-leaf-${index}`,
+  x,
+  y,
+  source: index,
+  scaleX: 1,
+  scaleY: 1,
+  front: Boolean(front),
+}));
 
 export function TreeArtDefs({ uid }: { uid: string }) {
   return <>
@@ -99,9 +108,10 @@ const LeafClumpDefinitions = memo(function LeafClumpDefinitions({ uid }: { uid: 
 });
 
 export const TreeCanopy = memo(function TreeCanopy({ uid, front, model }: { uid: string; front: boolean; model: TreeGrowthModel }) {
+  const canopy = model.mode === "classic" ? CLASSIC_CANOPY : model.canopy;
   return <g className={`konoha-foliage konoha-foliage--${front ? "front" : "back"}`}>
     {!front && <LeafClumpDefinitions uid={uid} />}
-    {model.canopy.map((clump, index) => clump.front === front
+    {canopy.map((clump, index) => clump.front === front
       ? <g key={clump.id} className="konoha-canopy-clump"
         transform={`translate(${clump.x} ${clump.y}) scale(${clump.scaleX} ${clump.scaleY})`}>
         <g className="konoha-canopy-drift" style={{ animationDelay: `${index * -.41}s` }}>

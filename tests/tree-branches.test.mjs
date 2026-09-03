@@ -20,6 +20,31 @@ test("tree stages follow the requested individual and grouped upload ranges", ()
   assert.equal(getTreeVisibleCount(365), 365);
 });
 
+test("classic mode restores the fixed twelve-tip tree from main", () => {
+  const expectedSlots = [
+    [80, 238], [302, 214], [145, 74], [310, 141], [75, 162], [224, 91],
+    [75, 82], [295, 63], [155, 150], [230, 166], [154, 228], [226, 239],
+  ];
+  const expectedBranches = [0, 0, 0, 5, 8, 10, 12, 12];
+  const expectedScales = [.18, .18, .32, .47, .61, .76, .89, 1];
+  for (let count = 0; count <= 7; count++) {
+    const model = getTreeGrowthModel(count, "classic");
+    assert.equal(model.mode, "classic");
+    assert.equal(model.stage, count);
+    assert.equal(model.capacity, 12);
+    assert.equal(model.branches.length, expectedBranches[count]);
+    assert.equal(model.contentScale, expectedScales[count]);
+    assert.deepEqual(model.canvas, { minX: 0, width: 380, minY: 0, height: 420, addedTips: 0 });
+    assert.deepEqual(model.slots, expectedSlots);
+  }
+  const full = getTreeGrowthModel(42, "classic");
+  assert.equal(full.stage, 7);
+  assert.equal(full.branches.length, 12);
+  assert.deepEqual(full.slots, expectedSlots);
+  assert.equal(getTreeVisibleCount(42, "classic"), 12);
+  assert.equal(getTreeVisibleCount(42, "expanding"), 42);
+});
+
 test("five, six and seven photos keep one branch topology while growing continuously", () => {
   const models = [5, 6, 7].map(getTreeGrowthModel);
   models.forEach(model => assert.equal(model.capacity, 7));
@@ -39,6 +64,10 @@ test("five, six and seven photos keep one branch topology while growing continuo
       if (oldDirection !== 0 && newDirection !== 0) assert.equal(newDirection, oldDirection);
     });
   }
+  assert.deepEqual(models[2].slots, [
+    [198, 182], [94.16000000000001, 97], [278.84, 110], [98.16000000000001, 280],
+    [284.84, 277], [111.03999999999999, 198], [276.96000000000004, 198],
+  ]);
 });
 
 test("eight through twelve photos use exactly one fixed tree skeleton", () => {
@@ -49,6 +78,33 @@ test("eight through twelve photos use exactly one fixed tree skeleton", () => {
   };
   const mature = geometry(8);
   for (let count = 9; count <= 12; count++) assert.deepEqual(geometry(count), mature);
+});
+
+test("mature fruit are subtly scattered and remain deterministic", () => {
+  for (const count of [12, 18, 24, 31, 38, 45, 101]) {
+    const model = getTreeGrowthModel(count);
+    assert.deepEqual(model.slots, getTreeGrowthModel(count).slots);
+    const fruitCenters = model.slots.map((slot, index) => {
+      const hang = fruitHangAt(index, false);
+      return [slot[0] + hang.x, slot[1] + hang.y];
+    });
+    const rowCount = count <= 12 ? 3 : count <= 18 ? 4 : count <= 24 ? 5 : count <= 31 ? 6 : 6 + (model.stage - 11) * 2;
+    assert.ok(new Set(fruitCenters.map(([, y]) => y.toFixed(3))).size > rowCount);
+  }
+});
+
+test("scattered fruit stay attached to their terminal branches", () => {
+  for (const count of [12, 31, 45, 101]) {
+    const model = getTreeGrowthModel(count);
+    const terminalBranches = new Map(model.branches.filter(branch => branch.id.startsWith("tip-"))
+      .map(branch => [Number(branch.id.slice(4)), branch]));
+    model.slots.forEach(([x, y], slot) => {
+      const branch = terminalBranches.get(slot);
+      assert.ok(branch);
+      assert.equal(branch.x, x);
+      assert.equal(branch.y, y);
+    });
+  }
 });
 
 test("later photos grow the whole tree only at band boundaries", () => {
@@ -81,12 +137,11 @@ test("mature stages increase trunk, branches, crown reach and vertical canvas to
 test("the 31-photo crown is rounded rather than an upright or inverted triangle", () => {
   const model = getTreeGrowthModel(31);
   const rows = new Map();
-  model.slots.forEach((slot, index) => {
-    const hang = fruitHangAt(index, false);
-    const y = Math.round(slot[1] + hang.y);
-    const values = rows.get(y) ?? [];
-    values.push(slot[0] + hang.x);
-    rows.set(y, values);
+  model.canopy.filter(clump => clump.id.startsWith("leaf-")).forEach(clump => {
+    const row = Number(clump.id.split("-")[1]);
+    const values = rows.get(row) ?? [];
+    values.push(clump.x);
+    rows.set(row, values);
   });
   const widths = [...rows.entries()].sort(([a], [b]) => a - b)
     .map(([, xs]) => Math.max(...xs) - Math.min(...xs));
@@ -111,20 +166,27 @@ test("every generated branch and slot remains finite and inside its tree scene",
   }
 });
 
+function renderedTarget(model, index, mirrored, width) {
+  const slot = getTreeSlot(model, index, mirrored);
+  const hang = fruitHangAt(index, mirrored);
+  const localX = slot.x + hang.x / model.contentScale;
+  const localY = slot.y + 14 + (9 + hang.y) / model.contentScale;
+  const proportionalX = 190 + (localX - 190) * TREE_PROPORTION.x;
+  const proportionalY = 383 + (localY - 383) * TREE_PROPORTION.y;
+  const targetX = 190 + (proportionalX - 190) * model.contentScale;
+  const targetY = 383 + (proportionalY - 383) * model.contentScale;
+  const scale = width / model.canvas.width;
+  return { x: (targetX - model.canvas.minX) * scale, y: (targetY - model.canvas.minY) * scale };
+}
+
 test("all fruit keep separate 44 by 52 pixel targets on phone widths", () => {
-  for (const count of [12, 18, 24, 31, 38, 45, 101]) {
-    const model = getTreeGrowthModel(count);
+  for (const [count, mode] of [[12, "classic"], [12, "expanding"], [18, "expanding"],
+    [24, "expanding"], [31, "expanding"], [38, "expanding"], [45, "expanding"], [101, "expanding"]]) {
+    const model = getTreeGrowthModel(count, mode);
     for (const width of [320, 430]) {
       const scale = width / model.canvas.width;
       for (const mirrored of [false, true]) {
-        const fruit = Array.from({ length: count }, (_, index) => {
-          const slot = getTreeSlot(model, index, mirrored);
-          const hang = fruitHangAt(index, mirrored);
-          return {
-            x: (190 + (slot.x - 190) * TREE_PROPORTION.x + hang.x) * scale,
-            y: (383 + (slot.y + 23 - 383) * TREE_PROPORTION.y + hang.y - model.canvas.minY) * scale,
-          };
-        });
+        const fruit = Array.from({ length: Math.min(count, model.capacity) }, (_, index) => renderedTarget(model, index, mirrored, width));
         fruit.forEach((point, index) => {
           assert.ok(point.x >= 22 && point.x <= width - 22, `fruit ${index + 1} leaves the horizontal target area`);
           assert.ok(point.y >= 26 && point.y <= model.canvas.height * scale - 26, `fruit ${index + 1} leaves the vertical target area`);
@@ -133,7 +195,7 @@ test("all fruit keep separate 44 by 52 pixel targets on phone widths", () => {
           for (let j = i + 1; j < fruit.length; j++) {
             const dx = Math.abs(fruit[i].x - fruit[j].x);
             const dy = Math.abs(fruit[i].y - fruit[j].y);
-            assert.ok(dx >= 44 || dy >= 52, `fruit ${i + 1} and ${j + 1} overlap at ${count}/${width}px`);
+            assert.ok(dx >= 44 || dy >= 52, `fruit ${i + 1} and ${j + 1} overlap at ${mode}/${count}/${width}px`);
           }
         }
       }
@@ -156,6 +218,19 @@ const photo = (n) => ({ id: `photo-${n}`, memoryId: `photo-${n}`, stage: "quiz-r
 const collect = (items, id) => items.map(item => item.id === id
   ? { id, memoryId: id, stage: "harvested", word: "思い出", wordSlot: 0 }
   : item);
+
+test("classic mode queues fruit after twelve and fills a harvested branch", () => {
+  let items = Array.from({ length: 13 }, (_, index) => photo(index));
+  let placed = placeTreeItems(items, [], 12);
+  assert.equal(placed.slots.length, 12);
+  assert.deepEqual(placed.visibleItems.map((item) => item.id), items.slice(0, 12).map((item) => item.id));
+
+  items = collect(items, "photo-3");
+  placed = placeTreeItems(items, placed.slots, 12);
+  assert.equal(placed.visibleItems.length, 12);
+  assert.equal(placed.slots[3], "photo-12");
+  assert.equal(placed.visibleItems.find((item) => item.id === "photo-12").fruitSlot, 3);
+});
 
 test("all active photos receive a stable visible slot without a capacity limit", () => {
   for (const count of [0, 1, 7, 12, 31, 38, 101, 365]) {

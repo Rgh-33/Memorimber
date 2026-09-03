@@ -1,4 +1,5 @@
 import type { MemoryTreeItem } from "./tree-data";
+import type { TreeDisplayMode } from "./tree-preferences";
 
 export type Point = readonly [number, number];
 type BranchOrigin = Point | { branch: number; at: number };
@@ -25,9 +26,11 @@ export type TreeCanopyClump = {
 };
 
 export type TreeGrowthModel = {
+  mode: TreeDisplayMode;
   stage: number;
   count: number;
   capacity: number;
+  contentScale: number;
   slots: readonly Point[];
   branches: readonly RenderedTreeBranch[];
   canopy: readonly TreeCanopyClump[];
@@ -64,6 +67,31 @@ const FRUIT_HANG_OFFSETS = [
 
 const BACK_SOURCES = [9, 0, 2, 7, 8, 1, 3] as const;
 const FRONT_SOURCES = [18, 11, 12, 19, 20, 13, 14, 17] as const;
+const SCATTER_X = [-2, -1.25, -.5, .75, 1.5, 2] as const;
+const SCATTER_Y = [-8, -6, -4, -2, 2, 4, 6, 8] as const;
+const PHONE_LAYOUT_WIDTH = 320;
+const FRUIT_TARGET_WIDTH = 44;
+const FRUIT_TARGET_HEIGHT = 52;
+
+// The fixed twelve-tip silhouette from main. In classic mode only the tree
+// geometry is restored; the current fruit lifecycle and interactions remain.
+const CLASSIC_BRANCHES: readonly BranchSpec[] = [
+  { id: "classic-0", tip: [80, 252], origin: [188, 282], bend: [150, 269], shoulder: [129, 242], width: 14 },
+  { id: "classic-1", tip: [302, 228], origin: [197, 267], bend: [236, 232], shoulder: [273, 242], width: 15 },
+  { id: "classic-2", tip: [145, 88], origin: [185, 248], bend: [142, 209], shoulder: [170, 139], width: 13 },
+  { id: "classic-3", tip: [310, 155], origin: { branch: 1, at: .52 }, bend: [287, 216], shoulder: [287, 175], width: 5 },
+  { id: "classic-4", tip: [75, 176], origin: { branch: 0, at: .6 }, bend: [105, 230], shoulder: [86, 203], width: 5 },
+  { id: "classic-5", tip: [224, 105], origin: [209, 225], bend: [236, 192], shoulder: [216, 136], width: 12 },
+  { id: "classic-6", tip: [75, 96], origin: { branch: 4, at: .6 }, bend: [77, 171], shoulder: [69, 132], width: 3 },
+  { id: "classic-7", tip: [295, 77], origin: { branch: 3, at: .52 }, bend: [311, 162], shoulder: [314, 114], width: 3 },
+  { id: "classic-8", tip: [155, 164], origin: { branch: 2, at: .35 }, bend: [132, 175], shoulder: [136, 162], width: 3.5 },
+  { id: "classic-9", tip: [230, 180], origin: { branch: 5, at: .36 }, bend: [224, 173], shoulder: [239, 170], width: 3.5 },
+  { id: "classic-10", tip: [154, 242], origin: { branch: 0, at: .4 }, bend: [149, 251], shoulder: [158, 233], width: 3 },
+  { id: "classic-11", tip: [226, 253], origin: { branch: 1, at: .32 }, bend: [233, 246], shoulder: [232, 249], width: 3 },
+];
+
+const CLASSIC_TREE_SCALES = [.18, .18, .32, .47, .61, .76, .89, 1] as const;
+const CLASSIC_BOUGH_COUNTS = [0, 0, 0, 5, 8, 10, 12, 12] as const;
 
 function safeCount(count: number) {
   return Math.max(0, Math.floor(Number.isFinite(count) ? count : 0));
@@ -71,8 +99,9 @@ function safeCount(count: number) {
 
 /** The first seven uploads have individual stages. Eight through twelve share
  * one mature skeleton; after that the whole tree changes only at band edges. */
-export function getTreeAppearanceStage(count: number) {
+export function getTreeAppearanceStage(count: number, mode: TreeDisplayMode = "expanding") {
   const photos = safeCount(count);
+  if (mode === "classic") return Math.min(7, photos);
   if (photos <= 7) return photos;
   if (photos <= 12) return 8;
   if (photos <= 18) return 9;
@@ -81,8 +110,9 @@ export function getTreeAppearanceStage(count: number) {
   return 11 + Math.ceil((photos - 31) / 7);
 }
 
-export function getTreeVisibleCount(count: number) {
-  return safeCount(count);
+export function getTreeVisibleCount(count: number, mode: TreeDisplayMode = "expanding") {
+  const photos = safeCount(count);
+  return mode === "classic" ? Math.min(TREE_NODE_CAPACITY, photos) : photos;
 }
 
 function overflowRowCounts(overflowStage: number) {
@@ -211,6 +241,70 @@ function balancedPoints(rows: readonly RowPoint[][]) {
   return selected;
 }
 
+function canvasMinYFor(shape: ModelShape) {
+  const projectedCrownTop = 383 + (shape.topY - 383) * TREE_PROPORTION.y;
+  return shape.stage >= 3 ? Math.min(shape.canvasMinY, projectedCrownTop - 42) : 0;
+}
+
+function scatterHash(point: RowPoint, slot: number) {
+  let hash = Math.imul(point.row + 1, 0x9e3779b1)
+    ^ Math.imul(point.column + 1, 0x85ebca6b)
+    ^ Math.imul(slot + 1, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x7feb352d);
+  return (hash ^ (hash >>> 15)) >>> 0;
+}
+
+function fruitTargetPoint(center: Point, slot: number, canvasMinY: number) {
+  const [hangX, hangY] = FRUIT_HANG_OFFSETS[slot % FRUIT_HANG_OFFSETS.length];
+  const scale = PHONE_LAYOUT_WIDTH / 380;
+  const slotX = center[0] - hangX;
+  const slotY = center[1] - hangY;
+  return {
+    x: (190 + (slotX - 190) * TREE_PROPORTION.x + hangX) * scale,
+    y: (383 + (slotY + 23 - 383) * TREE_PROPORTION.y + hangY - canvasMinY) * scale,
+  };
+}
+
+/** Break up the visible rows without making fruit jump between renders. The
+ * original point is always the final fallback, so small screens retain the
+ * same hit-target guarantees as the regular grid. */
+function scatterPoints(points: readonly RowPoint[], shape: ModelShape) {
+  if (shape.stage < 8) return points;
+  const canvasMinY = canvasMinYFor(shape);
+  const canvasHeight = (420 - canvasMinY) * PHONE_LAYOUT_WIDTH / 380;
+  const acceptedTargets: { x: number; y: number }[] = [];
+  return points.map((point, slot): RowPoint => {
+    const hash = scatterHash(point, slot);
+    const desiredX = Math.abs(point.center[0] - 190) < 6 ? 0 : SCATTER_X[hash % SCATTER_X.length];
+    const desiredY = SCATTER_Y[(hash >>> 8) % SCATTER_Y.length];
+    const attempts: Point[] = [
+      [desiredX, desiredY],
+      [desiredX * .75, desiredY * .75],
+      [desiredX * .5, desiredY * .5],
+      [0, desiredY * .5],
+      [0, 0],
+    ];
+    for (const [offsetX, offsetY] of attempts) {
+      const center: Point = [point.center[0] + offsetX, point.center[1] + offsetY];
+      const target = fruitTargetPoint(center, slot, canvasMinY);
+      const insideCanvas = target.x >= FRUIT_TARGET_WIDTH / 2
+        && target.x <= PHONE_LAYOUT_WIDTH - FRUIT_TARGET_WIDTH / 2
+        && target.y >= FRUIT_TARGET_HEIGHT / 2
+        && target.y <= canvasHeight - FRUIT_TARGET_HEIGHT / 2;
+      const separate = acceptedTargets.every(other => Math.abs(target.x - other.x) >= FRUIT_TARGET_WIDTH
+        || Math.abs(target.y - other.y) >= FRUIT_TARGET_HEIGHT);
+      if (!insideCanvas || !separate) continue;
+      acceptedTargets.push(target);
+      return { ...point, center };
+    }
+    // The unshifted layout is already collision-tested, so this is defensive.
+    const target = fruitTargetPoint(point.center, slot, canvasMinY);
+    acceptedTargets.push(target);
+    return point;
+  });
+}
+
 function pointOnBranch(branch: BranchSpec, t: number, branches: readonly BranchSpec[]): Point {
   const start = branchOrigin(branch, branches);
   const u = 1 - t;
@@ -224,17 +318,23 @@ function branchOrigin(branch: BranchSpec, branches: readonly BranchSpec[]): Poin
   return "branch" in branch.origin ? pointOnBranch(branches[branch.origin.branch], branch.origin.at, branches) : branch.origin;
 }
 
-function renderBranch(branch: BranchSpec, branches: readonly BranchSpec[]): RenderedTreeBranch {
+function renderBranch(
+  branch: BranchSpec,
+  branches: readonly BranchSpec[],
+  segments = 20,
+  taper = 1.28,
+  tipWidth = .6,
+): RenderedTreeBranch {
   const origin = branchOrigin(branch, branches);
   const sides: Point[][] = [[], []];
-  for (let i = 0; i <= 20; i++) {
-    const t = i / 20;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
     const u = 1 - t;
     const p = [0, 1].map(axis => u ** 3 * origin[axis] + 3 * u ** 2 * t * branch.bend[axis]
       + 3 * u * t ** 2 * branch.shoulder[axis] + t ** 3 * branch.tip[axis]);
     const d = [0, 1].map(axis => 3 * u ** 2 * (branch.bend[axis] - origin[axis])
       + 6 * u * t * (branch.shoulder[axis] - branch.bend[axis]) + 3 * t ** 2 * (branch.tip[axis] - branch.shoulder[axis]));
-    const radius = (branch.width * (1 - t) ** 1.28 + .6) / 2;
+    const radius = (branch.width * (1 - t) ** taper + tipWidth) / 2;
     const length = Math.hypot(d[0], d[1]) || 1;
     for (const side of [0, 1]) {
       const sign = side === 0 ? 1 : -1;
@@ -333,24 +433,54 @@ function youngPath(topY: number) {
   return `M190 384 C${194 + (238 - topY) * .025} 340 ${184 - (238 - topY) * .018} ${topY + 48} 192 ${topY}`;
 }
 
-export function getTreeGrowthModel(count: number): TreeGrowthModel {
+function getClassicTreeGrowthModel(count: number): TreeGrowthModel {
+  const photos = safeCount(count);
+  const stage = getTreeAppearanceStage(photos, "classic");
+  const slots = CLASSIC_BRANCHES.map((branch): Point => [branch.tip[0], branch.tip[1] - 14]);
+  const boughCount = CLASSIC_BOUGH_COUNTS[stage];
+  return {
+    mode: "classic",
+    stage,
+    count: photos,
+    capacity: TREE_NODE_CAPACITY,
+    contentScale: CLASSIC_TREE_SCALES[stage],
+    slots,
+    branches: CLASSIC_BRANCHES.slice(0, boughCount).map((branch) => renderBranch(branch, CLASSIC_BRANCHES, 24, 1.35, .65)),
+    canopy: [],
+    canvas: { minX: 0, width: 380, minY: 0, height: 420, addedTips: 0 },
+    trunk: {
+      detailed: stage >= 4,
+      topY: 185,
+      scaleX: 1,
+      scaleY: 1,
+      youngPath: "M188 384 C197 343 181 296 194 251 Q206 210 200 165",
+      youngWidth: 6,
+    },
+    soilStage: stage,
+  };
+}
+
+export function getTreeGrowthModel(count: number, mode: TreeDisplayMode = "expanding"): TreeGrowthModel {
+  if (mode === "classic") return getClassicTreeGrowthModel(count);
   const photos = safeCount(count);
   const shape = shapeFor(photos);
   const rows = makeRows(shape);
   const ordered = balancedPoints(rows);
-  const slots = ordered.map((point, slot): Point => {
+  const positioned = scatterPoints(ordered, shape);
+  const slots = positioned.map((point, slot): Point => {
     const [hangX, hangY] = FRUIT_HANG_OFFSETS[slot % FRUIT_HANG_OFFSETS.length];
     return [point.center[0] - hangX, point.center[1] - hangY];
   });
   const scaleY = (388 - shape.trunkTop) / (388 - 185);
-  const projectedCrownTop = 383 + (shape.topY - 383) * TREE_PROPORTION.y;
-  const canvasMinY = shape.stage >= 3 ? Math.min(shape.canvasMinY, projectedCrownTop - 42) : 0;
+  const canvasMinY = canvasMinYFor(shape);
   return {
+    mode: "expanding",
     stage: shape.stage,
     count: photos,
     capacity: shape.capacity,
+    contentScale: 1,
     slots,
-    branches: shape.stage >= 3 ? makeBranches(rows, ordered, shape) : [],
+    branches: shape.stage >= 3 ? makeBranches(rows, positioned, shape) : [],
     canopy: shape.stage >= 3 ? makeCanopy(rows, shape) : [],
     canvas: { minX: 0, width: 380, minY: canvasMinY, height: 420 - canvasMinY,
       addedTips: Math.max(0, photos - TREE_NODE_CAPACITY) },
@@ -365,18 +495,24 @@ export function getTreeSlot(model: TreeGrowthModel, index: number, mirrored: boo
   return { x: mirrored ? 380 - point[0] : point[0], y: point[1] };
 }
 
-export function getTreeCanvasMetrics(count: number) {
-  return getTreeGrowthModel(count).canvas;
+export function getTreeCanvasMetrics(count: number, mode: TreeDisplayMode = "expanding") {
+  return getTreeGrowthModel(count, mode).canvas;
 }
 
 /** Occupied tips remain stable inside a growth band. Harvesting leaves a hole;
  * the next upload reuses it before extending the slot list. */
-export function placeTreeItems(items: MemoryTreeItem[], previousSlots: readonly (string | null)[] = []) {
+export function placeTreeItems(
+  items: MemoryTreeItem[],
+  previousSlots: readonly (string | null)[] = [],
+  maximumSlots?: number,
+) {
   const pending = new Map(items.flatMap(item => item.stage === "harvested" ? [] : [[item.id, item] as const]));
   const assigned = new Set<string>();
   // Harvested items remain in `items`, so their holes stay stable. A deleted
   // memory leaves `items` entirely and intentionally lets the tree shrink.
-  const capacity = items.length;
+  const capacity = maximumSlots === undefined
+    ? items.length
+    : Math.max(0, Math.floor(Number.isFinite(maximumSlots) ? maximumSlots : 0));
   const slots = Array.from({ length: capacity }, (_, index) => {
     const id = previousSlots[index];
     if (!id || !pending.has(id) || assigned.has(id)) return null;
@@ -388,7 +524,9 @@ export function placeTreeItems(items: MemoryTreeItem[], previousSlots: readonly 
   for (let slot = 0; slot < slots.length && next < waiting.length; slot++) {
     if (slots[slot] === null) slots[slot] = waiting[next++];
   }
-  while (next < waiting.length) slots.push(waiting[next++]);
+  if (maximumSlots === undefined) {
+    while (next < waiting.length) slots.push(waiting[next++]);
+  }
   const visibleItems = slots.flatMap((id, fruitSlot) => {
     const item = id ? pending.get(id) : undefined;
     return item ? [{ ...item, fruitSlot }] : [];

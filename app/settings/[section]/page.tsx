@@ -1,9 +1,10 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Trees } from "lucide-react";
 import { SettingsHeader } from "@/components/settings-header";
 import { APP_COLOR_MODES, APP_THEMES, usePreferences } from "@/lib/preferences-context";
+import { TREE_DISPLAY_MODES } from "@/lib/tree-preferences";
 
 const sectionLabels = {
   style: "スタイル",
@@ -57,10 +58,12 @@ export default function SettingDetailPage() {
     colorMode,
     bgmVolume,
     soundEffectVolume,
+    treeMode,
     setTheme,
     setColorMode,
     setBgmVolume,
     setSoundEffectVolume,
+    setTreeMode,
   } = usePreferences();
 
   if (!isSettingSection(section)) {
@@ -153,7 +156,41 @@ export default function SettingDetailPage() {
         </section>
       )}
 
-      {section !== "style" && section !== "sound" && (
+      {section === "tree" && (
+        <section className="settings-card mt-7" aria-labelledby="tree-mode-heading">
+          <h2 id="tree-mode-heading" className="text-base font-semibold text-ink">木の成長タイプ</h2>
+          <p className="mt-1 text-xs leading-6 text-ink/50">思い出の数に合わせた木の育ち方を選びます。</p>
+          <div className="mt-5 space-y-2.5" role="radiogroup" aria-label="木の成長タイプ">
+            {TREE_DISPLAY_MODES.map((option) => {
+              const selected = treeMode === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setTreeMode(option.id)}
+                  className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3.5 text-left transition ${
+                    selected ? "border-coral bg-paper text-ink shadow-sm" : "border-line bg-ivory text-ink/65 hover:border-coral/55"
+                  }`}
+                >
+                  <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${
+                    selected ? "bg-coral text-white" : "bg-paper text-ink/45"
+                  }`} aria-hidden="true">
+                    <Trees size={18} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold">{option.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-ink/50">{option.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {section !== "style" && section !== "sound" && section !== "tree" && (
         <section className="settings-card mt-7">
           <p className="rounded-xl border border-dashed border-line bg-paper/60 px-4 py-8 text-center text-sm leading-7 text-ink/55">
             「{label}」の項目はまだ設定されていません。
