@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advanceDate, buildPetals, buildTreeItems, getFruitQuiz, memoryQuestion, monthlyQueue, recordHarvest } from "../lib/tree-growth.ts";
+import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getFruitQuiz, memoryQuestion, monthlyQueue, recordHarvest, tokyoDate, uploadDate } from "../lib/tree-growth.ts";
 
 const memory = (index, changes = {}) => ({ id: `photo-${String(index).padStart(3, "0")}`, date: "2020-01-01",
   createdAt: `2026-08-01T12:00:${String(index).padStart(2, "0")}`, imageUrl: "test.jpg", caption: "思い出", people: [], tags: [], ...changes });
@@ -78,6 +78,12 @@ test("preview calendar clamps month ends and handles year/leap-day boundaries", 
   assert.equal(advanceDate("2026-01-31", 0, 1), "2026-02-28");
 });
 
+test("real tree dates follow the same Asia/Tokyo boundary as the backend", () => {
+  assert.equal(tokyoDate(new Date("2026-08-31T14:59:59Z")), "2026-08-31");
+  assert.equal(tokyoDate(new Date("2026-08-31T15:00:00Z")), "2026-09-01");
+  assert.equal(uploadDate(memory(1, { createdAt: "2026-08-31T15:00:00Z" })), "2026-09-01");
+});
+
 test("quiz uses the selected photo date, not upload date; choices remain distinct across years", () => {
   const source = memory(1, { date: "2025-12-21" });
   const question = memoryQuestion(source);
@@ -92,6 +98,34 @@ test("harvested petals survive month rollover without showing future words or an
   assert.equal(buildPetals(source, "2026-09-01", harvests)[0].word, "夏の日");
   assert.equal(buildPetals(source, "2026-07-31", harvests).length, 0);
   assert.equal(buildPetals([], "2026-09-01", harvests).length, 0);
+});
+
+test("persisted fruit timestamps, not frontend upload counts, decide ripe and harvested states", () => {
+  const source = photos(9);
+  const fruits = {
+    [source[0].id]: { memoryId: source[0].id, ripenedAt: "2026-08-01T12:00:07Z", harvestedAt: null,
+      harvestWord: null, wordAssignedAt: null, homeVisibleUntil: null },
+  };
+  const items = buildPersistedTreeItems(source, "2026-08-31", fruits);
+  assert.equal(items[0].stage, "quiz-ready");
+  // Nine uploads would make the second fruit ripe in the prototype algorithm,
+  // but the real UI must wait for the backend timestamp.
+  assert.equal(items[1].stage, "growing");
+
+  const harvested = { ...fruits, [source[0].id]: { ...fruits[source[0].id],
+    harvestedAt: "2026-08-20T03:00:00Z", harvestWord: "夏の日",
+    wordAssignedAt: "2026-08-20T03:00:00Z", homeVisibleUntil: "2026-08-31T15:00:00Z" } };
+  assert.equal(buildPersistedTreeItems(source, "2026-08-31", harvested)[0].stage, "harvested");
+});
+
+test("persisted petals disappear at the backend deadline while harvest history remains", () => {
+  const source = photos(1);
+  const fruits = { [source[0].id]: { memoryId: source[0].id, ripenedAt: "2026-08-01T12:00:07Z",
+    harvestedAt: "2026-08-20T03:00:00Z", harvestWord: "夏の日", wordAssignedAt: "2026-08-20T03:00:00Z",
+    homeVisibleUntil: "2026-08-31T15:00:00Z" } };
+  assert.equal(buildPersistedPetals(source, "2026-08-31", fruits, Date.parse("2026-08-31T14:59:59Z"))[0].word, "夏の日");
+  assert.equal(buildPersistedPetals(source, "2026-09-01", fruits, Date.parse("2026-08-31T15:00:00Z")).length, 0);
+  assert.equal(buildPersistedTreeItems(source, "2026-08-31", fruits)[0].stage, "harvested");
 });
 
 test("each ripe fruit opens exactly its own photo's question, even when multiple fruits are ripe", () => {
