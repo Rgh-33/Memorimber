@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   deleteMemory, getMemoryImageType, loadMemories, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES, MAX_MEMORY_LETTER_LENGTH,
   MEMORY_IMAGE_BUCKET, MemoryNotFoundError, MemorySaveError, readPendingMemoryUpload,
-  recoverMemorySave, saveMemory, updateMemory, validateMemoryFields, validateMemoryInput,
+  recoverMemorySave, saveMemory, updateMemory, updateMemoryAlbumAppearance, validateMemoryFields, validateMemoryInput,
 } from "../lib/supabase/memories.ts";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -63,6 +63,9 @@ function harness(options = {}) {
           if (state.missingLetterColumn && parsed.searchParams.get("select")?.includes("letter")) {
             return json({ message: "column memories.letter does not exist", code: "42703", details: null, hint: null }, 400);
           }
+          if (state.missingAlbumAppearanceColumn && (parsed.searchParams.get("select")?.includes("album_appearance") || body?.album_appearance)) {
+            return json({ message: "column memories.album_appearance does not exist", code: "42703", details: null, hint: null }, 400);
+          }
           if (state.updateError) return json({ message: state.updateError, code: "42501", details: null, hint: null }, 403);
           const userId = parsed.searchParams.get("user_id")?.slice(3);
           const id = parsed.searchParams.get("id")?.slice(3);
@@ -86,6 +89,9 @@ function harness(options = {}) {
         if (parsed.pathname === "/rest/v1/memories" && method === "GET") {
           if (state.missingLetterColumn && parsed.searchParams.get("select")?.includes("letter")) {
             return json({ message: "column memories.letter does not exist", code: "42703", details: null, hint: null }, 400);
+          }
+          if (state.missingAlbumAppearanceColumn && parsed.searchParams.get("select")?.includes("album_appearance")) {
+            return json({ message: "column memories.album_appearance does not exist", code: "42703", details: null, hint: null }, 400);
           }
           if (state.readError) return json({ message: "Read failed", code: "42501" }, 403);
           let matching = [...rows.values()].filter((row) => `eq.${row.user_id}` === parsed.searchParams.get("user_id"));
@@ -369,6 +375,37 @@ test("editing owned fields persists and is visible after a fresh detail load", a
   assert.equal(update.url.searchParams.get("user_id"), `eq.${USER_ID}`);
   assert.equal(update.url.searchParams.get("id"), `eq.${DETAIL_IDS.current}`);
   assert.equal(update.body.image_path, undefined);
+});
+
+const albumAppearance = {
+  font: "mincho",
+  layout: "gallery",
+  textColor: "navy",
+  background: "mist",
+  pattern: "grid",
+  orientation: "landscape",
+};
+
+test("a complete per-memory album appearance is saved and loaded with its owner scope", async () => {
+  const h = harness({ rows: [detailRow(DETAIL_IDS.current)] });
+  assert.deepEqual(await updateMemoryAlbumAppearance(h.client, DETAIL_IDS.current, albumAppearance), albumAppearance);
+  const reloaded = await loadMemoryDetail(h.client, DETAIL_IDS.current);
+  assert.deepEqual(reloaded.memory.albumAppearance, albumAppearance);
+  const update = h.calls.find((call) => call.method === "PATCH");
+  assert.equal(update.url.searchParams.get("user_id"), `eq.${USER_ID}`);
+  assert.deepEqual(update.body.album_appearance, albumAppearance);
+  await assert.rejects(updateMemoryAlbumAppearance(h.client, DETAIL_IDS.current, {
+    ...albumAppearance, orientation: "square",
+  }), /正しくありません/);
+});
+
+test("a database without album_appearance still loads, but clearly rejects individual appearance saves", async () => {
+  const h = harness({ rows: [detailRow(DETAIL_IDS.current)], missingAlbumAppearanceColumn: true });
+  const album = await loadMemories(h.client);
+  const detail = await loadMemoryDetail(h.client, DETAIL_IDS.current);
+  assert.equal(album.memories[0].albumAppearance, null);
+  assert.equal(detail.memory.albumAppearance, null);
+  await assert.rejects(updateMemoryAlbumAppearance(h.client, DETAIL_IDS.current, albumAppearance), /データベース更新/);
 });
 
 test("an older database without the optional letter column still loads albums and details", async () => {
