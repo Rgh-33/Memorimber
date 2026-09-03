@@ -1,5 +1,6 @@
 import type { Memory, QuizQuestion } from "./types";
 import type { MemoryTreeItem } from "./tree-data";
+import type { MemoryFruits } from "./supabase/memory-fruits";
 
 export type GrowthStage = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type Harvest = { word: string; harvestedAt: string };
@@ -15,8 +16,59 @@ export function buildPetals(memories: Memory[], date: string, harvests: Harvests
       wordSlot, relatedMemoryIds: [memory.id] }));
 }
 
+/** Real fruit state is authoritative from Supabase. Visual growth between
+ * uploads remains derived, but ripeness and harvest are never inferred here. */
+export function buildPersistedTreeItems(memories: Memory[], date: string, fruits: MemoryFruits): MemoryTreeItem[] {
+  const queue = monthlyQueue(memories, date);
+  return queue.map((memory, index) => {
+    const laterUploads = queue.length - index - 1;
+    const fruit = fruits[memory.id];
+    if (fruit?.harvestedAt) {
+      return { id: memory.id, memoryId: memory.id, stage: "harvested", word: fruit.harvestWord ?? "",
+        wordSlot: index, relatedMemoryIds: [memory.id] };
+    }
+
+    const ripe = Boolean(fruit?.ripenedAt);
+    const growthStage = (ripe ? 7 : Math.min(6, laterUploads + 1)) as GrowthStage;
+    const common = {
+      id: memory.id,
+      memoryId: memory.id,
+      fruitSlot: index,
+      fruitTone: "peach" as const,
+      growthStage,
+      newlyAdded: laterUploads === 0,
+      newlyFruited: laterUploads === 5,
+      newlyRipened: ripe && laterUploads === LATER_UPLOADS_TO_HARVEST,
+    };
+    return ripe
+      ? { ...common, stage: "quiz-ready", growth: 1, href: `/quiz?memory=${encodeURIComponent(memory.id)}` }
+      : { ...common, stage: "growing", growth: (growthStage - 1) / 6 };
+  });
+}
+
+export function buildPersistedPetals(memories: Memory[], date: string, fruits: MemoryFruits, now: number): HarvestedItem[] {
+  return [...new Map(memories.map((memory) => [memory.id, memory])).values()]
+    .filter((memory) => {
+      const fruit = fruits[memory.id];
+      return uploadDate(memory) <= date
+        && Boolean(fruit?.harvestedAt && fruit.harvestWord && fruit.homeVisibleUntil)
+        && Date.parse(fruit.homeVisibleUntil!) > now;
+    })
+    .sort((a, b) => fruits[a.id].harvestedAt!.localeCompare(fruits[b.id].harvestedAt!) || a.id.localeCompare(b.id))
+    .map((memory, wordSlot) => ({ id: memory.id, memoryId: memory.id, stage: "harvested",
+      word: fruits[memory.id].harvestWord!, wordSlot, relatedMemoryIds: [memory.id] }));
+}
+
 export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function tokyoDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 export function advanceDate(date: string, days = 0, months = 0) {
@@ -29,7 +81,7 @@ export function advanceDate(date: string, days = 0, months = 0) {
 }
 
 export function uploadDate(memory: Memory) {
-  return memory.createdAt ? localDate(new Date(memory.createdAt)) : memory.date;
+  return memory.createdAt ? tokyoDate(new Date(memory.createdAt)) : memory.date;
 }
 
 export function monthlyQueue(memories: Memory[], date: string) {
