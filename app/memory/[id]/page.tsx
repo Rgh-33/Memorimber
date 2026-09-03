@@ -60,6 +60,7 @@ export default function MemoryDetailPage() {
   const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
   const [draftMemory, setDraftMemory] = useState<Memory | null>(null);
   const [printPreparing, setPrintPreparing] = useState(false);
+  const [browserPrintPreparing, setBrowserPrintPreparing] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
@@ -224,41 +225,62 @@ export default function MemoryDetailPage() {
     window.open(pdfUrl, "_blank", "noopener,noreferrer");
   };
 
+  const handleCancelPdf = () => {
+    if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+    pdfUrlRef.current = null;
+    setPdfUrl(null);
+    setPdfBlob(null);
+    setPrintError(null);
+    setPrintPreparing(false);
+  };
+
+  const handleBrowserPrint = async () => {
+    if (browserPrintPreparing) return;
+    setBrowserPrintPreparing(true);
+    setPrintError(null);
+    try {
+      applyAlbumPrintPageSize(resolvedAppearance.orientation);
+      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          promise,
+          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
+        ]);
+        if (timeout) clearTimeout(timeout);
+      };
+      if (document.fonts) await waitAtMost(document.fonts.ready);
+      const images = Array.from(printPageRef.current?.querySelectorAll("img") ?? []);
+      await Promise.all(images.map(async (image) => {
+        if (!image.complete) {
+          await waitAtMost(new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          }));
+        }
+        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
+      }));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      window.print();
+    } finally {
+      setBrowserPrintPreparing(false);
+    }
+  };
+
   const harvestWord = tree.harvestWordFor(memory.id);
 
   return (
     <div className="memory-detail-page page-pad">
       <div className="print-hide"><AppHeader /></div>
 
-      <div className="print-hide mt-7 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-semibold tracking-[0.22em] text-coral">MEMORY PAGE</p>
-          <h1 className="mt-1 font-sans text-[23px] font-medium tracking-[0.07em] text-ink">思い出の1ページ</h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
-            <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
-          </Link>
-          <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をL判PDFにして印刷する">
-            <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "PDF作成中…" : pdfUrl ? "PDFを作り直す" : "L判PDFで印刷"}
-          </button>
-        </div>
+      <div className="print-hide mt-3 flex items-baseline gap-2.5 whitespace-nowrap">
+        <p className="text-[10px] font-semibold tracking-[0.22em] text-coral">MEMORY PAGE</p>
+        <span className="text-xs text-coral/45" aria-hidden="true">／</span>
+        <h1 className="font-sans text-[20px] font-medium tracking-[0.04em] text-ink sm:text-[23px] sm:tracking-[0.07em]">思い出の1ページ</h1>
       </div>
       {sampleMemory && <p className="print-hide mt-2 text-xs text-ink/55">サンプルの思い出です</p>}
       {detail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
-      {pdfUrl && (
-        <div role="status" className="print-hide mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coral/30 bg-ivory px-4 py-3 text-xs leading-5 text-ink/70">
-          <span>余白なしのL判PDFができました。iPhoneでは「共有して印刷」から「プリント」を選んでください。</span>
-          <span className="flex shrink-0 items-center gap-2">
-            <button type="button" onClick={() => void handleOpenPdf()} className="rounded-full bg-coral px-4 py-2 font-semibold text-white shadow-sm">共有して印刷</button>
-            <a href={pdfUrl} target="_blank" rel="noreferrer" className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">PDFを開く</a>
-            <a href={pdfUrl} download={getAlbumPdfFilename(memory.date)} className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">保存</a>
-          </span>
-        </div>
-      )}
-      {printError && <p role="alert" className="print-hide mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">{printError}</p>}
 
-      <div ref={printPageRef} className={`memory-book-page-shell memory-book-page-shell--${resolvedAppearance.orientation} mt-5`}>
+      <div ref={printPageRef} className={`memory-book-page-shell memory-book-page-shell--${resolvedAppearance.orientation} mt-3`}>
         <MemoryBookPage
           memory={renderedMemory ?? memory}
           appearance={resolvedAppearance}
@@ -285,7 +307,32 @@ export default function MemoryDetailPage() {
         </div>
       )}
 
-      <nav aria-label="前後の思い出" className="print-hide mt-6 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
+      <div className="print-hide mt-4 flex flex-wrap justify-end gap-2">
+        <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
+          <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
+        </Link>
+        <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をPDFにして印刷する">
+          <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "PDF作成中…" : "PDFで印刷"}
+        </button>
+        <button type="button" onClick={() => void handleBrowserPrint()} disabled={browserPrintPreparing} className="flex items-center gap-2 rounded-full border border-line bg-paper px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-ivory hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="ブラウザの印刷画面を開く">
+          <Printer size={16} className="text-ink/55" aria-hidden="true" /> {browserPrintPreparing ? "準備中…" : "通常印刷"}
+        </button>
+      </div>
+
+      {pdfUrl && (
+        <div role="status" className="print-hide mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coral/30 bg-ivory px-4 py-3 text-xs leading-5 text-ink/70">
+          <span>PDFができました。iPhoneでは「共有して印刷」から「プリント」を選択してください。</span>
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            <button type="button" onClick={() => void handleOpenPdf()} className="rounded-full bg-coral px-4 py-2 font-semibold text-white shadow-sm">共有して印刷</button>
+            <a href={pdfUrl} target="_blank" rel="noreferrer" className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">PDFを開く</a>
+            <a href={pdfUrl} download={getAlbumPdfFilename(memory.date)} className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">保存</a>
+            <button type="button" onClick={handleCancelPdf} className="rounded-full border border-line bg-paper px-3 py-2 font-semibold text-ink/65">キャンセル</button>
+          </span>
+        </div>
+      )}
+      {printError && <p role="alert" className="print-hide mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">{printError}</p>}
+
+      <nav aria-label="前後の思い出" className="print-hide mt-4 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
         {previousId ? <Link href={`/memory/${previousId}`} className="flex items-center gap-1"><ChevronLeft size={16} /> 前の思い出</Link> : <span />}
         <span className="h-5 w-px bg-ink/30" />
         {nextId ? <Link href={`/memory/${nextId}`} className="flex items-center gap-1">次の思い出 <ChevronRight size={16} /></Link> : <span />}
