@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { getTreeStructure } from "@/lib/tree-branches";
+import type { RenderedTreeBranch, TreeGrowthModel } from "@/lib/tree-branches";
 
 const TRUNK = "M153 388 C169 376 173 357 172 338 C171 315 183 287 180 264 C177 246 174 227 180 214 L187 220 C188 237 186 249 192 254 C203 237 214 211 216 190 L223 185 C225 214 208 246 204 267 C208 293 196 322 199 342 C202 363 215 379 237 390 L211 386 199 381 Q181 385 164 390Z";
 
@@ -43,11 +43,16 @@ function leafMesh(rx: number, ry: number, seed: number, front: boolean) {
   return bins;
 }
 
-const CROWN = CLUMPS.map(([x, y, rx, ry, front], index) => ({
-  x, y, front: Boolean(front), mesh: leafMesh(rx, ry, index + 1, Boolean(front)),
-  // Central leaves appear first; outer and upper clumps arrive as the trunk
-  // forks. All clumps are present at stage 7, preserving the mature crown.
-  birth: [5, 4, 4, 5, 6, 6, 6, 4, 4, 3, 6, 5, 4, 4, 5, 6, 5, 4, 3, 4, 5, 4, 6, 6, 6, 6, 6][index],
+const LEAF_MESHES = CLUMPS.map(([, , rx, ry, front], index) =>
+  leafMesh(rx, ry, index + 1, Boolean(front)));
+const CLASSIC_CANOPY = CLUMPS.map(([x, y, , , front], index) => ({
+  id: `classic-leaf-${index}`,
+  x,
+  y,
+  source: index,
+  scaleX: 1,
+  scaleY: 1,
+  front: Boolean(front),
 }));
 
 export function TreeArtDefs({ uid }: { uid: string }) {
@@ -91,16 +96,29 @@ export function TreeArtDefs({ uid }: { uid: string }) {
   </>;
 }
 
-export const TreeCanopy = memo(function TreeCanopy({ uid, front, stage }: { uid: string; front: boolean; stage: number }) {
-  return <g className={`konoha-foliage konoha-foliage--${front ? "front" : "back"}`}>
-    {CROWN.map((clump, index) => clump.front === front && clump.birth <= stage && <g key={index} className="konoha-canopy-clump" transform={`translate(${clump.x} ${clump.y})`}>
-      <g className="konoha-canopy-drift" style={{ animationDelay: `${index * -.73}s` }}>
-        {clump.mesh.map((mesh, shade) => <g key={shade}>
-          <path d={mesh.leaves} fill={`url(#${uid}-leaf-${shade})`} />
-          <path d={mesh.folds} fill={`var(--konoha-leaf-${Math.min(7, shade + 1)})`} opacity=".52" />
-        </g>)}
-      </g>
+const LeafClumpDefinitions = memo(function LeafClumpDefinitions({ uid }: { uid: string }) {
+  return <defs>
+    {LEAF_MESHES.map((clump, index) => <g key={index} id={`${uid}-leaf-clump-${index}`}>
+      {clump.map((mesh, shade) => <g key={shade}>
+        <path d={mesh.leaves} fill={`url(#${uid}-leaf-${shade})`} />
+        <path d={mesh.folds} fill={`var(--konoha-leaf-${Math.min(7, shade + 1)})`} opacity=".52" />
+      </g>)}
     </g>)}
+  </defs>;
+});
+
+export const TreeCanopy = memo(function TreeCanopy({ uid, front, model }: { uid: string; front: boolean; model: TreeGrowthModel }) {
+  const canopy = model.mode === "classic" ? CLASSIC_CANOPY : model.canopy;
+  return <g className={`konoha-foliage konoha-foliage--${front ? "front" : "back"}`}>
+    {!front && <LeafClumpDefinitions uid={uid} />}
+    {canopy.map((clump, index) => clump.front === front
+      ? <g key={clump.id} className="konoha-canopy-clump"
+        transform={`translate(${clump.x} ${clump.y}) scale(${clump.scaleX} ${clump.scaleY})`}>
+        <g className="konoha-canopy-drift" style={{ animationDelay: `${index * -.41}s` }}>
+          <use href={`#${uid}-leaf-clump-${clump.source}`} />
+        </g>
+      </g>
+      : null)}
   </g>;
 });
 
@@ -145,12 +163,11 @@ export function TreeGround({ uid, stage, front }: { uid: string; stage: number; 
   </g>;
 }
 
-export function TreeSeed({ uid }: { uid: string }) {
-  return <g className="konoha-seed" transform="translate(190 388) rotate(-8)" data-seed-visible="true">
-    <ellipse rx="8.5" ry="8.2" fill={`url(#${uid}-seed)`} stroke="#4f3d2d" strokeWidth=".65" />
-    <path d="M-6 -2 Q-1 -7 5 -4" fill="none" stroke="#e5c892" strokeWidth="1.1" strokeLinecap="round" opacity=".7" />
-    <path d="M0 -7 Q-2 -4 -1 -1 M0 -7 Q2 -4 1 -1" fill="none" stroke="#5c432f" strokeWidth=".75" strokeLinecap="round" opacity=".72" />
-    <path d="M1 -7 Q3 -9 5 -10" fill="none" stroke="#6d7e4d" strokeWidth="1.2" strokeLinecap="round" />
+function TreeSeedShell({ uid }: { uid: string }) {
+  return <g className="konoha-seed" transform="rotate(-8)" data-seed-visible="true">
+    <path d="M-1 1 C-9 3 -13 -2 -12 -9 C-7 -11 -2 -8 1 -3Z" fill={`url(#${uid}-seed)`} stroke="#4f3d2d" strokeWidth=".5" />
+    <path d="M1 0 C8 3 13 -1 12 -8 C8 -10 3 -8 0 -4Z" fill={`url(#${uid}-seed)`} stroke="#4f3d2d" strokeWidth=".5" />
+    <path d="M-9 -7 Q-5 -4 -1 -3 M9 -7 Q5 -4 1 -3" fill="none" stroke="#e5c892" strokeWidth=".8" strokeLinecap="round" opacity=".65" />
   </g>;
 }
 
@@ -173,21 +190,22 @@ export function TreeSeedling({ uid, stage }: { uid: string; stage: number }) {
       <g className="konoha-cotyledon" data-cotyledon="right" style={{ transform: opened ? "rotate(-8deg) scale(1)" : "rotate(-64deg) scale(.1)", opacity: opened ? 1 : 0 }}>
         <g transform="scale(-1 1)">{leaf}</g>
       </g>
+      {!opened && <TreeSeedShell uid={uid} />}
     </g>
   </g>;
 }
 
-export const TreeWood = memo(function TreeWood({ uid, stage }: { uid: string; stage: number }) {
-  const branches = getTreeStructure(stage, false);
-  const youngTrunks = {
-    3: { d: "M190 384 C193 354 184 313 192 238", width: 7.4 },
-    4: { d: "M190 384 C197 346 181 287 194 207", width: 7.1 },
-    5: { d: "M189 384 C198 340 180 270 195 183", width: 6.7 },
-    6: { d: "M189 384 C199 336 180 252 198 165", width: 6.3 },
-  } as const;
-  const youngTrunk = youngTrunks[stage as keyof typeof youngTrunks] ?? youngTrunks[6];
+const TreeBough = memo(function TreeBough({ uid, branch }: { uid: string; branch: RenderedTreeBranch }) {
+  return <g className="konoha-bough">
+    <path d={branch.surface} fill={`url(#${uid}-bough)`} />
+    <path d={branch.path} fill="none" stroke="#b3ab81" strokeWidth={branch.width > 10 ? 1.1 : .55} strokeLinecap="round" opacity=".38" />
+  </g>;
+});
+
+export const TreeWood = memo(function TreeWood({ uid, model }: { uid: string; model: TreeGrowthModel }) {
+  const trunkTransform = `translate(190 388) scale(${model.trunk.scaleX} ${model.trunk.scaleY}) translate(-190 -388)`;
   return <>
-    <g className="konoha-trunk-detail" opacity={stage >= 7 ? 1 : 0}>
+    <g className="konoha-trunk-detail" opacity={model.trunk.detailed ? 1 : 0} transform={trunkTransform}>
       <g filter={`url(#${uid}-wood-grain)`}>
         <path d="M182 363 Q165 381 132 390 Q155 393 177 384 L185 374 M201 367 Q222 386 255 392 Q229 394 207 383Z" fill="#586045" />
         <path d={TRUNK} fill={`url(#${uid}-bark)`} />
@@ -207,15 +225,12 @@ export const TreeWood = memo(function TreeWood({ uid, stage }: { uid: string; st
         <path d="M153 387 l-4 -6 7 4 -1 -8 5 7 4 -4 -1 6 M217 388 l3 -7 2 5 5 -3 -3 6" opacity=".8" />
       </g>
     </g>
-    <g className="konoha-young-wood" opacity={stage >= 3 && stage < 7 ? 1 : 0}>
-      <path className="konoha-young-trunk" pathLength="1" d={youngTrunk.d} fill="none" stroke={`url(#${uid}-bark)`} strokeWidth={youngTrunk.width} strokeLinecap="round" />
-      <path d={youngTrunk.d} fill="none" stroke="#bdb58d" strokeWidth=".75" strokeLinecap="round" opacity=".42" />
+    <g className="konoha-young-wood" opacity={model.stage >= 3 && !model.trunk.detailed ? 1 : 0}>
+      <path className="konoha-young-trunk" pathLength="1" d={model.trunk.youngPath} fill="none" stroke={`url(#${uid}-bark)`} strokeWidth={model.trunk.youngWidth} strokeLinecap="round" />
+      <path d={model.trunk.youngPath} fill="none" stroke="#bdb58d" strokeWidth=".75" strokeLinecap="round" opacity=".42" />
     </g>
-    <g className="konoha-wood-branches" data-branch-count={branches.length}>
-      {branches.map((branch, index) => <g key={index} className="konoha-bough">
-        <path d={branch.surface} fill={`url(#${uid}-bough)`} />
-        <path d={branch.path} fill="none" stroke="#b3ab81" strokeWidth={branch.width > 10 ? 1.1 : .55} strokeLinecap="round" opacity=".38" />
-      </g>)}
+    <g className="konoha-wood-branches" data-branch-count={model.branches.length}>
+      {model.branches.map((branch) => <TreeBough key={branch.id} uid={uid} branch={branch} />)}
     </g>
   </>;
 });

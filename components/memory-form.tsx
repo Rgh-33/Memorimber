@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CalendarDays, Check, ChevronRight, ImagePlus, Sprout, Tag, Users } from "lucide-react";
 import { useMemories } from "@/lib/memories-context";
 import { useProcessing } from "@/lib/processing-context";
@@ -23,6 +23,7 @@ const today = () => {
 };
 
 export function MemoryForm({ compact = false }: { compact?: boolean }) {
+  const router = useRouter();
   const { refreshMemories } = useMemories();
   const { startProcessing, stopProcessing } = useProcessing();
   const configured = isSupabaseConfigured();
@@ -39,7 +40,6 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const [stage, setStage] = useState<MemorySaveStage | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingMemoryUpload | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);
   const busy = stage !== null;
 
   useEffect(() => {
@@ -67,7 +67,6 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
         setImage(file);
         setImageUrl(URL.createObjectURL(file));
         setPreviewFailed(false);
-        setSavedId(null);
         setErrors((current) => ({ ...current, image: undefined }));
       } catch (cause) {
         setImage(null);
@@ -82,8 +81,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setter((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]));
   };
 
-  const onSaved = (id: string) => {
-    setSavedId(id);
+  const onSaved = async () => {
     setSaveError(null);
     clearPending();
     setImage(null);
@@ -94,7 +92,8 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setTags([]);
     setErrors({});
     formRef.current?.reset();
-    void refreshMemories();
+    await refreshMemories();
+    router.replace("/", { scroll: true });
   };
 
   const clearPending = () => {
@@ -129,12 +128,11 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
 
     submittingRef.current = true;
     setSaveError(null);
-    setSavedId(null);
     setStage("auth");
     startProcessing();
     try {
-      const result = await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
-      onSaved(result.id);
+      await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
+      await onSaved();
     } catch (cause) {
       showSaveError(cause);
     } finally {
@@ -151,7 +149,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     startProcessing();
     try {
       const result = await recoverMemorySave(createClient(), pending);
-      if (result.saved) onSaved(result.id);
+      if (result.saved) await onSaved();
       else {
         clearPending();
         setSaveError("未保存の画像を取り消しました。入力内容を確認して、もう一度投稿できます。");
@@ -167,7 +165,6 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} aria-busy={busy} className={`rounded-[22px] border border-line bg-ivory p-3 shadow-card ${compact ? "" : "mt-5"}`}>
-      {savedId && <div role="status" className="mb-3 rounded-xl border border-coral/30 bg-coral/10 p-3 text-sm text-ink">思い出を保存しました。<Link href={`/memory/${savedId}`} className="mt-2 block font-medium text-coral underline">保存した思い出を見る</Link></div>}
       {!configured && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">Supabaseの接続設定後、ログインすると投稿できます。この画面での一時保存は行いません。</p>}
       <fieldset disabled={busy || Boolean(pending) || !configured} className="min-w-0 disabled:opacity-60">
       <div className="mb-2 flex items-center gap-2 px-1 pb-1">
