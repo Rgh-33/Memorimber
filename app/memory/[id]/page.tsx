@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Tag, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Printer, Settings2, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { MemoryBookPage } from "@/components/memory-book-page";
 import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
-import { MemoryPhoto } from "@/components/memory-photo";
-import { formatJapaneseDate, SAMPLE_MEMORIES } from "@/lib/data";
+import { SAMPLE_MEMORIES } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -35,6 +35,7 @@ export default function MemoryDetailPage() {
   const [detail, setDetail] = useState<MemoryDetail | null>(null);
   const [loadState, setLoadState] = useState<LoadState>(prototypeMemory ? "loaded" : "idle");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
 
   const fetchDetail = useCallback(async (showLoading = true) => {
     const version = ++requestVersion.current;
@@ -108,6 +109,7 @@ export default function MemoryDetailPage() {
 
   const handleUpdated = (updated: Memory) => {
     setDetail((current) => current ? { ...current, memory: updated } : current);
+    setActionMode(null);
     void refreshMemories();
     void fetchDetail(false);
   };
@@ -119,36 +121,67 @@ export default function MemoryDetailPage() {
   };
 
   return (
-    <div className="page-pad">
-      <AppHeader />
-      <h1 className="pt-7 text-center font-sans text-[25px] font-medium tracking-[0.1em] text-ink">思い出詳細</h1>
-      {sampleMemory && <p className="mt-2 text-center text-xs text-ink/55">サンプルの思い出です</p>}
-      {detail?.warning && <p role="status" className="mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
+    <div className="memory-detail-page page-pad">
+      <div className="print-hide"><AppHeader /></div>
 
-      <article className="mt-4">
-        <div className="overflow-hidden rounded-xl border border-dashed border-coral/45 bg-ivory p-2">
-          <div className="aspect-[4/3] overflow-hidden rounded-lg"><MemoryPhoto src={memory.imageUrl} alt={memory.caption} detailed className="h-full w-full object-cover" /></div>
+      <div className="print-hide mt-7 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold tracking-[0.22em] text-coral">MEMORY PAGE</p>
+          <h1 className="mt-1 font-sans text-[23px] font-medium tracking-[0.07em] text-ink">思い出の1ページ</h1>
         </div>
-        <p className="mt-4 flex items-center gap-2 text-xs text-ink/65"><CalendarDays size={16} className="text-ink" /> {formatJapaneseDate(memory.date)}</p>
-        <h2 className="mt-3 text-[15px] font-medium leading-6 text-ink">{memory.caption}</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {memory.people.map((person) => <span key={person} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[11px] text-ink/65"><Users size={12} className="text-coral" /> {person}</span>)}
-          {memory.tags.map((tag) => <span key={tag} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[11px] text-ink/65"><Tag size={12} className="text-coral" /> {tag}</span>)}
+        <div className="flex shrink-0 items-center gap-2">
+          <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
+            <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
+          </Link>
+          <button type="button" onClick={() => window.print()} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出を印刷する">
+            <Printer size={16} className="text-coral" aria-hidden="true" /> 印刷
+          </button>
         </div>
-      </article>
+      </div>
+      {sampleMemory && <p className="print-hide mt-2 text-xs text-ink/55">サンプルの思い出です</p>}
+      {detail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
 
-      {!prototypeMemory && detail && <MemoryDetailActions memory={memory} onUpdated={handleUpdated} onDeleted={handleDeleted} />}
+      <div className="memory-book-page-shell mt-5">
+        <MemoryBookPage
+          memory={memory}
+          editControl={!prototypeMemory && detail ? (
+            <button type="button" onClick={() => setActionMode("edit")} className="memory-book-pencil" aria-label="思い出と手紙を編集" title="編集">
+              <Pencil size={19} aria-hidden="true" />
+            </button>
+          ) : undefined}
+        />
+      </div>
 
-      <section className="mt-7">
-        <h2 className="mb-3 text-sm font-medium text-ink">関連する思い出</h2>
-        {related.length > 0 ? <div className="grid grid-cols-3 gap-2.5">{related.map((item) => <MemoryCard key={item.id} memory={item} compact />)}</div> : <div className="rounded-xl border border-dashed border-coral/35 px-4 py-5 text-center text-xs text-ink/45">近い思い出を、これから増やしていこう。</div>}
-      </section>
+      {!prototypeMemory && detail && actionMode === "edit" && (
+        <div className="print-hide">
+          <MemoryDetailActions key={`edit-${memory.id}`} memory={memory} mode="edit" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={() => setActionMode(null)} />
+        </div>
+      )}
 
-      <nav aria-label="前後の思い出" className="mt-6 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
+      <nav aria-label="前後の思い出" className="print-hide mt-6 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
         {previousId ? <Link href={`/memory/${previousId}`} className="flex items-center gap-1"><ChevronLeft size={16} /> 前の思い出</Link> : <span />}
         <span className="h-5 w-px bg-ink/30" />
         {nextId ? <Link href={`/memory/${nextId}`} className="flex items-center gap-1">次の思い出 <ChevronRight size={16} /></Link> : <span />}
       </nav>
+
+      <section className="print-hide mt-7">
+        <h2 className="mb-3 text-sm font-medium text-ink">関連する思い出</h2>
+        {related.length > 0 ? <div className="grid grid-cols-3 gap-2.5">{related.map((item) => <MemoryCard key={item.id} memory={item} compact />)}</div> : <div className="rounded-xl border border-dashed border-coral/35 px-4 py-5 text-center text-xs text-ink/45">近い思い出を、これから増やしていこう。</div>}
+      </section>
+
+      {!prototypeMemory && detail && (
+        <div className="print-hide mt-8 border-t border-line pt-4">
+          {actionMode === "delete" ? (
+            <MemoryDetailActions key={`delete-${memory.id}`} memory={memory} mode="delete" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={() => setActionMode(null)} />
+          ) : (
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setActionMode("delete")} className="flex items-center gap-1.5 px-1 py-2 text-[11px] text-red-500/75 transition hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60" aria-label="思い出を削除">
+                <Trash2 size={15} aria-hidden="true" /> 思い出を削除
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

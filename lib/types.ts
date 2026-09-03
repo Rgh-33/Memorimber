@@ -7,6 +7,7 @@ export type Memory = {
   caption: string;
   people: string[];
   tags: string[];
+  letter?: string;
 };
 
 export type QuizQuestion = {
@@ -28,4 +29,4 @@ export type MemoryInput = Omit<Memory, "id" | "imageUrl" | "imagePath"> & {
   image: File;
 };
 
-export type MemoryUpdateInput = Pick<Memory, "caption" | "date" | "people" | "tags">;
+export type MemoryUpdateInput = Pick<Memory, "caption" | "date" | "people" | "tags" | "letter">;
