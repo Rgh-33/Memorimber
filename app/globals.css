@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Memorinber Zen Kurenaido";
+  src: url("/fonts/ZenKurenaido-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
 :root {
   --ivory-rgb: 255 255 255;
   --paper-rgb: 244 249 255;
@@ -213,6 +221,687 @@ a {
 
 .page-pad {
   padding: 22px 20px 34px;
+}
+
+.album-font-zen-kurenaido {
+  --album-font-family: "Memorinber Zen Kurenaido", "Yu Kyokasho", "UD Digi Kyokasho NK-R", cursive;
+  --album-font-weight: 400;
+  --album-font-letter-spacing: 0.015em;
+  --album-font-shadow: 0.2px 0 currentColor;
+}
+
+.album-font-gothic {
+  --album-font-family: "Yu Gothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --album-font-weight: 600;
+  --album-font-letter-spacing: 0.035em;
+  --album-font-shadow: none;
+}
+
+.album-font-mincho {
+  --album-font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+  --album-font-weight: 500;
+  --album-font-letter-spacing: 0.035em;
+  --album-font-shadow: none;
+}
+
+.album-font-rounded {
+  --album-font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  --album-font-weight: 600;
+  --album-font-letter-spacing: 0.035em;
+  --album-font-shadow: none;
+}
+
+.album-font-preview {
+  font-family: var(--album-font-family);
+  font-weight: var(--album-font-weight);
+  letter-spacing: var(--album-font-letter-spacing);
+}
+
+.album-text-cocoa {
+  --album-text-color: #493225;
+  --album-subtext-color: #987451;
+  --album-meta-color: #81766c;
+}
+
+.album-text-navy {
+  --album-text-color: #243a59;
+  --album-subtext-color: #66758b;
+  --album-meta-color: #6b7683;
+}
+
+.album-text-rose {
+  --album-text-color: #794656;
+  --album-subtext-color: #a16978;
+  --album-meta-color: #8e7278;
+}
+
+.album-text-forest {
+  --album-text-color: #3c5146;
+  --album-subtext-color: #71806d;
+  --album-meta-color: #6f7b73;
+}
+
+.album-background-cream { --album-page-background: #fbf8f0; }
+.album-background-white { --album-page-background: #fffdfa; }
+.album-background-blush { --album-page-background: #fff3f0; }
+.album-background-mist { --album-page-background: #f1f7f8; }
+
+.album-pattern-botanical {
+  --album-pattern-image:
+    radial-gradient(circle at 10% 90%, rgb(var(--accent-rgb) / 0.08) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 16% 86%, rgb(var(--accent-rgb) / 0.055) 0 2px, transparent 2.5px);
+}
+
+.album-pattern-plain {
+  --album-pattern-image: linear-gradient(transparent, transparent);
+}
+
+.album-pattern-dots {
+  --album-pattern-image: radial-gradient(circle, rgb(151 118 84 / 0.12) 0 1.2px, transparent 1.4px);
+  background-size: 17px 17px, auto !important;
+}
+
+.album-pattern-grid {
+  --album-pattern-image:
+    linear-gradient(rgb(111 141 151 / 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(111 141 151 / 0.08) 1px, transparent 1px);
+  background-size: 18px 18px, 18px 18px, auto !important;
+}
+
+.memory-book-page {
+  position: relative;
+  width: 100%;
+  container-type: size;
+  overflow: hidden;
+  border: 0.26cqmin solid rgb(107 87 68 / 0.16);
+  border-radius: 0.77cqmin 3.08cqmin 3.08cqmin 0.77cqmin;
+  background-color: var(--album-page-background);
+  background-image:
+    var(--album-pattern-image),
+    linear-gradient(90deg, rgb(75 54 37 / 0.075), transparent 8%, transparent 100%);
+  background-size: auto;
+  box-shadow:
+    0 5.64cqmin 10.77cqmin rgb(var(--ink-rgb) / 0.13),
+    inset 0.26cqmin 0 rgb(255 255 255 / 0.86);
+  color: #332c27;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.memory-book-page.album-orientation-portrait {
+  /* Japanese L photo paper: the same ratio is used on screen and in print. */
+  aspect-ratio: 89 / 127;
+}
+
+.memory-book-page.album-orientation-landscape {
+  aspect-ratio: 127 / 89;
+}
+
+.memory-book-page::after {
+  position: absolute;
+  inset: 0 auto 0 1.79cqmin;
+  width: 0.26cqmin;
+  background: rgb(76 55 39 / 0.08);
+  box-shadow: 0.77cqmin 0 2.05cqmin rgb(76 55 39 / 0.055);
+  content: "";
+}
+
+.memory-book-page-inner {
+  position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 2.56cqmin 2.31cqmin 2.56cqmin 3.85cqmin;
+}
+
+.memory-book-edit-control {
+  position: absolute;
+  z-index: 8;
+  top: 1.54cqmin;
+  right: 1.28cqmin;
+}
+
+.memory-book-copy-heading {
+  display: flex;
+  min-height: 6.4cqmin;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2cqmin;
+}
+
+.memory-book-pencil {
+  display: grid;
+  padding: 1.28cqmin;
+  border: 0;
+  background: transparent;
+  color: var(--album-text-color);
+  filter: drop-shadow(0 1px 1px rgb(255 255 255 / 0.85));
+  opacity: 0.72;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.memory-book-pencil:hover {
+  opacity: 1;
+  transform: rotate(-8deg) scale(1.06);
+}
+
+.memory-book-pencil:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid rgb(var(--accent-rgb) / 0.52);
+  outline-offset: 2px;
+}
+
+.memory-book-photo-frame {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: auto;
+  align-self: center;
+  flex: 0 0 auto;
+  padding: 1.79cqmin 1.79cqmin 10cqmin;
+  border-radius: 1.03cqmin 5.64cqmin 1.28cqmin 4.62cqmin;
+  background: #fffdf8;
+  box-shadow:
+    0 3.08cqmin 6.67cqmin rgb(60 43 30 / 0.18),
+    0 0 0 0.26cqmin rgb(73 52 35 / 0.08);
+  transform: rotate(-0.45deg);
+}
+
+.memory-book-photo-frame::before {
+  position: absolute;
+  z-index: 3;
+  top: -1.79cqmin;
+  left: 50%;
+  width: 19.49cqmin;
+  height: 4.87cqmin;
+  border-radius: 0.77cqmin;
+  background: rgb(202 179 148 / 0.42);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+  content: "";
+  transform: translateX(-50%) rotate(-2.5deg);
+}
+
+.memory-book-photo-frame::after {
+  position: absolute;
+  z-index: 4;
+  right: 4.1cqmin;
+  bottom: -4.62cqmin;
+  display: grid;
+  width: 11.03cqmin;
+  height: 11.03cqmin;
+  place-items: center;
+  border: 0.77cqmin solid #fbf8f0;
+  border-radius: 50%;
+  background: #eadfce;
+  box-shadow: 0 1.28cqmin 3.08cqmin rgb(60 43 30 / 0.2);
+  color: #9a7d5e;
+  content: "✦";
+  font-family: Georgia, serif;
+  font-size: 4.87cqmin;
+  transform: rotate(9deg);
+}
+
+.memory-book-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.51cqmin 4.36cqmin 0.51cqmin 3.59cqmin;
+  background: #efe7da;
+}
+
+.memory-book-photo[role="img"] {
+  min-height: 55cqmin;
+}
+
+.album-orientation-landscape .memory-book-photo[role="img"] {
+  min-height: 30cqmin;
+}
+
+.memory-book-frame-doodle {
+  position: absolute;
+  right: 3.85cqmin;
+  bottom: 1.28cqmin;
+  left: 3.85cqmin;
+  width: calc(100% - 7.7cqmin);
+  height: 6.92cqmin;
+  overflow: visible;
+  color: #b79d7d;
+}
+
+.memory-book-frame-doodle path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.35cqmin;
+  vector-effect: non-scaling-stroke;
+}
+
+.memory-book-copy {
+  position: relative;
+  z-index: 2;
+  margin: 5.13cqmin 7.18cqmin 0 10.77cqmin;
+  padding: 0;
+  transform: rotate(-0.7deg);
+}
+
+.memory-book-copy::before {
+  position: absolute;
+  top: 3.85cqmin;
+  left: -6.41cqmin;
+  width: auto;
+  height: auto;
+  background: transparent;
+  color: #b89a76;
+  content: "✦";
+  font-family: Georgia, serif;
+  font-size: 3.59cqmin;
+  transform: rotate(-8deg);
+}
+
+.memory-book-date {
+  margin: 0;
+  color: var(--album-subtext-color);
+  font-family: var(--album-font-family);
+  font-size: 3.33cqmin;
+  font-weight: var(--album-font-weight);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.memory-book-caption {
+  position: relative;
+  margin: 6px 0 0;
+  padding-bottom: 7px;
+  color: var(--album-text-color);
+  font-family: var(--album-font-family);
+  font-size: 6.67cqmin;
+  font-weight: var(--album-font-weight);
+  letter-spacing: var(--album-font-letter-spacing);
+  line-height: 1.48;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-shadow: var(--album-font-shadow);
+}
+
+.memory-book-caption::after {
+  position: absolute;
+  right: 5%;
+  bottom: 0;
+  left: 0;
+  height: 1.28cqmin;
+  border-bottom: 0.26cqmin solid rgb(183 157 125 / 0.54);
+  border-radius: 50%;
+  content: "";
+  transform: rotate(-0.8deg);
+}
+
+.memory-book-caption--long {
+  font-size: 5.28cqmin;
+  line-height: 1.5;
+}
+
+.memory-book-meta {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3.08cqmin;
+  margin: 3.59cqmin 4.62cqmin 0 5.64cqmin;
+  color: var(--album-meta-color);
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  font-size: 2.31cqmin;
+  letter-spacing: 0.06em;
+}
+
+.memory-book-meta p {
+  margin: 0;
+}
+
+.memory-book-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 1.03cqmin 2.05cqmin;
+  text-align: right;
+}
+
+.memory-book-harvest-word {
+  position: absolute;
+  z-index: 6;
+  right: -3.08cqmin;
+  bottom: -3.33cqmin;
+  width: 45.13cqmin;
+  height: 12.31cqmin;
+  color: var(--album-text-color);
+  isolation: isolate;
+  pointer-events: none;
+  transform: rotate(-7deg);
+  transform-origin: left bottom;
+}
+
+.memory-book-harvest-text {
+  position: absolute;
+  z-index: 2;
+  right: 10.26cqmin;
+  bottom: 4.36cqmin;
+  left: 0;
+  overflow: hidden;
+  font-family: var(--album-font-family);
+  font-size: 3.85cqmin;
+  font-weight: var(--album-font-weight);
+  letter-spacing: var(--album-font-letter-spacing);
+  line-height: 1.1;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-text-stroke: 0.18cqmin var(--album-page-background);
+  paint-order: stroke fill;
+  text-shadow: var(--album-font-shadow);
+}
+
+.memory-book-harvest-text[data-long] {
+  font-size: 2.56cqmin;
+}
+
+.memory-book-harvest-flourish {
+  position: absolute;
+  right: 0;
+  bottom: 0.77cqmin;
+  width: 8.72cqmin;
+  height: 6.92cqmin;
+  overflow: visible;
+  color: #b79d7d;
+  opacity: 0.56;
+}
+
+.memory-book-harvest-flourish path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.38cqmin;
+  vector-effect: non-scaling-stroke;
+}
+
+.memory-book-page--has-harvest-word .memory-book-photo-frame::after {
+  right: auto;
+  left: 4.1cqmin;
+  transform: rotate(-9deg);
+}
+
+.memory-book-page--has-harvest-word .memory-book-frame-doodle {
+  display: none;
+}
+
+.memory-book-page--has-harvest-word.album-layout-gallery .memory-book-photo-frame {
+  padding-bottom: 10cqmin;
+}
+
+.memory-book-letter {
+  position: relative;
+  z-index: 2;
+  margin: 3.08cqmin 6.92cqmin 0 9.23cqmin;
+  padding: 2.56cqmin 0.77cqmin 0;
+  border-top: 0.26cqmin solid rgb(183 157 125 / 0.34);
+  color: var(--album-text-color);
+  font-family: var(--album-font-family);
+  font-size: 2.82cqmin;
+  font-weight: var(--album-font-weight);
+  letter-spacing: 0.025em;
+  line-height: 1.72;
+  transform: rotate(0.18deg);
+}
+
+.memory-book-letter p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.memory-book-letter--long {
+  font-size: 2.44cqmin;
+  letter-spacing: 0.015em;
+  line-height: 1.56;
+}
+
+.album-layout-gallery .memory-book-photo-frame {
+  padding-bottom: 7.44cqmin;
+  border-radius: 0.77cqmin;
+  box-shadow: 0 2.05cqmin 5.13cqmin rgb(60 43 30 / 0.13), 0 0 0 0.26cqmin rgb(73 52 35 / 0.07);
+  transform: none;
+}
+
+.album-layout-gallery .memory-book-photo {
+  border-radius: 0.26cqmin;
+}
+
+.album-layout-gallery .memory-book-photo-frame::before {
+  top: -1.28cqmin;
+  width: 14.1cqmin;
+  height: 3.33cqmin;
+  opacity: 0.72;
+}
+
+.album-layout-gallery .memory-book-photo-frame::after,
+.album-layout-gallery .memory-book-copy::before,
+.album-layout-gallery .memory-book-frame-doodle {
+  display: none;
+}
+
+.album-layout-gallery .memory-book-copy {
+  margin: 4.1cqmin 6.15cqmin 0;
+  text-align: center;
+  transform: none;
+}
+
+.album-layout-gallery .memory-book-caption::after {
+  right: 16%;
+  left: 16%;
+}
+
+.album-layout-gallery .memory-book-meta {
+  justify-content: center;
+  margin-right: 5.64cqmin;
+  margin-left: 5.64cqmin;
+}
+
+.album-layout-gallery .memory-book-letter {
+  margin-right: 9.23cqmin;
+  margin-left: 9.23cqmin;
+  text-align: center;
+  transform: none;
+}
+
+.album-layout-diary .memory-book-photo-frame {
+  margin-top: 2.05cqmin;
+  border-radius: 2.05cqmin 0.77cqmin 3.08cqmin 1.03cqmin;
+  transform: rotate(0.55deg);
+}
+
+.album-layout-diary .memory-book-photo-frame::after {
+  display: none;
+}
+
+.album-layout-diary .memory-book-copy {
+  margin: 4.36cqmin 5.64cqmin 0 7.95cqmin;
+  transform: none;
+}
+
+.album-layout-diary .memory-book-caption {
+  font-size: 6.03cqmin;
+}
+
+.album-layout-diary .memory-book-caption--long {
+  font-size: 5.03cqmin;
+}
+
+.album-layout-diary .memory-book-letter {
+  margin: 2.82cqmin 5.38cqmin 0 7.69cqmin;
+  padding: 2.31cqmin 2.56cqmin 2.05cqmin 3.59cqmin;
+  border-top: 0;
+  border-left: 0.51cqmin solid rgb(183 157 125 / 0.38);
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.3), transparent);
+  transform: none;
+}
+
+.album-pattern-plain .memory-book-corner-doodle,
+.album-pattern-plain .memory-book-copy::before {
+  display: none;
+}
+
+.album-settings-preview {
+  width: min(100%, 260px);
+  margin: 0 auto;
+}
+
+.album-setting-choice {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--ivory);
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.album-setting-choice:hover {
+  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: rgb(var(--paper-rgb) / 0.48);
+  transform: translateY(-1px);
+}
+
+.album-setting-choice:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+}
+
+.album-setting-choice--selected {
+  border-color: var(--accent);
+  background: rgb(var(--paper-rgb) / 0.75);
+  box-shadow: 0 5px 13px rgb(var(--ink-rgb) / 0.07);
+}
+
+.album-setting-arrow {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--ivory);
+  color: var(--accent);
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.album-setting-arrow:hover {
+  background: var(--paper);
+  transform: scale(1.04);
+}
+
+.album-layout-swatch {
+  position: relative;
+  display: block;
+  width: 76px;
+  height: 48px;
+  margin-top: 10px;
+  border: 1px solid rgb(119 91 64 / 0.18);
+  border-radius: 5px;
+  background: #fbf8f0;
+  box-shadow: inset 3px 0 rgb(119 91 64 / 0.08);
+}
+
+.album-layout-swatch i {
+  position: absolute;
+  display: block;
+  background: #d9c7b1;
+}
+
+.album-layout-swatch i:first-child { top: 6px; left: 11px; width: 53px; height: 24px; }
+.album-layout-swatch i:nth-child(2) { top: 35px; left: 19px; width: 36px; height: 3px; }
+.album-layout-swatch i:nth-child(3) { top: 41px; left: 25px; width: 25px; height: 2px; }
+.album-layout-swatch--scrapbook i:first-child { transform: rotate(-3deg); }
+.album-layout-swatch--gallery i:first-child { left: 8px; width: 60px; transform: none; }
+.album-layout-swatch--gallery i:nth-child(2),
+.album-layout-swatch--gallery i:nth-child(3) { left: 20px; width: 36px; }
+.album-layout-swatch--diary i:first-child { left: 20px; width: 42px; height: 21px; transform: rotate(2deg); }
+.album-layout-swatch--diary i:nth-child(2) { top: 33px; left: 15px; width: 46px; height: 2px; }
+.album-layout-swatch--diary i:nth-child(3) { top: 38px; left: 15px; width: 39px; height: 5px; }
+
+.album-orientation-swatch {
+  display: block;
+  width: 58px;
+  margin-top: 10px;
+  border: 1px solid rgb(119 91 64 / 0.2);
+  border-radius: 4px;
+  background: #fbf8f0;
+  box-shadow: inset 3px 0 rgb(119 91 64 / 0.08);
+}
+
+.album-orientation-swatch--portrait {
+  aspect-ratio: 89 / 127;
+}
+
+.album-orientation-swatch--landscape {
+  width: 76px;
+  aspect-ratio: 127 / 89;
+}
+
+.album-pattern-swatch {
+  display: block;
+  height: 42px;
+  margin-top: 10px;
+  border: 1px solid rgb(119 91 64 / 0.14);
+  border-radius: 10px;
+  background-color: #fbf8f0;
+}
+
+.album-pattern-swatch--botanical {
+  background-image:
+    radial-gradient(circle at 18% 60%, rgb(var(--accent-rgb) / 0.18) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 28% 35%, rgb(151 118 84 / 0.18) 0 2px, transparent 2.5px);
+}
+
+.album-pattern-swatch--plain { background-image: none; }
+.album-pattern-swatch--dots { background-image: radial-gradient(circle, rgb(151 118 84 / 0.19) 0 1.2px, transparent 1.4px); background-size: 13px 13px; }
+.album-pattern-swatch--grid { background-image: linear-gradient(rgb(111 141 151 / 0.12) 1px, transparent 1px), linear-gradient(90deg, rgb(111 141 151 / 0.12) 1px, transparent 1px); background-size: 14px 14px; }
+
+.memory-book-corner-doodle {
+  position: absolute;
+  z-index: 0;
+  bottom: 1.03cqmin;
+  left: 2.82cqmin;
+  width: 43%;
+  max-width: 44.1cqmin;
+  color: #c6b294;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.memory-book-corner-doodle path,
+.memory-book-corner-doodle circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.36cqmin;
+  vector-effect: non-scaling-stroke;
+}
+
+.memory-book-signature {
+  position: absolute;
+  right: 2.05cqmin;
+  bottom: -0.26cqmin;
+  margin: 0;
+  color: #9b9188;
+  font-family: Georgia, serif;
+  font-size: 2.05cqmin;
+  letter-spacing: 0.25em;
 }
 
 .accent-gradient {
@@ -1060,15 +1749,38 @@ details > summary::-webkit-details-marker {
 }
 
 @media print {
-  html,
-  body {
-    background: white;
+  html {
+    color-scheme: light !important;
   }
 
+  html,
+  body {
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    background: #fff !important;
+  }
+
+  html[data-album-print-orientation="portrait"],
+  html[data-album-print-orientation="portrait"] body {
+    width: 89mm !important;
+    height: 127mm !important;
+  }
+
+  html[data-album-print-orientation="landscape"],
+  html[data-album-print-orientation="landscape"] body {
+    width: 127mm !important;
+    height: 89mm !important;
+  }
+
+  body > div,
+  body > div > div,
   .app-shell {
+    min-height: 0 !important;
     max-width: none;
     box-shadow: none;
-    background-image: none;
+    background: #fff !important;
+    background-image: none !important;
   }
 
   .page-pad {
@@ -1077,5 +1789,51 @@ details > summary::-webkit-details-marker {
 
   .print-hide {
     display: none !important;
+  }
+
+  .app-shell:has(.memory-detail-page) {
+    overflow: visible;
+  }
+
+  .app-shell:has(.memory-detail-page) main {
+    min-height: 0;
+    padding-bottom: 0 !important;
+    background: #fff !important;
+  }
+
+  .memory-detail-page {
+    min-height: 0;
+    padding: 0 !important;
+  }
+
+  .memory-detail-page .memory-book-page-shell {
+    display: block;
+    width: auto;
+    height: auto;
+    margin: 0 !important;
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  .memory-detail-page .memory-book-page {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    forced-color-adjust: none;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .memory-detail-page .memory-book-page.album-orientation-portrait {
+    width: 89mm;
+    height: 127mm;
+  }
+
+  .memory-detail-page .memory-book-page.album-orientation-landscape {
+    width: 127mm;
+    height: 89mm;
   }
 }

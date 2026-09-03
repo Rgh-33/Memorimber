@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isAlbumAppearance, type AlbumAppearance } from "../album-appearance.ts";
 import type { Memory, MemoryInput, MemoryUpdateInput } from "../types";
 
 export const MEMORY_IMAGE_BUCKET = "memory-images";
 export const MAX_MEMORY_IMAGE_BYTES = 20 * 1024 * 1024;
 export const MEMORY_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif";
 export const MEMORY_IMAGE_URL_LIFETIME = 60 * 60;
+export const MAX_MEMORY_LETTER_LENGTH = 400;
 
 const IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
@@ -31,6 +33,10 @@ export function getMemoryImageType(file: Pick<File, "type" | "name" | "size">) {
 export function validateMemoryFields(input: MemoryUpdateInput) {
   const caption = input.caption.trim();
   if (!caption || [...caption].length > 80) throw new Error("一言は1〜80文字で入力してください。");
+  const letter = input.letter?.trim();
+  if (letter && [...letter].length > MAX_MEMORY_LETTER_LENGTH) {
+    throw new Error(`手紙は${MAX_MEMORY_LETTER_LENGTH}文字以内で入力してください。`);
+  }
   const parsedDate = new Date(`${input.date}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !Number.isFinite(parsedDate.getTime())
     || parsedDate.toISOString().slice(0, 10) !== input.date) {
@@ -38,7 +44,11 @@ export function validateMemoryFields(input: MemoryUpdateInput) {
   }
   const strings = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   return {
-    caption, memory_date: input.date, people: strings(input.people), tags: strings(input.tags),
+    caption,
+    memory_date: input.date,
+    people: strings(input.people),
+    tags: strings(input.tags),
+    ...(input.letter !== undefined ? { letter: letter ?? "" } : {}),
   };
 }
 
@@ -215,25 +225,50 @@ export async function saveMemory(
 
 type MemoryRow = {
   id: string; image_path: string; caption: string; memory_date: string; people: string[]; tags: string[];
+  letter?: string;
+  album_appearance?: unknown;
   created_at?: string; updated_at?: string;
 };
 
-const MEMORY_ROW_COLUMNS = "id, image_path, caption, memory_date, people, tags, created_at, updated_at";
+const MEMORY_ROW_COLUMN_SETS = [
+  "id, image_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at",
+  "id, image_path, caption, memory_date, people, tags, letter, created_at, updated_at",
+  "id, image_path, caption, memory_date, people, tags, album_appearance, created_at, updated_at",
+  "id, image_path, caption, memory_date, people, tags, created_at, updated_at",
+] as const;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isMissingOptionalMemoryColumnError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; message?: unknown; details?: unknown };
+  const description = `${String(record.message ?? "")} ${String(record.details ?? "")}`.toLowerCase();
+  return (description.includes("letter") || description.includes("album_appearance")) && (
+    record.code === "42703"
+    || record.code === "PGRST204"
+    || description.includes("does not exist")
+    || description.includes("could not find")
+  );
+}
 
 function toMemory(row: MemoryRow, imageUrl = ""): Memory {
   return {
     id: row.id, imagePath: row.image_path, imageUrl,
-    caption: row.caption, date: row.memory_date, people: row.people, tags: row.tags,
+    caption: row.caption, date: row.memory_date, people: row.people, tags: row.tags, letter: row.letter ?? "",
+    albumAppearance: isAlbumAppearance(row.album_appearance) ? row.album_appearance : null,
     createdAt: row.created_at,
   };
 }
 
 async function loadOwnedMemoryRow(client: SupabaseClient, userId: string, id: string) {
-  const { data, error } = await client.from("memories").select(MEMORY_ROW_COLUMNS)
-    .eq("user_id", userId).eq("id", id).maybeSingle();
-  if (error) throw new Error(`思い出を読み込めませんでした。${errorDetail(error)}`);
-  return data as MemoryRow | null;
+  for (const columns of MEMORY_ROW_COLUMN_SETS) {
+    const result = await client.from("memories").select(columns)
+      .eq("user_id", userId).eq("id", id).maybeSingle();
+    if (!result.error) return result.data as unknown as MemoryRow | null;
+    if (!isMissingOptionalMemoryColumnError(result.error)) {
+      throw new Error(`思い出を読み込めませんでした。${errorDetail(result.error)}`);
+    }
+  }
+  throw new Error("思い出を読み込めませんでした。データベースの列を確認してください。");
 }
 
 async function loadMemoryOrder(client: SupabaseClient, userId: string) {
@@ -304,11 +339,49 @@ export async function updateMemory(client: SupabaseClient, id: string, input: Me
   if (!UUID_PATTERN.test(id)) throw new MemoryNotFoundError();
   const fields = validateMemoryFields(input);
   const user = await requireUser(client);
-  const { data, error } = await client.from("memories").update(fields)
-    .eq("user_id", user.id).eq("id", id).select(MEMORY_ROW_COLUMNS).maybeSingle();
-  if (error) throw new Error(`思い出を更新できませんでした。${errorDetail(error)}`);
+  let payload: Record<string, unknown> = fields;
+  let lastError: unknown = null;
+  for (const columns of MEMORY_ROW_COLUMN_SETS) {
+    const result = await client.from("memories").update(payload)
+      .eq("user_id", user.id).eq("id", id).select(columns).maybeSingle();
+    if (!result.error) {
+      if (!result.data) throw new MemoryNotFoundError();
+      return toMemory(result.data as unknown as MemoryRow);
+    }
+    lastError = result.error;
+    if (!isMissingOptionalMemoryColumnError(result.error)) break;
+    const description = errorDetail(result.error).toLowerCase();
+    if (description.includes("letter")) {
+      if (fields.letter) {
+        throw new Error("手紙を保存するためのデータベース更新がまだ完了していません。管理者がマイグレーションを適用した後に、もう一度お試しください。");
+      }
+      payload = {
+        caption: fields.caption,
+        memory_date: fields.memory_date,
+        people: fields.people,
+        tags: fields.tags,
+      };
+    }
+  }
+  throw new Error(`思い出を更新できませんでした。${errorDetail(lastError)}`);
+}
+
+export async function updateMemoryAlbumAppearance(client: SupabaseClient, id: string, appearance: AlbumAppearance) {
+  if (!UUID_PATTERN.test(id)) throw new MemoryNotFoundError();
+  if (!isAlbumAppearance(appearance)) throw new Error("アルバムの見た目設定が正しくありません。");
+  const user = await requireUser(client);
+  const { data, error } = await client.from("memories").update({ album_appearance: appearance })
+    .eq("user_id", user.id).eq("id", id).select("id, album_appearance").maybeSingle();
+  if (error) {
+    if (isMissingOptionalMemoryColumnError(error) && errorDetail(error).toLowerCase().includes("album_appearance")) {
+      throw new Error("個別の見た目を保存するためのデータベース更新がまだ完了していません。マイグレーションを適用してから、もう一度お試しください。");
+    }
+    throw new Error(`アルバムの見た目を保存できませんでした。${errorDetail(error)}`);
+  }
   if (!data) throw new MemoryNotFoundError();
-  return toMemory(data as MemoryRow);
+  const saved = (data as { album_appearance?: unknown }).album_appearance;
+  if (!isAlbumAppearance(saved)) throw new Error("保存したアルバム設定を確認できませんでした。");
+  return saved;
 }
 
 function isOwnedImagePath(imagePath: string, userId: string) {
@@ -324,6 +397,8 @@ async function restoreDeletedMemory(client: SupabaseClient, row: MemoryRow) {
     memory_date: row.memory_date,
     people: row.people,
     tags: row.tags,
+    ...(row.letter !== undefined ? { letter: row.letter } : {}),
+    ...(isAlbumAppearance(row.album_appearance) ? { album_appearance: row.album_appearance } : {}),
     ...(row.created_at ? { created_at: row.created_at } : {}),
     ...(row.updated_at ? { updated_at: row.updated_at } : {}),
   });
@@ -414,16 +489,23 @@ export async function loadMemories(client: SupabaseClient): Promise<{ memories: 
   const user = await requireUser(client);
   const rows: MemoryRow[] = [];
   const pageSize = 100;
-  for (let offset = 0; ; offset += pageSize) {
+  let offset = 0;
+  let columnSetIndex = 0;
+  for (;;) {
     const { data, error } = await client.from("memories")
-      .select("id, image_path, caption, memory_date, people, tags, created_at")
+      .select(MEMORY_ROW_COLUMN_SETS[columnSetIndex])
       .eq("user_id", user.id).order("memory_date", { ascending: false })
       .order("created_at", { ascending: false }).order("id", { ascending: false })
       .range(offset, offset + pageSize - 1);
+    if (error && columnSetIndex < MEMORY_ROW_COLUMN_SETS.length - 1 && isMissingOptionalMemoryColumnError(error)) {
+      columnSetIndex += 1;
+      continue;
+    }
     if (error) throw new Error(`思い出を読み込めませんでした。${errorDetail(error)}`);
-    const page = data as MemoryRow[];
+    const page = data as unknown as MemoryRow[];
     rows.push(...page);
     if (page.length < pageSize) break;
+    offset += pageSize;
   }
 
   const urls = new Map<string, string>();

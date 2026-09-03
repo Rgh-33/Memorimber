@@ -6,7 +6,7 @@ const settingsSections = [
   { href: "/settings/style", label: "スタイル", description: "明るさとテーマカラーを変更", icon: Palette },
   { href: "/settings/sound", label: "サウンド", description: "BGMと効果音の音量", icon: Music2 },
   { href: "/settings/tree", label: "木", description: "思い出の木の設定", icon: TreePine },
-  { href: "/settings/album", label: "アルバム", description: "アルバムの設定", icon: Images },
+  { href: "/settings/album", label: "アルバム", description: "フォント・レイアウト・色・模様", icon: Images },
   { href: "/settings/quiz", label: "クイズ", description: "クイズの設定", icon: CircleHelp },
   { href: "/settings/post", label: "写真の追加", description: "投稿画面の設定", icon: ImagePlus },
   { href: "/settings/more", label: "その他", description: "その他の設定", icon: MoreHorizontal },

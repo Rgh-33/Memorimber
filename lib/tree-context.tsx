@@ -6,7 +6,7 @@ import { useMemories } from "./memories-context";
 import { usePreferences } from "./preferences-context";
 import { createClient } from "./supabase/client";
 import { completeMemoryHarvest, loadMemoryFruits, type MemoryFruits } from "./supabase/memory-fruits";
-import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
+import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getHarvestWordForMemory, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
 import { getTreeVisibleCount, placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
 
@@ -122,6 +122,9 @@ function useTreeState() {
   }, [ready, state.preview, state.previewHarvests, source, date, fruits, now]);
   const totalCount = ready ? monthlyQueue(source, date).length : 0;
   const count = getTreeVisibleCount(totalCount, treeMode);
+  const harvestWordFor = useCallback((memoryId: string) => (
+    getHarvestWordForMemory(memoryId, state.previewHarvests, fruits)
+  ), [fruits, state.previewHarvests]);
   const legacySlotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
   const slotKey = `${legacySlotKey}:${treeMode}`;
   const storedSlots = state.slots[slotKey] ?? state.slots[legacySlotKey];
@@ -143,7 +146,8 @@ function useTreeState() {
 
   return {
     ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
-    date, preview: state.preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source, count, totalCount,
+    date, preview: state.preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source,
+    count, totalCount, harvestWordFor,
     setPreview: (preview: boolean) => setState((current) => ({ ...current, preview })),
     setDate: (next: string) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));

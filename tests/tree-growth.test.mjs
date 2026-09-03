@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getFruitQuiz, memoryQuestion, monthlyQueue, recordHarvest, tokyoDate, uploadDate } from "../lib/tree-growth.ts";
+import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getFruitQuiz, getHarvestWordForMemory, memoryQuestion, monthlyQueue, recordHarvest, tokyoDate, uploadDate } from "../lib/tree-growth.ts";
 
 const memory = (index, changes = {}) => ({ id: `photo-${String(index).padStart(3, "0")}`, date: "2020-01-01",
   createdAt: `2026-08-01T12:00:${String(index).padStart(2, "0")}`, imageUrl: "test.jpg", caption: "思い出", people: [], tags: [], ...changes });
@@ -126,6 +126,8 @@ test("persisted petals disappear at the backend deadline while harvest history r
   assert.equal(buildPersistedPetals(source, "2026-08-31", fruits, Date.parse("2026-08-31T14:59:59Z"))[0].word, "夏の日");
   assert.equal(buildPersistedPetals(source, "2026-09-01", fruits, Date.parse("2026-08-31T15:00:00Z")).length, 0);
   assert.equal(buildPersistedTreeItems(source, "2026-08-31", fruits)[0].stage, "harvested");
+  assert.equal(getHarvestWordForMemory(source[0].id, {}, fruits), "夏の日");
+  assert.equal(getHarvestWordForMemory("not-harvested", {}, fruits), null);
 });
 
 test("each ripe fruit opens exactly its own photo's question, even when multiple fruits are ripe", () => {

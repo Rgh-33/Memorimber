@@ -11,6 +11,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
     caption: "帰り道、みんなでアイスを食べた",
     people: ["友達"],
     tags: ["放課後", "8月"],
+    letter: "夕日がまぶしくて、アイスはすぐに溶けてしまったね。何でもない帰り道だったけれど、みんなで笑った時間をずっと覚えていたい。",
   },
   {
     id: "memory-classroom",

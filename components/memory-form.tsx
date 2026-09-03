@@ -220,7 +220,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
         <details className="group border-b border-line">
           <summary className="grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-2.5">
             <Users size={18} strokeWidth={1.6} />
-            <span className="text-xs font-medium">誰と</span>
+            <span className="text-xs font-medium">誰と <span className="font-normal text-ink/40">（任意）</span></span>
             <span className="flex items-center gap-1 text-[11px] text-ink/45">{people.length ? `${people.length}件` : "選択する"}<ChevronRight size={15} className="transition group-open:rotate-90" /></span>
           </summary>
           <div className="flex flex-wrap gap-2 bg-paper/60 px-3 pb-3 pt-1">
@@ -234,7 +234,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
         <details className="group">
           <summary className="grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-2.5">
             <Tag size={18} strokeWidth={1.6} />
-            <span className="text-xs font-medium">タグ</span>
+            <span className="text-xs font-medium">タグ <span className="font-normal text-ink/40">（任意）</span></span>
             <span className="flex items-center gap-1 text-[11px] text-ink/45">{tags.length ? `${tags.length}件` : "選択する"}<ChevronRight size={15} className="transition group-open:rotate-90" /></span>
           </summary>
           <div className="flex flex-wrap gap-2 bg-paper/60 px-3 pb-3 pt-1">

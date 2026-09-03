@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Tag, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Printer, Settings2, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { MemoryBookPage } from "@/components/memory-book-page";
 import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
-import { MemoryPhoto } from "@/components/memory-photo";
-import { formatJapaneseDate, SAMPLE_MEMORIES } from "@/lib/data";
+import { SAMPLE_MEMORIES } from "@/lib/data";
+import { createAlbumPdf, getAlbumPdfFilename } from "@/lib/album-pdf";
 import { useMemories } from "@/lib/memories-context";
+import { usePreferences } from "@/lib/preferences-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { loadMemoryDetail, type MemoryDetail } from "@/lib/supabase/memories";
@@ -17,6 +19,25 @@ import { useTree } from "@/lib/tree-context";
 import type { Memory } from "@/lib/types";
 
 type LoadState = "idle" | "loading" | "loaded" | "not-found" | "error";
+
+const ALBUM_PRINT_PAGE_STYLE_ID = "memory-album-print-page-size";
+
+function applyAlbumPrintPageSize(orientation: "portrait" | "landscape") {
+  const [width, height] = orientation === "landscape" ? [127, 89] : [89, 127];
+  let style = document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID) as HTMLStyleElement | null;
+
+  if (!style) {
+    style = document.createElement("style");
+    style.id = ALBUM_PRINT_PAGE_STYLE_ID;
+    style.media = "print";
+    document.head.appendChild(style);
+  }
+
+  // An unnamed page rule is supported more consistently than CSS named pages,
+  // especially by Safari and Firefox print preview.
+  style.textContent = `@page { size: ${width}mm ${height}mm; margin: 0; }`;
+  document.documentElement.dataset.albumPrintOrientation = orientation;
+}
 
 function compareMemories(a: Memory, b: Memory) {
   return a.date.localeCompare(b.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id.localeCompare(b.id);
@@ -26,6 +47,7 @@ export default function MemoryDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { memories, getRelatedMemories, refreshMemories } = useMemories();
+  const { albumAppearance: defaultAlbumAppearance } = usePreferences();
   const tree = useTree();
   const configured = isSupabaseConfigured();
   const requestVersion = useRef(0);
@@ -35,6 +57,15 @@ export default function MemoryDetailPage() {
   const [detail, setDetail] = useState<MemoryDetail | null>(null);
   const [loadState, setLoadState] = useState<LoadState>(prototypeMemory ? "loaded" : "idle");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
+  const [draftMemory, setDraftMemory] = useState<Memory | null>(null);
+  const [printPreparing, setPrintPreparing] = useState(false);
+  const [browserPrintPreparing, setBrowserPrintPreparing] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const pdfUrlRef = useRef<string | null>(null);
+  const printPageRef = useRef<HTMLDivElement>(null);
 
   const fetchDetail = useCallback(async (showLoading = true) => {
     const version = ++requestVersion.current;
@@ -72,6 +103,20 @@ export default function MemoryDetailPage() {
     return () => { requestVersion.current += 1; };
   }, [configured, fetchDetail, prototypeMemory]);
 
+  useEffect(() => {
+    setActionMode(null);
+    setDraftMemory(null);
+    setPrintError(null);
+    if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+    pdfUrlRef.current = null;
+    setPdfUrl(null);
+    setPdfBlob(null);
+  }, [params.id]);
+
+  useEffect(() => () => {
+    if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+  }, []);
+
   const localNavigation = useMemo(() => {
     if (!prototypeMemory) return null;
     const source = previewMemory ? tree.memories : SAMPLE_MEMORIES;
@@ -94,6 +139,18 @@ export default function MemoryDetailPage() {
     return getRelatedMemories(memories.find((item) => item.id === memory.id) ?? memory);
   }, [getRelatedMemories, memories, memory, previewMemory, tree.memories]);
 
+  const renderedMemory = memory ? (draftMemory ?? memory) : null;
+  const resolvedAppearance = renderedMemory?.albumAppearance ?? defaultAlbumAppearance;
+
+  useEffect(() => {
+    applyAlbumPrintPageSize(resolvedAppearance.orientation);
+
+    return () => {
+      document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID)?.remove();
+      delete document.documentElement.dataset.albumPrintOrientation;
+    };
+  }, [resolvedAppearance.orientation]);
+
   if (loadState === "idle" || loadState === "loading") {
     return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p role="status">思い出を読み込んでいます…</p></div></div>;
   }
@@ -108,6 +165,8 @@ export default function MemoryDetailPage() {
 
   const handleUpdated = (updated: Memory) => {
     setDetail((current) => current ? { ...current, memory: updated } : current);
+    setDraftMemory(null);
+    setActionMode(null);
     void refreshMemories();
     void fetchDetail(false);
   };
@@ -118,37 +177,185 @@ export default function MemoryDetailPage() {
     router.refresh();
   };
 
+  const closeAction = () => {
+    setActionMode(null);
+    setDraftMemory(null);
+  };
+
+  const openEditor = () => {
+    setDraftMemory(memory);
+    setActionMode("edit");
+  };
+
+  const handlePrint = async () => {
+    if (printPreparing) return;
+    setPrintPreparing(true);
+    setPrintError(null);
+    try {
+      const page = printPageRef.current?.querySelector<HTMLElement>(".memory-book-page");
+      if (!page) throw new Error("アルバム紙面を見つけられませんでした。");
+      const blob = await createAlbumPdf(page, resolvedAppearance.orientation);
+      const url = URL.createObjectURL(blob);
+      if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+      pdfUrlRef.current = url;
+      setPdfUrl(url);
+      setPdfBlob(blob);
+    } catch (cause) {
+      setPrintError(cause instanceof Error ? cause.message : "L判PDFを作成できませんでした。もう一度お試しください。");
+    } finally {
+      setPrintPreparing(false);
+    }
+  };
+
+  const handleOpenPdf = async () => {
+    if (!pdfBlob || !pdfUrl) return;
+    const file = new File([pdfBlob], getAlbumPdfFilename(memory.date), { type: "application/pdf" });
+    const shareData = { files: [file], title: "Memorinber L判アルバム" };
+
+    if (typeof navigator.share === "function" && (!navigator.canShare || navigator.canShare(shareData))) {
+      try {
+        await navigator.share(shareData);
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setPrintError("共有画面を開けませんでした。「PDFを開く」から印刷してください。");
+      }
+      return;
+    }
+
+    window.open(pdfUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCancelPdf = () => {
+    if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+    pdfUrlRef.current = null;
+    setPdfUrl(null);
+    setPdfBlob(null);
+    setPrintError(null);
+    setPrintPreparing(false);
+  };
+
+  const handleBrowserPrint = async () => {
+    if (browserPrintPreparing) return;
+    setBrowserPrintPreparing(true);
+    setPrintError(null);
+    try {
+      applyAlbumPrintPageSize(resolvedAppearance.orientation);
+      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          promise,
+          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
+        ]);
+        if (timeout) clearTimeout(timeout);
+      };
+      if (document.fonts) await waitAtMost(document.fonts.ready);
+      const images = Array.from(printPageRef.current?.querySelectorAll("img") ?? []);
+      await Promise.all(images.map(async (image) => {
+        if (!image.complete) {
+          await waitAtMost(new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          }));
+        }
+        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
+      }));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      window.print();
+    } finally {
+      setBrowserPrintPreparing(false);
+    }
+  };
+
+  const harvestWord = tree.harvestWordFor(memory.id);
+
   return (
-    <div className="page-pad">
-      <AppHeader />
-      <h1 className="pt-7 text-center font-sans text-[25px] font-medium tracking-[0.1em] text-ink">思い出詳細</h1>
-      {sampleMemory && <p className="mt-2 text-center text-xs text-ink/55">サンプルの思い出です</p>}
-      {detail?.warning && <p role="status" className="mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
+    <div className="memory-detail-page page-pad">
+      <div className="print-hide"><AppHeader /></div>
 
-      <article className="mt-4">
-        <div className="overflow-hidden rounded-xl border border-dashed border-coral/45 bg-ivory p-2">
-          <div className="aspect-[4/3] overflow-hidden rounded-lg"><MemoryPhoto src={memory.imageUrl} alt={memory.caption} detailed className="h-full w-full object-cover" /></div>
+      <div className="print-hide mt-3 flex items-baseline gap-2.5 whitespace-nowrap">
+        <p className="text-[10px] font-semibold tracking-[0.22em] text-coral">MEMORY PAGE</p>
+        <span className="text-xs text-coral/45" aria-hidden="true">／</span>
+        <h1 className="font-sans text-[20px] font-medium tracking-[0.04em] text-ink sm:text-[23px] sm:tracking-[0.07em]">思い出の1ページ</h1>
+      </div>
+      {sampleMemory && <p className="print-hide mt-2 text-xs text-ink/55">サンプルの思い出です</p>}
+      {detail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
+
+      <div ref={printPageRef} className={`memory-book-page-shell memory-book-page-shell--${resolvedAppearance.orientation} mt-3`}>
+        <MemoryBookPage
+          memory={renderedMemory ?? memory}
+          appearance={resolvedAppearance}
+          harvestWord={harvestWord}
+          editControl={!prototypeMemory && detail ? (
+            <button type="button" onClick={openEditor} className="memory-book-pencil" aria-label="思い出と手紙を編集" title="編集">
+              <Pencil size={19} aria-hidden="true" />
+            </button>
+          ) : undefined}
+        />
+      </div>
+
+      {!prototypeMemory && detail && actionMode === "edit" && (
+        <div className="print-hide">
+          <MemoryDetailActions
+            key={`edit-${memory.id}`}
+            memory={memory}
+            mode="edit"
+            onDraftChange={(draft) => setDraftMemory({ ...memory, ...draft })}
+            onUpdated={handleUpdated}
+            onDeleted={handleDeleted}
+            onClose={closeAction}
+          />
         </div>
-        <p className="mt-4 flex items-center gap-2 text-xs text-ink/65"><CalendarDays size={16} className="text-ink" /> {formatJapaneseDate(memory.date)}</p>
-        <h2 className="mt-3 text-[15px] font-medium leading-6 text-ink">{memory.caption}</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {memory.people.map((person) => <span key={person} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[11px] text-ink/65"><Users size={12} className="text-coral" /> {person}</span>)}
-          {memory.tags.map((tag) => <span key={tag} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-[11px] text-ink/65"><Tag size={12} className="text-coral" /> {tag}</span>)}
+      )}
+
+      <div className="print-hide mt-4 flex flex-wrap justify-end gap-2">
+        <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
+          <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
+        </Link>
+        <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をPDFにして印刷する">
+          <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "PDF作成中…" : "PDFで印刷"}
+        </button>
+        <button type="button" onClick={() => void handleBrowserPrint()} disabled={browserPrintPreparing} className="flex items-center gap-2 rounded-full border border-line bg-paper px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-ivory hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="ブラウザの印刷画面を開く">
+          <Printer size={16} className="text-ink/55" aria-hidden="true" /> {browserPrintPreparing ? "準備中…" : "通常印刷"}
+        </button>
+      </div>
+
+      {pdfUrl && (
+        <div role="status" className="print-hide mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coral/30 bg-ivory px-4 py-3 text-xs leading-5 text-ink/70">
+          <span>PDFができました。iPhoneでは「共有して印刷」から「プリント」を選択してください。</span>
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            <button type="button" onClick={() => void handleOpenPdf()} className="rounded-full bg-coral px-4 py-2 font-semibold text-white shadow-sm">共有して印刷</button>
+            <a href={pdfUrl} target="_blank" rel="noreferrer" className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">PDFを開く</a>
+            <a href={pdfUrl} download={getAlbumPdfFilename(memory.date)} className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">保存</a>
+            <button type="button" onClick={handleCancelPdf} className="rounded-full border border-line bg-paper px-3 py-2 font-semibold text-ink/65">キャンセル</button>
+          </span>
         </div>
-      </article>
+      )}
+      {printError && <p role="alert" className="print-hide mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">{printError}</p>}
 
-      {!prototypeMemory && detail && <MemoryDetailActions memory={memory} onUpdated={handleUpdated} onDeleted={handleDeleted} />}
-
-      <section className="mt-7">
-        <h2 className="mb-3 text-sm font-medium text-ink">関連する思い出</h2>
-        {related.length > 0 ? <div className="grid grid-cols-3 gap-2.5">{related.map((item) => <MemoryCard key={item.id} memory={item} compact />)}</div> : <div className="rounded-xl border border-dashed border-coral/35 px-4 py-5 text-center text-xs text-ink/45">近い思い出を、これから増やしていこう。</div>}
-      </section>
-
-      <nav aria-label="前後の思い出" className="mt-6 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
+      <nav aria-label="前後の思い出" className="print-hide mt-4 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
         {previousId ? <Link href={`/memory/${previousId}`} className="flex items-center gap-1"><ChevronLeft size={16} /> 前の思い出</Link> : <span />}
         <span className="h-5 w-px bg-ink/30" />
         {nextId ? <Link href={`/memory/${nextId}`} className="flex items-center gap-1">次の思い出 <ChevronRight size={16} /></Link> : <span />}
       </nav>
+
+      <section className="print-hide mt-7">
+        <h2 className="mb-3 text-sm font-medium text-ink">関連する思い出</h2>
+        {related.length > 0 ? <div className="grid grid-cols-3 gap-2.5">{related.map((item) => <MemoryCard key={item.id} memory={item} compact />)}</div> : <div className="rounded-xl border border-dashed border-coral/35 px-4 py-5 text-center text-xs text-ink/45">近い思い出を、これから増やしていこう。</div>}
+      </section>
+
+      {!prototypeMemory && detail && (
+        <div className="print-hide mt-8 border-t border-line pt-4">
+          {actionMode === "delete" ? (
+            <MemoryDetailActions key={`delete-${memory.id}`} memory={memory} mode="delete" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={closeAction} />
+          ) : (
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setActionMode("delete")} className="flex items-center gap-1.5 px-1 py-2 text-[11px] text-red-500/75 transition hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60" aria-label="思い出を削除">
+                <Trash2 size={15} aria-hidden="true" /> 思い出を削除
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
