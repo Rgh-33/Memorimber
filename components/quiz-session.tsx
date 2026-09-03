@@ -109,10 +109,10 @@ export function QuizSession({ quiz, variant = "page", onClose, onHarvest }: {
     {!answered ? (
       <button type="button" onClick={() => selected && setConfirmed(true)} disabled={!selected} className="accent-gradient mt-3 min-h-11 w-full rounded-xl px-4 py-3 text-sm font-medium tracking-[0.08em] text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-45">答えを確認</button>
     ) : (
-      <form className="konoha-harvest-form" onSubmit={(event) => {
+      <form className="konoha-harvest-form" onSubmit={async (event) => {
         event.preventDefault();
         input.current?.blur();
-        if (harvest.launch(memory.id, word)) onHarvest?.();
+        if (await harvest.launch(memory.id, word)) onHarvest?.();
       }}>
         <input ref={input} value={word} onChange={(event) => setWord([...event.target.value].slice(0, 12).join(""))}
           onKeyDown={event => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }}
@@ -120,6 +120,7 @@ export function QuizSession({ quiz, variant = "page", onClose, onHarvest }: {
         <button type="submit" disabled={!word.trim() || harvest.busy} aria-label="この言葉で収穫する"><Check size={18} /></button>
       </form>
     )}
+    {harvest.error && <p role="alert" className="mt-3 rounded-lg border border-red-400/40 p-3 text-xs leading-6 text-ink">{harvest.error}</p>}
   </>;
 
   if (!dialog) return <div className="page-pad"><AppHeader />{content}</div>;

@@ -27,3 +27,5 @@ export type AlbumMonth = {
 export type MemoryInput = Omit<Memory, "id" | "imageUrl" | "imagePath"> & {
   image: File;
 };
+
+export type MemoryUpdateInput = Pick<Memory, "caption" | "date" | "people" | "tags">;

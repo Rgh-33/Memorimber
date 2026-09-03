@@ -19,6 +19,7 @@ function QuizContent() {
   const tree = useTree();
   const memoryId = search.get("memory");
 
+  if (tree.error) return <div className="page-pad"><AppHeader /><div role="alert" className="mt-10 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{tree.error}<button type="button" onClick={() => void tree.refresh()} className="mt-2 block text-coral underline">再読み込み</button></div></div>;
   if (!tree.ready) return <div className="page-pad"><AppHeader /></div>;
 
   if (memoryId === null) {

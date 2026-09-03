@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import {
-  getMemoryImageType, loadMemories, MAX_MEMORY_IMAGE_BYTES, MEMORY_IMAGE_BUCKET,
-  MemorySaveError, readPendingMemoryUpload, recoverMemorySave, saveMemory, validateMemoryInput,
+  deleteMemory, getMemoryImageType, loadMemories, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES,
+  MEMORY_IMAGE_BUCKET, MemoryNotFoundError, MemorySaveError, readPendingMemoryUpload,
+  recoverMemorySave, saveMemory, updateMemory, validateMemoryFields, validateMemoryInput,
 } from "../lib/supabase/memories.ts";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -50,10 +51,34 @@ function harness(options = {}) {
         }
         if (parsed.pathname === "/rest/v1/memories" && method === "POST") {
           if (state.insertThrowsBeforeCommit) throw new TypeError("Network failed before response");
+          if (state.restoreError && body.id === state.lastDeletedId) {
+            return json({ message: state.restoreError, code: "23514", details: null, hint: null }, 400);
+          }
           if (state.insertError) return json({ message: state.insertError, code: "23514", details: null, hint: null }, 400);
           rows.set(body.id, { ...body, user_id: state.userId });
           if (state.insertThrowsAfterCommit) throw new TypeError("Response lost after commit");
           return new Response(null, { status: 201 });
+        }
+        if (parsed.pathname === "/rest/v1/memories" && method === "PATCH") {
+          if (state.updateError) return json({ message: state.updateError, code: "42501", details: null, hint: null }, 403);
+          const userId = parsed.searchParams.get("user_id")?.slice(3);
+          const id = parsed.searchParams.get("id")?.slice(3);
+          const row = rows.get(id);
+          if (!row || row.user_id !== userId) return json([]);
+          const updated = { ...row, ...body, updated_at: "2026-09-02T12:00:00.000Z" };
+          rows.set(id, updated);
+          return json([updated]);
+        }
+        if (parsed.pathname === "/rest/v1/memories" && method === "DELETE") {
+          if (state.deleteError) return json({ message: state.deleteError, code: "42501", details: null, hint: null }, 403);
+          const userId = parsed.searchParams.get("user_id")?.slice(3);
+          const id = parsed.searchParams.get("id")?.slice(3);
+          const row = rows.get(id);
+          if (!row || row.user_id !== userId) return json([]);
+          rows.delete(id);
+          state.lastDeletedId = id;
+          if (state.deleteThrowsAfterCommit) throw new TypeError("Delete response lost after commit");
+          return json([{ id }]);
         }
         if (parsed.pathname === "/rest/v1/memories" && method === "GET") {
           if (state.readError) return json({ message: "Read failed", code: "42501" }, 403);
@@ -67,7 +92,15 @@ function harness(options = {}) {
         if (parsed.pathname === `/storage/v1/object/${MEMORY_IMAGE_BUCKET}` && method === "DELETE") {
           if (state.removeError) return json({ message: "Delete denied", statusCode: "403", error: "Forbidden" }, 403);
           for (const path of body.prefixes) objects.delete(path);
+          if (state.removeThrowsAfterCommit) throw new TypeError("Storage delete response lost after commit");
           return json(body.prefixes.map((name) => ({ name })));
+        }
+        if (parsed.pathname === `/storage/v1/object/list/${MEMORY_IMAGE_BUCKET}` && method === "POST") {
+          const prefix = body.prefix ? `${body.prefix}/` : "";
+          return json([...objects.keys()]
+            .filter((path) => path.startsWith(prefix))
+            .map((path) => ({ name: path.slice(prefix.length) }))
+            .filter((item) => !body.search || item.name.includes(body.search)));
         }
         if (parsed.pathname === `/storage/v1/object/sign/${MEMORY_IMAGE_BUCKET}` && method === "POST") {
           if (state.signError) return json({ message: "Sign denied", statusCode: "403", error: "Forbidden" }, 403);
@@ -132,6 +165,9 @@ test("validates caption/date; people/tags remain string arrays", () => {
   for (const caption of [" ", "あ".repeat(81)]) assert.throws(() => validateMemoryInput(makeInput({ caption })), /80文字/);
   assert.deepEqual(validateMemoryInput(makeInput({ people: [], tags: [] })).fields.tags, []);
   assert.equal(validateMemoryInput(makeInput({ date: "2024-02-29" })).fields.memory_date, "2024-02-29");
+  assert.deepEqual(validateMemoryFields({ caption: " 編集後 ", date: "2026-09-02", people: ["友達", "友達"], tags: [" 放課後 "] }), {
+    caption: "編集後", memory_date: "2026-09-02", people: ["友達"], tags: ["放課後"],
+  });
 });
 
 test("unauthenticated users cannot upload or insert", async () => {
@@ -255,6 +291,128 @@ test("paginated read does not silently stop at the first 100 memories", async ()
 test("failed DB read does not become an empty successful album", async () => {
   const h = harness({ readError: true });
   await assert.rejects(loadMemories(h.client), /思い出を読み込めません/);
+});
+
+const DETAIL_IDS = {
+  earlier: "10000000-0000-4000-8000-000000000001",
+  sameEarlier: "10000000-0000-4000-8000-000000000002",
+  current: "10000000-0000-4000-8000-000000000003",
+  sameLater: "10000000-0000-4000-8000-000000000004",
+  other: "20000000-0000-4000-8000-000000000001",
+};
+const detailRow = (id, changes = {}) => ({
+  id, user_id: USER_ID, image_path: `${USER_ID}/${id}.jpg`, caption: "詳細の思い出",
+  memory_date: "2026-09-01", people: ["友達"], tags: ["放課後"],
+  created_at: "2026-09-01T10:00:00.000Z", updated_at: "2026-09-01T10:00:00.000Z",
+  ...changes,
+});
+
+test("detail loads one owned URL id, signs its private image, and orders same-day neighbors stably", async () => {
+  const rows = [
+    detailRow(DETAIL_IDS.sameLater, { created_at: "2026-09-01T11:00:00.000Z" }),
+    detailRow(DETAIL_IDS.current),
+    detailRow(DETAIL_IDS.earlier, { memory_date: "2026-08-31", created_at: "2026-08-31T18:00:00.000Z" }),
+    detailRow(DETAIL_IDS.sameEarlier, { created_at: "2026-09-01T09:00:00.000Z" }),
+    detailRow(DETAIL_IDS.other, { user_id: OTHER_USER_ID, image_path: `${OTHER_USER_ID}/${DETAIL_IDS.other}.jpg` }),
+  ];
+  const h = harness({ rows });
+  const result = await loadMemoryDetail(h.client, DETAIL_IDS.current);
+  assert.equal(result.memory.id, DETAIL_IDS.current);
+  assert.equal(result.memory.caption, "詳細の思い出");
+  assert.match(result.memory.imageUrl, /\/object\/sign\/memory-images\//);
+  assert.equal(result.previousId, DETAIL_IDS.sameEarlier);
+  assert.equal(result.nextId, DETAIL_IDS.sameLater);
+  const reads = h.calls.filter((call) => call.method === "GET" && call.url?.pathname === "/rest/v1/memories");
+  assert.equal(reads[0].url.searchParams.get("id"), `eq.${DETAIL_IDS.current}`);
+  assert.ok(reads.every((call) => call.url.searchParams.get("user_id") === `eq.${USER_ID}`));
+  const sign = h.calls.find((call) => call.url?.pathname.includes("/object/sign/"));
+  assert.deepEqual(sign.body.paths, [`${USER_ID}/${DETAIL_IDS.current}.jpg`]);
+});
+
+test("another owner's or invalid memory id is indistinguishable from not found", async () => {
+  const h = harness({ rows: [detailRow(DETAIL_IDS.other, {
+    user_id: OTHER_USER_ID, image_path: `${OTHER_USER_ID}/${DETAIL_IDS.other}.jpg`,
+  })] });
+  assert.equal(await loadMemoryDetail(h.client, DETAIL_IDS.other), null);
+  assert.equal(await loadMemoryDetail(h.client, "not-a-uuid"), null);
+  await assert.rejects(updateMemory(h.client, DETAIL_IDS.other, {
+    caption: "変更", date: "2026-09-02", people: [], tags: [],
+  }), MemoryNotFoundError);
+  await assert.rejects(deleteMemory(h.client, DETAIL_IDS.other), MemoryNotFoundError);
+  assert.equal(h.calls.filter((call) => call.url?.pathname.includes("/object/sign/")).length, 0);
+  const attemptedUpdate = h.calls.find((call) => call.method === "PATCH");
+  assert.equal(attemptedUpdate.url.searchParams.get("user_id"), `eq.${USER_ID}`);
+  assert.equal(h.rows.get(DETAIL_IDS.other).caption, "詳細の思い出");
+  assert.equal(h.calls.filter((call) => call.method === "DELETE").length, 0);
+});
+
+test("editing owned fields persists and is visible after a fresh detail load", async () => {
+  const h = harness({ rows: [detailRow(DETAIL_IDS.current)] });
+  await updateMemory(h.client, DETAIL_IDS.current, {
+    caption: " 編集した一言 ", date: "2026-09-02", people: ["友達", " 家族 ", "友達"], tags: ["帰り道"],
+  });
+  const reloaded = await loadMemoryDetail(h.client, DETAIL_IDS.current);
+  assert.equal(reloaded.memory.caption, "編集した一言");
+  assert.equal(reloaded.memory.date, "2026-09-02");
+  assert.deepEqual(reloaded.memory.people, ["友達", "家族"]);
+  assert.deepEqual(reloaded.memory.tags, ["帰り道"]);
+  const update = h.calls.find((call) => call.method === "PATCH");
+  assert.equal(update.url.searchParams.get("user_id"), `eq.${USER_ID}`);
+  assert.equal(update.url.searchParams.get("id"), `eq.${DETAIL_IDS.current}`);
+  assert.equal(update.body.image_path, undefined);
+});
+
+test("deleting an owned memory removes both its DB row and exact Storage object", async () => {
+  const row = detailRow(DETAIL_IDS.current);
+  const h = harness({ rows: [row] });
+  h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  assert.deepEqual(await deleteMemory(h.client, DETAIL_IDS.current), { id: DETAIL_IDS.current });
+  assert.equal(h.rows.has(DETAIL_IDS.current), false);
+  assert.equal(h.objects.has(row.image_path), false);
+  const removal = h.calls.find((call) => call.method === "DELETE" && call.url?.pathname.startsWith("/storage/"));
+  assert.deepEqual(removal.body.prefixes, [row.image_path]);
+});
+
+test("Storage deletion failure restores the captured DB row instead of leaving an orphan image", async () => {
+  const row = detailRow(DETAIL_IDS.current);
+  const h = harness({ rows: [row], removeError: true });
+  h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  await assert.rejects(deleteMemory(h.client, DETAIL_IDS.current), /元に戻しました/);
+  assert.equal(h.rows.get(DETAIL_IDS.current).image_path, row.image_path);
+  assert.equal(h.rows.get(DETAIL_IDS.current).caption, row.caption);
+  assert.equal(h.objects.has(row.image_path), true);
+  assert.equal(h.calls.filter((call) => call.method === "POST" && call.url?.pathname === "/rest/v1/memories").length, 1);
+});
+
+test("DB deletion failure leaves the Storage image untouched", async () => {
+  const row = detailRow(DETAIL_IDS.current);
+  const h = harness({ rows: [row], deleteError: "Delete denied" });
+  h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  await assert.rejects(deleteMemory(h.client, DETAIL_IDS.current), /写真は削除していません/);
+  assert.equal(h.rows.has(DETAIL_IDS.current), true);
+  assert.equal(h.objects.has(row.image_path), true);
+  assert.equal(h.calls.filter((call) => call.url?.pathname.startsWith("/storage/") && call.method === "DELETE").length, 0);
+});
+
+test("lost DB delete response is reconciled before cleaning the captured image", async () => {
+  const row = detailRow(DETAIL_IDS.current);
+  const h = harness({ rows: [row], deleteThrowsAfterCommit: true });
+  h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  assert.deepEqual(await deleteMemory(h.client, DETAIL_IDS.current), { id: DETAIL_IDS.current });
+  assert.equal(h.rows.has(DETAIL_IDS.current), false);
+  assert.equal(h.objects.has(row.image_path), false);
+  assert.ok(h.calls.filter((call) => call.method === "GET" && call.url?.pathname === "/rest/v1/memories").length >= 2);
+});
+
+test("lost Storage delete response does not restore a row after the object is confirmed absent", async () => {
+  const row = detailRow(DETAIL_IDS.current);
+  const h = harness({ rows: [row], removeThrowsAfterCommit: true });
+  h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  assert.deepEqual(await deleteMemory(h.client, DETAIL_IDS.current), { id: DETAIL_IDS.current });
+  assert.equal(h.rows.has(DETAIL_IDS.current), false);
+  assert.equal(h.objects.has(row.image_path), false);
+  assert.equal(h.calls.filter((call) => call.method === "POST" && call.url?.pathname === "/rest/v1/memories").length, 0);
+  assert.ok(h.calls.some((call) => call.url?.pathname === `/storage/v1/object/list/${MEMORY_IMAGE_BUCKET}`));
 });
 
 test("recovery metadata is journaled before uploading and survives a tab reload", async () => {

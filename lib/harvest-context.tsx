@@ -6,8 +6,9 @@ import { useTree } from "@/lib/tree-context";
 
 type Flight = { memoryId: string; word: string };
 type HarvestContextValue = {
-  launch: (id: string, word: string) => boolean;
+  launch: (id: string, word: string) => Promise<boolean>;
   busy: boolean;
+  error: string | null;
   arrivingMemoryId: string | null;
   completeArrival: (id: string) => void;
 };
@@ -17,6 +18,8 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
   const tree = useTree();
   const [flight, setFlight] = useState<Flight | null>(null);
   const [arrivingMemoryId, setArrivingMemoryId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const active = useRef(false);
   const lastMemory = useRef<string | null>(null);
   const finish = useCallback(() => {
@@ -28,16 +31,26 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     setArrivingMemoryId((current) => current === id ? null : current);
   }, []);
 
-  const launch = (id: string, word: string) => {
+  const launch = async (id: string, word: string) => {
     if (active.current) return false;
     active.current = true;
     setArrivingMemoryId(null);
-    // Commit first: interrupted animation, refresh or a hidden tab cannot lose
-    // the word. The provider survives the quiz disappearing after this commit.
-    if (!tree.harvest(id, word)) { active.current = false; return false; }
-    lastMemory.current = id;
-    setFlight({ memoryId: id, word: word.trim() });
-    return true;
+    setSaving(true);
+    setError(null);
+    try {
+      // Commit first: interrupted animation, refresh or a hidden tab cannot
+      // lose the word. The provider survives the quiz disappearing afterward.
+      if (!await tree.harvest(id, word)) throw new Error("この木の実は現在収穫できません。");
+      lastMemory.current = id;
+      setFlight({ memoryId: id, word: word.trim() });
+      return true;
+    } catch (cause) {
+      active.current = false;
+      setError(cause instanceof Error ? cause.message : "木の実を収穫できませんでした。");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -55,7 +68,7 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [arrivingMemoryId]);
 
-  return <HarvestContext.Provider value={{ launch, busy: Boolean(flight), arrivingMemoryId, completeArrival }}>
+  return <HarvestContext.Provider value={{ launch, busy: saving || Boolean(flight), error, arrivingMemoryId, completeArrival }}>
     <div inert={flight ? true : undefined}>{children}</div>
     {flight && <HarvestFlight word={flight.word} saved={tree.petals.some(petal => petal.id === flight.memoryId)} onFinish={finish} />}
   </HarvestContext.Provider>;

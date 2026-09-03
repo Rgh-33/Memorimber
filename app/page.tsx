@@ -17,7 +17,16 @@ export default function HomePage() {
         <p className="mt-2 text-xs leading-6 text-ink/52">何気ない一日を、未来の自分へ。</p>
       </section>
 
-      <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}`} items={tree.visibleItems} petals={tree.petals} memories={tree.memories} count={tree.count} month={tree.date.slice(0, 7)} />
+      {tree.error ? (
+        <div role="alert" className="mt-10 rounded-xl border border-line p-4 text-sm leading-6 text-ink">
+          {tree.error}
+          <button type="button" onClick={() => void tree.refresh()} className="mt-2 block text-coral underline">再読み込み</button>
+        </div>
+      ) : tree.ready ? (
+        <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}`} items={tree.visibleItems} petals={tree.petals} memories={tree.memories} count={tree.count} month={tree.date.slice(0, 7)} />
+      ) : (
+        <p role="status" className="py-12 text-center text-sm text-ink/65">思い出の木を読み込んでいます…</p>
+      )}
       <TreePreviewControls />
     </div>
   );

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Memory, MemoryInput } from "../types";
+import type { Memory, MemoryInput, MemoryUpdateInput } from "../types";
 
 export const MEMORY_IMAGE_BUCKET = "memory-images";
 export const MAX_MEMORY_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -28,8 +28,7 @@ export function getMemoryImageType(file: Pick<File, "type" | "name" | "size">) {
   return { contentType, extension };
 }
 
-export function validateMemoryInput(input: MemoryInput) {
-  const imageType = getMemoryImageType(input.image);
+export function validateMemoryFields(input: MemoryUpdateInput) {
   const caption = input.caption.trim();
   if (!caption || [...caption].length > 80) throw new Error("一言は1〜80文字で入力してください。");
   const parsedDate = new Date(`${input.date}T00:00:00Z`);
@@ -39,8 +38,14 @@ export function validateMemoryInput(input: MemoryInput) {
   }
   const strings = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   return {
-    ...imageType,
-    fields: { caption, memory_date: input.date, people: strings(input.people), tags: strings(input.tags) },
+    caption, memory_date: input.date, people: strings(input.people), tags: strings(input.tags),
+  };
+}
+
+export function validateMemoryInput(input: MemoryInput) {
+  return {
+    ...getMemoryImageType(input.image),
+    fields: validateMemoryFields(input),
   };
 }
 
@@ -210,8 +215,199 @@ export async function saveMemory(
 
 type MemoryRow = {
   id: string; image_path: string; caption: string; memory_date: string; people: string[]; tags: string[];
-  created_at?: string;
+  created_at?: string; updated_at?: string;
 };
+
+const MEMORY_ROW_COLUMNS = "id, image_path, caption, memory_date, people, tags, created_at, updated_at";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function toMemory(row: MemoryRow, imageUrl = ""): Memory {
+  return {
+    id: row.id, imagePath: row.image_path, imageUrl,
+    caption: row.caption, date: row.memory_date, people: row.people, tags: row.tags,
+    createdAt: row.created_at,
+  };
+}
+
+async function loadOwnedMemoryRow(client: SupabaseClient, userId: string, id: string) {
+  const { data, error } = await client.from("memories").select(MEMORY_ROW_COLUMNS)
+    .eq("user_id", userId).eq("id", id).maybeSingle();
+  if (error) throw new Error(`思い出を読み込めませんでした。${errorDetail(error)}`);
+  return data as MemoryRow | null;
+}
+
+async function loadMemoryOrder(client: SupabaseClient, userId: string) {
+  const rows: Pick<MemoryRow, "id" | "memory_date" | "created_at">[] = [];
+  const pageSize = 100;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await client.from("memories").select("id, memory_date, created_at")
+      .eq("user_id", userId).order("memory_date", { ascending: true })
+      .order("created_at", { ascending: true }).order("id", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(`前後の思い出を読み込めませんでした。${errorDetail(error)}`);
+    const page = data as Pick<MemoryRow, "id" | "memory_date" | "created_at">[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return rows.sort((a, b) => a.memory_date.localeCompare(b.memory_date)
+    || (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id));
+}
+
+export type MemoryDetail = {
+  memory: Memory;
+  previousId: string | null;
+  nextId: string | null;
+  warning: string | null;
+};
+
+/** Load one owned row by URL id. RLS is authoritative; user_id is extra scoping. */
+export async function loadMemoryDetail(client: SupabaseClient, id: string): Promise<MemoryDetail | null> {
+  if (!UUID_PATTERN.test(id)) return null;
+  const user = await requireUser(client);
+  const row = await loadOwnedMemoryRow(client, user.id, id);
+  if (!row) return null;
+
+  const [order, signedImage] = await Promise.all([
+    loadMemoryOrder(client, user.id),
+    (async () => {
+      try {
+        const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
+          .createSignedUrls([row.image_path], MEMORY_IMAGE_URL_LIFETIME);
+        if (error) throw error;
+        const imageUrl = data?.[0]?.signedUrl ?? "";
+        if (!imageUrl || data?.[0]?.error) throw data?.[0]?.error ?? new Error("Signed URL missing");
+        return { imageUrl, warning: null };
+      } catch {
+        return { imageUrl: "", warning: "写真を読み込めませんでした。時間をおいて再読み込みしてください。" };
+      }
+    })(),
+  ]);
+  const currentIndex = order.findIndex((item) => item.id === row.id);
+  if (currentIndex < 0) throw new Error("前後の思い出を確認できませんでした。再読み込みしてください。");
+
+  return {
+    memory: toMemory(row, signedImage.imageUrl),
+    previousId: currentIndex > 0 ? order[currentIndex - 1].id : null,
+    nextId: currentIndex < order.length - 1 ? order[currentIndex + 1].id : null,
+    warning: signedImage.warning,
+  };
+}
+
+export class MemoryNotFoundError extends Error {
+  constructor() {
+    super("思い出が見つかりません。削除されたか、閲覧する権限がありません。");
+    this.name = "MemoryNotFoundError";
+  }
+}
+
+export async function updateMemory(client: SupabaseClient, id: string, input: MemoryUpdateInput) {
+  if (!UUID_PATTERN.test(id)) throw new MemoryNotFoundError();
+  const fields = validateMemoryFields(input);
+  const user = await requireUser(client);
+  const { data, error } = await client.from("memories").update(fields)
+    .eq("user_id", user.id).eq("id", id).select(MEMORY_ROW_COLUMNS).maybeSingle();
+  if (error) throw new Error(`思い出を更新できませんでした。${errorDetail(error)}`);
+  if (!data) throw new MemoryNotFoundError();
+  return toMemory(data as MemoryRow);
+}
+
+function isOwnedImagePath(imagePath: string, userId: string) {
+  const parts = imagePath.split("/");
+  return parts.length >= 2 && parts[0] === userId && parts.slice(1).every((part) => part && part !== "." && part !== "..");
+}
+
+async function restoreDeletedMemory(client: SupabaseClient, row: MemoryRow) {
+  const { error } = await client.from("memories").insert({
+    id: row.id,
+    image_path: row.image_path,
+    caption: row.caption,
+    memory_date: row.memory_date,
+    people: row.people,
+    tags: row.tags,
+    ...(row.created_at ? { created_at: row.created_at } : {}),
+    ...(row.updated_at ? { updated_at: row.updated_at } : {}),
+  });
+  return error;
+}
+
+async function storageObjectExists(client: SupabaseClient, imagePath: string) {
+  const parts = imagePath.split("/");
+  const fileName = parts.pop();
+  if (!fileName) throw new Error("Invalid image path");
+  const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
+    .list(parts.join("/"), { limit: 100, search: fileName });
+  if (error) throw error;
+  return (data ?? []).some((item) => item.name === fileName);
+}
+
+/**
+ * Delete the DB row first, then its private object. If Storage rejects the
+ * removal, restore the captured row so the image does not become an orphan.
+ * DB and Storage are separate services, so a double failure is reported for
+ * manual cleanup instead of being presented as a successful deletion.
+ */
+export async function deleteMemory(client: SupabaseClient, id: string) {
+  if (!UUID_PATTERN.test(id)) throw new MemoryNotFoundError();
+  const user = await requireUser(client);
+  const row = await loadOwnedMemoryRow(client, user.id, id);
+  if (!row) throw new MemoryNotFoundError();
+  if (!isOwnedImagePath(row.image_path, user.id)) {
+    throw new Error("写真の保存先を安全に確認できないため、削除を中止しました。");
+  }
+
+  let deletionConfirmed = false;
+  let deletionFailure: unknown = null;
+  try {
+    const { data, error } = await client.from("memories").delete()
+      .eq("user_id", user.id).eq("id", id).select("id");
+    deletionFailure = error;
+    deletionConfirmed = !error && Array.isArray(data) && data.length === 1;
+    if (!deletionConfirmed && !error) deletionFailure = new Error("削除対象を確認できませんでした。");
+  } catch (error) {
+    deletionFailure = error;
+  }
+  if (!deletionConfirmed) {
+    let remaining: MemoryRow | null;
+    try {
+      remaining = await loadOwnedMemoryRow(client, user.id, id);
+    } catch (verificationError) {
+      throw new Error(
+        `削除結果を確認できませんでした。写真は安全のため削除していません。` +
+        `${errorDetail(deletionFailure)} / 確認: ${errorDetail(verificationError)}`,
+      );
+    }
+    if (remaining) {
+      throw new Error(`思い出を削除できませんでした。写真は削除していません。${errorDetail(deletionFailure)}`);
+    }
+    // The response may have been lost after commit. The missing owned row is
+    // the evidence needed to continue cleaning up its captured image path.
+  }
+
+  let storageError: unknown = null;
+  try {
+    const result = await client.storage.from(MEMORY_IMAGE_BUCKET).remove([row.image_path]);
+    storageError = result.error;
+  } catch (error) {
+    storageError = error;
+  }
+  if (!storageError) return { id };
+
+  try {
+    if (!await storageObjectExists(client, row.image_path)) {
+      // The Storage response was lost after the object was removed.
+      return { id };
+    }
+  } catch { /* If object state is uncertain, restore the DB row conservatively. */ }
+
+  const restoreError = await restoreDeletedMemory(client, row);
+  if (!restoreError) {
+    throw new Error(`写真を削除できなかったため、思い出を元に戻しました。もう一度お試しください。${errorDetail(storageError)}`);
+  }
+  throw new Error(
+    `思い出のレコードは削除されましたが、写真の削除とレコードの復元に失敗しました。` +
+    `管理者による確認が必要です。写真削除: ${errorDetail(storageError)} / 復元: ${errorDetail(restoreError)}`,
+  );
+}
 
 /** RLS remains authoritative; the owner filter is additional query scoping. */
 export async function loadMemories(client: SupabaseClient): Promise<{ memories: Memory[]; warning: string | null }> {
@@ -248,11 +444,7 @@ export async function loadMemories(client: SupabaseClient): Promise<{ memories: 
   }
   if (urls.size !== rows.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
   return {
-    memories: rows.map((row) => ({
-      id: row.id, imagePath: row.image_path, imageUrl: urls.get(row.image_path) ?? "",
-      caption: row.caption, date: row.memory_date, people: row.people, tags: row.tags,
-      createdAt: row.created_at,
-    })),
+    memories: rows.map((row) => toMemory(row, urls.get(row.image_path) ?? "")),
     warning,
   };
 }
