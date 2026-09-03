@@ -7,6 +7,7 @@ import {
   getTreeCanvasMetrics,
   getTreeTrunkScale,
   getTreeStructure,
+  getTreeShapeScale,
   getTreeVisibleCount,
   placeTreeItems,
   TREE_NODE_CAPACITY,
@@ -24,6 +25,14 @@ test("the tree exterior follows all twelve monthly upload stages beyond the frui
   ];
   stages.forEach(([photos, stage]) => assert.equal(getTreeAppearanceStage(photos), stage));
   assert.equal(getTreeVisibleCount(56), TREE_VISIBLE_CAPACITY);
+});
+
+test("the sapling silhouette grows wider and taller through the mature stages", () => {
+  const stages = Array.from({ length: 10 }, (_, index) => getTreeShapeScale(index + 3));
+  stages.slice(1).forEach((scale, index) => {
+    assert.ok(scale.x > stages[index].x);
+    assert.ok(scale.y > stages[index].y);
+  });
 });
 
 test("photo tips stay in the leafy crown, away from the bare lower trunk", () => {
@@ -63,7 +72,7 @@ test("all ripe fruit touch areas remain separate at 320px and 430px screen width
   }
 });
 
-test("the added crown keeps every fruit visible while the camera widens", () => {
+test("the added crown keeps every fruit inside one compact camera", () => {
   for (const count of [13, 15, 16, 17, 22, 23, 33, 120]) {
     const visibleCount = getTreeVisibleCount(count);
     const canvas = getTreeCanvasMetrics(count);
@@ -71,7 +80,7 @@ test("the added crown keeps every fruit visible while the camera widens", () => 
     for (const width of [320, 430]) {
       const viewportScale = (width - 40) / canvas.width;
       for (const mirrored of [false, true]) {
-        const fruit = Array.from({ length: visibleCount }, (_, index) => {
+        Array.from({ length: visibleCount }, (_, index) => {
           const branch = getTreeBranch(index, mirrored);
           const hang = fruitHangAt(index, mirrored);
           const x = 190 + (branch.x - 190) * TREE_PROPORTION.x + hang.x;
@@ -80,42 +89,30 @@ test("the added crown keeps every fruit visible while the camera widens", () => 
             `fruit ${index + 1} is outside the horizontal canvas`);
           assert.ok(y >= canvas.minY + 10 && y <= canvas.minY + canvas.height - 10,
             `fruit ${index + 1} is outside the vertical canvas`);
-          return { x: x * viewportScale, y: y * viewportScale };
+          const screenX = (x - canvas.minX) * viewportScale;
+          assert.ok(screenX >= 0 && screenX <= width - 40,
+            `fruit ${index + 1} is outside the ${width}px viewport`);
         });
-        for (let i = 0; i < fruit.length; i++) {
-          for (let j = i + 1; j < fruit.length; j++) {
-            const dx = Math.abs(fruit[i].x - fruit[j].x);
-            const dy = Math.abs(fruit[i].y - fruit[j].y);
-            assert.ok(Math.hypot(dx, dy) >= 30 * viewportScale,
-              `fruit ${i + 1} and ${j + 1} visually overlap at ${width}px with ${count} photos`);
-          }
-        }
       }
     }
   }
 });
 
-test("the camera keeps the upper crown familiar, then pulls back for each wider lower tier", () => {
+test("the camera remains compact as later fruit fill the crown", () => {
   assert.deepEqual(getTreeCanvasMetrics(12), { minX: 0, width: 380, minY: 0, height: 420, addedTips: 0 });
-  assert.deepEqual(getTreeCanvasMetrics(13), { minX: 0, width: 380, minY: -20, height: 440, addedTips: 1 });
-  assert.deepEqual(getTreeCanvasMetrics(15), { minX: 0, width: 380, minY: -20, height: 440, addedTips: 3 });
-  assert.deepEqual(getTreeCanvasMetrics(16), { minX: 0, width: 380, minY: -20, height: 440, addedTips: 4 });
-  assert.deepEqual(getTreeCanvasMetrics(17), { minX: 0, width: 380, minY: -20, height: 440, addedTips: 5 });
-  assert.deepEqual(getTreeCanvasMetrics(18), { minX: -25, width: 410, minY: -20, height: 440, addedTips: 6 });
-  assert.deepEqual(getTreeCanvasMetrics(19), { minX: -25, width: 430, minY: -20, height: 440, addedTips: 7 });
-  assert.deepEqual(getTreeCanvasMetrics(22), { minX: -145, width: 670, minY: -20, height: 440, addedTips: 10 });
-  assert.deepEqual(getTreeCanvasMetrics(23), { minX: -145, width: 670, minY: -20, height: 440, addedTips: 11 });
-  assert.deepEqual(getTreeCanvasMetrics(33), { minX: -190, width: 760, minY: -20, height: 440, addedTips: 21 });
+  assert.deepEqual(getTreeCanvasMetrics(13), { minX: 0, width: 380, minY: -8, height: 428, addedTips: 1 });
+  assert.deepEqual(getTreeCanvasMetrics(22), { minX: 0, width: 380, minY: -8, height: 428, addedTips: 10 });
+  assert.deepEqual(getTreeCanvasMetrics(33), { minX: 0, width: 380, minY: -8, height: 428, addedTips: 21 });
   assert.deepEqual(getTreeCanvasMetrics(365), getTreeCanvasMetrics(33));
 });
 
-test("the trunk gains girth as the added crown becomes heavy without changing the first mature tree", () => {
+test("the trunk keeps gaining girth after all visible fruit positions are full", () => {
   assert.equal(getTreeTrunkScale(12), 1);
-  assert.equal(getTreeTrunkScale(20), 1);
-  assert.ok(getTreeTrunkScale(27) > 1.09);
-  assert.ok(getTreeTrunkScale(33) > getTreeTrunkScale(27));
-  assert.ok(getTreeTrunkScale(33) < 1.24);
-  assert.equal(getTreeTrunkScale(365), getTreeTrunkScale(33));
+  assert.equal(getTreeTrunkScale(17), 1);
+  assert.ok(getTreeTrunkScale(29) > 1.14);
+  assert.ok(getTreeTrunkScale(46) > getTreeTrunkScale(35));
+  assert.ok(Math.abs(getTreeTrunkScale(56) - 1.36) < 1e-9);
+  assert.equal(getTreeTrunkScale(365), getTreeTrunkScale(56));
 });
 
 test("twigs meet a parent branch curve without a visible gap, including mirrored months", () => {
@@ -165,22 +162,16 @@ test("each added crown grows from one central tip toward balanced outer tips", (
   assert.ok(tips[3] < tips[1] && tips[4] > tips[2]);
 });
 
-test("the added crown widens toward its base and never forms an inverted triangle", () => {
+test("all added fruit positions stay inside the compact mature crown", () => {
   const centers = Array.from({ length: TREE_VISIBLE_CAPACITY - TREE_NODE_CAPACITY }, (_, index) =>
     getTreeAddedFruitCenter(TREE_NODE_CAPACITY + index));
   const xs = centers.map(([x]) => x);
   const ys = centers.map(([, y]) => y);
-  const width = Math.max(...xs) - Math.min(...xs);
-  const height = Math.max(...ys) - Math.min(...ys);
-  const tierSpans = [[12], [13, 14], [15, 16], [17, 18], [19, 20], [21, 22], [29, 30]]
-    .map(indices => {
-      const tierXs = indices.map(index => getTreeAddedFruitCenter(index)[0]);
-      return Math.max(...tierXs) - Math.min(...tierXs);
-    });
   assert.equal(centers.length, 21);
-  assert.ok(width > height * 2);
-  assert.deepEqual(tierSpans, [0, 140, 170, 310, 380, 530, 620]);
-  assert.ok(tierSpans.every((span, index) => index === 0 || span > tierSpans[index - 1]));
+  assert.ok(xs.every(x => x >= 40 && x <= 340));
+  assert.ok(ys.every(y => y >= 30 && y <= 300));
+  assert.equal(Math.min(...ys), centers[0][1]);
+  assert.ok(Math.max(...xs) - Math.min(...xs) <= 300);
 });
 
 test("the sapling adds forks gradually before reaching the unchanged mature skeleton", () => {

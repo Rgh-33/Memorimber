@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useId, useState, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
-import { getTreeAppearanceStage, getTreeBranch, getTreeCanvasMetrics, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
+import { getTreeAppearanceStage, getTreeBranch, getTreeCanvasMetrics, getTreeShapeScale, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
 import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeedling, TreeWood } from "@/components/tree-art";
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
@@ -199,10 +199,11 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
   const visible = items.filter(item => item.stage !== "harvested");
   const stage = Math.min(7, count);
   const appearanceStage = getTreeAppearanceStage(totalCount);
+  const shapeScale = getTreeShapeScale(appearanceStage);
   const canvas = getTreeCanvasMetrics(count);
   const scale = [0.18, 0.18, 0.32, 0.34, 0.52, 0.69, 0.85, 1][stage];
-  const spread = [1, 1, 1, .5, .66, .8, .91, 1][stage];
-  const heightSpread = [1, 1, 1, .62, .74, .86, .94, 1][stage];
+  const spread = shapeScale.x;
+  const heightSpread = shapeScale.y;
   const monthIndex = Number(month.slice(5, 7));
   const mirrored = monthIndex % 2 === 0;
   const leafColor = ["#55724d", "#527366", "#79734a", "#586e54"][monthIndex % 4];
@@ -234,7 +235,7 @@ export function GrowingTree({ items, memories, count, totalCount, month, onFruit
             <g transform={mirrored ? "translate(380 0) scale(-1 1)" : undefined}>
               <g transform={growthTransform}>
                 {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} stage={appearanceStage} count={count} /></g>}
-                <TreeWood uid={uid} stage={stage} appearanceStage={appearanceStage} />
+                <TreeWood uid={uid} stage={stage} totalCount={totalCount} />
                 {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front stage={appearanceStage} count={count} /></g>}
               </g>
             </g>

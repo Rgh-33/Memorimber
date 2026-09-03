@@ -24,20 +24,19 @@ export const TREE_PROPORTION = { x: .98, y: 1.06 } as const;
 
 export const TREE_VISIBLE_CAPACITY = 33;
 export const TREE_SLOT_STORAGE_LIMIT = TREE_VISIBLE_CAPACITY;
+const TREE_STAGE_WIDTH = [1, 1, 1, .5, .67, .78, .86, .92, .96, 1, 1.03, 1.055, 1.08] as const;
+const TREE_STAGE_HEIGHT = [1, 1, 1, .62, .76, .83, .88, .92, .95, .98, 1, 1.015, 1.03] as const;
 
-// Added tips form an upright triangle: a narrow crown at the top, then pairs
-// that become progressively wider toward the lower skirt. The order matters;
-// it lets the silhouette keep growing downward and outward without ever
-// becoming an inverted triangle.
-// Coordinates describe the leaf/fruit anchor before the fruit's own 23px
+// Later fruit fill gaps inside the same compact crown instead of widening the
+// canvas. Coordinates describe the leaf/fruit anchor before the fruit's own
 // hanging stem is added.
 const EXTRA_FRUIT_CENTERS: readonly Point[] = [
-  [190, 30], [120, 90], [260, 90],
-  [105, 145], [275, 145], [35, 200], [345, 200],
-  [0, 250], [380, 250], [-75, 285], [455, 285],
-  [150, 125], [230, 125], [115, 180], [265, 180],
-  [110, 220], [270, 220], [-120, 315], [500, 315],
-  [155, 300], [225, 300],
+  [190, 35], [112, 116], [270, 120],
+  [88, 190], [292, 194], [48, 126], [336, 116],
+  [45, 224], [340, 232], [94, 278], [292, 278],
+  [183, 105], [205, 136], [112, 155], [270, 160],
+  [114, 232], [276, 238], [146, 196], [238, 207],
+  [164, 278], [224, 292],
 ];
 
 // Every added limb grows from the trunk or an already-connected bough. This
@@ -93,6 +92,11 @@ export function getTreeAppearanceStage(count: number) {
   return 12;
 }
 
+export function getTreeShapeScale(stage: number) {
+  const safeStage = Math.max(0, Math.min(12, Math.floor(stage)));
+  return { x: TREE_STAGE_WIDTH[safeStage], y: TREE_STAGE_HEIGHT[safeStage] };
+}
+
 export function getTreeAddedFruitCenter(index: number): Point {
   const offset = Math.max(0, Math.min(EXTRA_FRUIT_CENTERS.length - 1,
     Math.floor(index) - TREE_NODE_CAPACITY));
@@ -100,38 +104,25 @@ export function getTreeAddedFruitCenter(index: number): Point {
 }
 
 export function getTreeTrunkScale(count: number) {
-  const photos = getTreeVisibleCount(count);
+  const photos = Math.max(0, Math.floor(count));
   const smoothstep = (value: number) => {
     const progress = Math.max(0, Math.min(1, value));
     return progress * progress * (3 - 2 * progress);
   };
-  // Once the added crown is carrying several fruit, the established trunk
-  // gains girth without moving its roots, forks, or the outer crown.
-  const matureGrowth = smoothstep((photos - 20) / 16) * .24;
-  const elderGrowth = smoothstep((photos - 36) / 36) * .12;
+  // Girth keeps following the monthly total after all visible slots are full.
+  const matureGrowth = smoothstep((photos - 17) / 18) * .2;
+  const elderGrowth = smoothstep((photos - 35) / 21) * .16;
   return 1 + matureGrowth + elderGrowth;
 }
 
 export function getTreeCanvasMetrics(count: number) {
   const photos = getTreeVisibleCount(count);
   const hasAddedCrown = photos > TREE_NODE_CAPACITY;
-  // Keep the familiar framing while the new upper crown remains inside it.
-  // Pull back in steps as each successively wider lower tier appears.
-  const horizontal = photos <= 17
-    ? { minX: 0, width: 380 }
-    : photos === 18
-      ? { minX: -25, width: 410 }
-      : photos === 19
-        ? { minX: -25, width: 430 }
-        : photos <= 21
-          ? { minX: -55, width: 490 }
-          : photos <= 29
-            ? { minX: -145, width: 670 }
-            : { minX: -190, width: 760 };
   return {
-    ...horizontal,
-    minY: hasAddedCrown ? -20 : 0,
-    height: hasAddedCrown ? 440 : 420,
+    minX: 0,
+    width: 380,
+    minY: hasAddedCrown ? -8 : 0,
+    height: hasAddedCrown ? 428 : 420,
     addedTips: Math.max(0, photos - TREE_NODE_CAPACITY),
   };
 }

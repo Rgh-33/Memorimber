@@ -23,43 +23,33 @@
   transform: none;
 }
 .konoha-tree-canvas {
-  --konoha-canopy-deep: color-mix(in srgb, var(--leaf-color) 72%, #1f422b);
-  --konoha-canopy-shadow: color-mix(in srgb, var(--leaf-color) 82%, #315b35);
-  --konoha-canopy-mid: color-mix(in srgb, var(--leaf-color) 72%, #6f974c);
-  --konoha-canopy-light: color-mix(in srgb, var(--leaf-color) 52%, #b5c96f);
-  --konoha-bark-light: color-mix(in srgb, var(--accent) 12%, #ad7b4f);
-  --konoha-bark-mid: color-mix(in srgb, var(--accent) 8%, #815336);
-  --konoha-bark-dark: color-mix(in srgb, var(--accent) 7%, #543923);
-  --konoha-soil-light: color-mix(in srgb, var(--accent) 9%, #b78c5c);
-  --konoha-soil-dark: color-mix(in srgb, var(--accent) 8%, #71513a);
-  --konoha-ground-glow: color-mix(in srgb, var(--leaf-color) 72%, #879968);
+  --konoha-leaf-0: color-mix(in srgb, var(--leaf-color) 22%, #152d24);
+  --konoha-leaf-1: color-mix(in srgb, var(--leaf-color) 40%, #203b2b);
+  --konoha-leaf-2: color-mix(in srgb, var(--leaf-color) 62%, #284631);
+  --konoha-leaf-3: color-mix(in srgb, var(--leaf-color) 86%, #2e5838);
+  --konoha-leaf-4: color-mix(in srgb, var(--leaf-color) 85%, #97ac66);
+  --konoha-leaf-5: color-mix(in srgb, var(--leaf-color) 64%, #b9c680);
+  --konoha-leaf-6: color-mix(in srgb, var(--leaf-color) 40%, #d9d69b);
+  --konoha-leaf-7: color-mix(in srgb, var(--leaf-color) 22%, #ebe3b0);
   position: relative;
   width: 100%;
   aspect-ratio: 380 / 420;
 }
 .konoha-tree-svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.konoha-soil--back { filter: drop-shadow(0 4px 3px rgb(68 52 35 / .2)); }
-.konoha-soil-face { fill: var(--konoha-soil-dark); opacity: .92; }
-.konoha-soil-ridge { fill: none; stroke: color-mix(in srgb, var(--konoha-soil-light) 72%, white); stroke-width: .9; stroke-linecap: round; opacity: .36; }
-.konoha-soil-specks { fill: color-mix(in srgb, var(--konoha-soil-dark) 75%, #30261e); opacity: .52; }
-.konoha-seed { filter: drop-shadow(0 1px 1px rgb(62 40 23 / .35)); }
-.konoha-seed-shine { fill: none; stroke: #edcc8c; stroke-width: .8; stroke-linecap: round; opacity: .58; }
+.konoha-soil--back { filter: drop-shadow(0 3px 2.5px #26332938); }
+.konoha-soil-ridge { fill: none; stroke: #b09a70; stroke-width: 1; stroke-linecap: round; opacity: .5; }
+.konoha-soil-front-ridge { fill: none; stroke: #bda477; stroke-width: .85; stroke-linecap: round; opacity: .42; }
+.konoha-soil-specks { fill: #3e3c32; opacity: .58; }
+.konoha-soil-pebbles { fill: #ab9874; stroke: #4c4638; stroke-width: .35; opacity: .7; }
+.konoha-seed { filter: drop-shadow(0 1px 1px #2b302a66); }
+.konoha-seed-gap { fill: none; stroke: #302f29; stroke-width: 1.5; stroke-linecap: round; opacity: .82; }
 .konoha-tree-size { transition: transform 1.3s cubic-bezier(.2,.65,.25,1), opacity .6s ease; }
 .konoha-seedling { transition: opacity .45s ease; }
 .konoha-seedling-stem, .konoha-cotyledon-joint, .konoha-cotyledon { transition: transform 1.2s cubic-bezier(.22,.61,.36,1), opacity .8s ease; transform-origin: 0 0; }
-.konoha-sprout-stem { fill: none; stroke: color-mix(in srgb, var(--leaf-color) 74%, #57713b); stroke-width: 2.8; stroke-linecap: round; }
-.konoha-sprout-stem-light { fill: none; stroke: #d2dc99; stroke-width: .65; stroke-linecap: round; opacity: .62; }
-.konoha-sprout-leaf { fill: var(--konoha-canopy-light); stroke: var(--konoha-canopy-shadow); stroke-width: .55; }
-.konoha-sprout-vein { fill: none; stroke: color-mix(in srgb, var(--konoha-canopy-deep) 55%, white); stroke-width: .65; stroke-linecap: round; opacity: .62; }
 .konoha-trunk-detail { transition: opacity .8s ease; }
 .konoha-young-wood { transition: opacity .8s ease; }
 .konoha-young-trunk { stroke-dasharray: 1; transition: stroke-dashoffset 1.3s ease, opacity .8s ease; }
-.konoha-young-trunk-light { fill: none; stroke: color-mix(in srgb, var(--konoha-bark-light) 58%, #f0c58c); stroke-width: .8; stroke-linecap: round; opacity: .5; }
 .konoha-bough { animation: konoha-stage-enter 1.1s ease-out both; }
-.konoha-bough-light { fill: none; stroke: color-mix(in srgb, var(--konoha-bark-light) 60%, #ecc795); stroke-linecap: round; opacity: .4; }
-.konoha-tree-roots { fill: var(--konoha-bark-dark); opacity: .9; }
-.konoha-bark-light { fill: none; stroke: color-mix(in srgb, var(--konoha-bark-light) 68%, #f1cc98); stroke-width: 2.4; stroke-linecap: round; opacity: .42; }
-.konoha-bark-shadow { fill: none; stroke: var(--konoha-bark-dark); stroke-width: 1.4; stroke-linecap: round; opacity: .38; }
 .konoha-branch-tip { animation: konoha-stage-enter .7s ease-out .25s both; }
 .konoha-node-size { transition: transform 1.3s cubic-bezier(.2,.65,.25,1); }
 .konoha-tree-wind { transform-origin: 190px 383px; animation: konoha-tree-wind 10s ease-in-out infinite; }
@@ -67,11 +57,10 @@
 .konoha-crown { animation: konoha-stage-enter 1.4s ease-out both; }
 .konoha-canopy-clump { animation: konoha-stage-enter .9s ease-out both; }
 .konoha-canopy-drift { animation: konoha-canopy-drift 8s ease-in-out infinite; }
-.konoha-foliage--back { filter: drop-shadow(0 4px 3px rgb(27 48 42 / .19)); }
-.konoha-foliage--front { filter: drop-shadow(1px 5px 4px rgb(26 48 42 / .2)); }
-.konoha-canopy-underpaint { fill: var(--konoha-canopy-deep); opacity: .18; }
-.konoha-canopy-highlight { fill: color-mix(in srgb, var(--konoha-canopy-light) 64%, #e1dfa1); opacity: .3; filter: blur(.7px); }
-.konoha-canopy-brush-lights { fill: color-mix(in srgb, var(--konoha-canopy-light) 74%, #e9e0a6); opacity: .2; filter: blur(2px); }
+.konoha-foliage--back { filter: drop-shadow(0 3px 2px #1b302a32); }
+.konoha-foliage--front > g { filter: drop-shadow(1px 4px 2.5px #1a302a45); }
+.konoha-bark-groove { fill: none; stroke: #343e30; stroke-width: 1.1; stroke-linecap: round; opacity: .65; }
+.konoha-bark-ridge { fill: none; stroke: #c0b48b; stroke-width: .8; stroke-linecap: round; opacity: .65; }
 .konoha-light-dust { animation: konoha-light-dust 7s ease-in-out infinite; }
 .konoha-leaf { opacity: .9; }
 .konoha-flower--open > path { fill: var(--konoha-blossom); stroke: var(--konoha-blossom-edge); stroke-width: .72; }
