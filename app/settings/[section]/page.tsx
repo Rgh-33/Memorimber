@@ -2,7 +2,9 @@
 
 import { useParams } from "next/navigation";
 import { Moon, Sun } from "lucide-react";
+import { AlbumSettingsPanel } from "@/components/album-settings-panel";
 import { SettingsHeader } from "@/components/settings-header";
+import { SAMPLE_MEMORIES } from "@/lib/data";
 import { APP_COLOR_MODES, APP_THEMES, usePreferences } from "@/lib/preferences-context";
 
 const sectionLabels = {
@@ -153,7 +155,11 @@ export default function SettingDetailPage() {
         </section>
       )}
 
-      {section !== "style" && section !== "sound" && (
+      {section === "album" && (
+        <AlbumSettingsPanel memory={SAMPLE_MEMORIES[0]} />
+      )}
+
+      {section !== "style" && section !== "sound" && section !== "album" && (
         <section className="settings-card mt-7">
           <p className="rounded-xl border border-dashed border-line bg-paper/60 px-4 py-8 text-center text-sm leading-7 text-ink/55">
             「{label}」の項目はまだ設定されていません。

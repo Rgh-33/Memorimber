@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import {
-  deleteMemory, getMemoryImageType, loadMemories, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES,
+  deleteMemory, getMemoryImageType, loadMemories, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES, MAX_MEMORY_LETTER_LENGTH,
   MEMORY_IMAGE_BUCKET, MemoryNotFoundError, MemorySaveError, readPendingMemoryUpload,
   recoverMemorySave, saveMemory, updateMemory, validateMemoryFields, validateMemoryInput,
 } from "../lib/supabase/memories.ts";
@@ -60,6 +60,9 @@ function harness(options = {}) {
           return new Response(null, { status: 201 });
         }
         if (parsed.pathname === "/rest/v1/memories" && method === "PATCH") {
+          if (state.missingLetterColumn && parsed.searchParams.get("select")?.includes("letter")) {
+            return json({ message: "column memories.letter does not exist", code: "42703", details: null, hint: null }, 400);
+          }
           if (state.updateError) return json({ message: state.updateError, code: "42501", details: null, hint: null }, 403);
           const userId = parsed.searchParams.get("user_id")?.slice(3);
           const id = parsed.searchParams.get("id")?.slice(3);
@@ -81,6 +84,9 @@ function harness(options = {}) {
           return json([{ id }]);
         }
         if (parsed.pathname === "/rest/v1/memories" && method === "GET") {
+          if (state.missingLetterColumn && parsed.searchParams.get("select")?.includes("letter")) {
+            return json({ message: "column memories.letter does not exist", code: "42703", details: null, hint: null }, 400);
+          }
           if (state.readError) return json({ message: "Read failed", code: "42501" }, 403);
           let matching = [...rows.values()].filter((row) => `eq.${row.user_id}` === parsed.searchParams.get("user_id"));
           const id = parsed.searchParams.get("id");
@@ -163,11 +169,13 @@ test("rejects empty, unsupported, and oversized files before any auth/upload/ins
 test("validates caption/date; people/tags remain string arrays", () => {
   for (const date of ["", "invalid", "2026-02-30", "2026-13-01"]) assert.throws(() => validateMemoryInput(makeInput({ date })), /日付/);
   for (const caption of [" ", "あ".repeat(81)]) assert.throws(() => validateMemoryInput(makeInput({ caption })), /80文字/);
+  assert.throws(() => validateMemoryFields({ caption: "一言", date: "2026-09-02", people: [], tags: [], letter: "あ".repeat(MAX_MEMORY_LETTER_LENGTH + 1) }), /手紙/);
   assert.deepEqual(validateMemoryInput(makeInput({ people: [], tags: [] })).fields.tags, []);
   assert.equal(validateMemoryInput(makeInput({ date: "2024-02-29" })).fields.memory_date, "2024-02-29");
   assert.deepEqual(validateMemoryFields({ caption: " 編集後 ", date: "2026-09-02", people: ["友達", "友達"], tags: [" 放課後 "] }), {
     caption: "編集後", memory_date: "2026-09-02", people: ["友達"], tags: ["放課後"],
   });
+  assert.equal(validateMemoryFields({ caption: "一言", date: "2026-09-02", people: [], tags: [], letter: " 未来の自分へ。 " }).letter, "未来の自分へ。");
 });
 
 test("unauthenticated users cannot upload or insert", async () => {
@@ -302,7 +310,7 @@ const DETAIL_IDS = {
 };
 const detailRow = (id, changes = {}) => ({
   id, user_id: USER_ID, image_path: `${USER_ID}/${id}.jpg`, caption: "詳細の思い出",
-  memory_date: "2026-09-01", people: ["友達"], tags: ["放課後"],
+  memory_date: "2026-09-01", people: ["友達"], tags: ["放課後"], letter: "",
   created_at: "2026-09-01T10:00:00.000Z", updated_at: "2026-09-01T10:00:00.000Z",
   ...changes,
 });
@@ -349,17 +357,37 @@ test("another owner's or invalid memory id is indistinguishable from not found",
 test("editing owned fields persists and is visible after a fresh detail load", async () => {
   const h = harness({ rows: [detailRow(DETAIL_IDS.current)] });
   await updateMemory(h.client, DETAIL_IDS.current, {
-    caption: " 編集した一言 ", date: "2026-09-02", people: ["友達", " 家族 ", "友達"], tags: ["帰り道"],
+    caption: " 編集した一言 ", date: "2026-09-02", people: ["友達", " 家族 ", "友達"], tags: ["帰り道"], letter: " またここへ来よう。 ",
   });
   const reloaded = await loadMemoryDetail(h.client, DETAIL_IDS.current);
   assert.equal(reloaded.memory.caption, "編集した一言");
   assert.equal(reloaded.memory.date, "2026-09-02");
   assert.deepEqual(reloaded.memory.people, ["友達", "家族"]);
   assert.deepEqual(reloaded.memory.tags, ["帰り道"]);
+  assert.equal(reloaded.memory.letter, "またここへ来よう。");
   const update = h.calls.find((call) => call.method === "PATCH");
   assert.equal(update.url.searchParams.get("user_id"), `eq.${USER_ID}`);
   assert.equal(update.url.searchParams.get("id"), `eq.${DETAIL_IDS.current}`);
   assert.equal(update.body.image_path, undefined);
+});
+
+test("an older database without the optional letter column still loads albums and details", async () => {
+  const h = harness({ rows: [detailRow(DETAIL_IDS.current)], missingLetterColumn: true });
+  const album = await loadMemories(h.client);
+  const detail = await loadMemoryDetail(h.client, DETAIL_IDS.current);
+  assert.equal(album.memories.length, 1);
+  assert.equal(album.memories[0].letter, "");
+  assert.equal(detail.memory.caption, "詳細の思い出");
+  assert.equal(detail.memory.letter, "");
+  assert.ok(h.calls.some((call) => call.method === "GET" && call.url.searchParams.get("select")?.includes("letter")));
+  assert.ok(h.calls.some((call) => call.method === "GET" && !call.url.searchParams.get("select")?.includes("letter")));
+
+  await updateMemory(h.client, DETAIL_IDS.current, {
+    caption: "一言だけ更新", date: "2026-09-02", people: [], tags: [], letter: "",
+  });
+  await assert.rejects(updateMemory(h.client, DETAIL_IDS.current, {
+    caption: "手紙も更新", date: "2026-09-02", people: [], tags: [], letter: "まだ保存できない手紙",
+  }), /データベース更新/);
 });
 
 test("deleting an owned memory removes both its DB row and exact Storage object", async () => {
@@ -380,6 +408,7 @@ test("Storage deletion failure restores the captured DB row instead of leaving a
   await assert.rejects(deleteMemory(h.client, DETAIL_IDS.current), /元に戻しました/);
   assert.equal(h.rows.get(DETAIL_IDS.current).image_path, row.image_path);
   assert.equal(h.rows.get(DETAIL_IDS.current).caption, row.caption);
+  assert.equal(h.rows.get(DETAIL_IDS.current).letter, row.letter);
   assert.equal(h.objects.has(row.image_path), true);
   assert.equal(h.calls.filter((call) => call.method === "POST" && call.url?.pathname === "/rest/v1/memories").length, 1);
 });
