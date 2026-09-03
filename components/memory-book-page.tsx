@@ -2,40 +2,46 @@
 
 import { type ReactNode, useState } from "react";
 import { MemoryPhoto } from "@/components/memory-photo";
+import type { AlbumAppearance } from "@/lib/album-appearance";
 import { formatJapaneseDate } from "@/lib/data";
-import { usePreferences } from "@/lib/preferences-context";
 import type { Memory } from "@/lib/types";
 
 export function MemoryBookPage({
   memory,
+  appearance,
   editControl,
-  preview = false,
-  previewLetter = "",
+  harvestWord,
 }: {
   memory: Memory;
+  appearance: AlbumAppearance;
   editControl?: ReactNode;
-  preview?: boolean;
-  previewLetter?: string;
+  harvestWord?: string | null;
 }) {
-  const { albumFont, albumLayout, albumTextColor, albumBackground, albumPattern } = usePreferences();
   const [photoLayout, setPhotoLayout] = useState({ src: "", aspectRatio: 4 / 3 });
-  const savedLetter = memory.letter?.trim() ?? "";
-  const letter = savedLetter || previewLetter.trim();
+  const letter = memory.letter?.trim() ?? "";
   const letterLength = [...letter].length;
+  const savedHarvestWord = harvestWord?.trim() ?? "";
+  const harvestWordLength = [...savedHarvestWord].length;
   const photoAspectRatio = photoLayout.src === memory.imageUrl ? photoLayout.aspectRatio : 4 / 3;
-  const photoScale = preview ? (letter ? 58 : 72) : letterLength > 220 ? 62 : letter ? 70 : 82;
-  const maximumWidth = preview ? (letter ? 78 : 92) : letterLength > 220 ? 80 : letter ? 90 : 100;
+  const isLandscape = appearance.orientation === "landscape";
+  const photoScale = isLandscape
+    ? (letterLength > 220 ? 28 : letter ? 33 : 39)
+    : (letterLength > 220 ? 62 : letter ? 70 : 82);
+  const maximumWidth = isLandscape
+    ? (letterLength > 220 ? 72 : letter ? 82 : 90)
+    : (letterLength > 220 ? 80 : letter ? 90 : 100);
   const photoFrameWidth = Math.round(Math.min(maximumWidth, Math.max(30, photoAspectRatio * photoScale)) * 10) / 10;
   const pageClasses = [
     "memory-book-page",
-    `album-font-${albumFont}`,
-    `album-layout-${albumLayout}`,
-    `album-text-${albumTextColor}`,
-    `album-background-${albumBackground}`,
-    `album-pattern-${albumPattern}`,
+    `album-font-${appearance.font}`,
+    `album-layout-${appearance.layout}`,
+    `album-text-${appearance.textColor}`,
+    `album-background-${appearance.background}`,
+    `album-pattern-${appearance.pattern}`,
+    `album-orientation-${appearance.orientation}`,
     letter ? "memory-book-page--has-letter" : "",
     letterLength > 220 ? "memory-book-page--long-letter" : "",
-    preview ? "memory-book-page--preview" : "",
+    savedHarvestWord ? "memory-book-page--has-harvest-word" : "",
   ].filter(Boolean).join(" ");
 
   return (
@@ -47,7 +53,7 @@ export function MemoryBookPage({
           <MemoryPhoto
             src={memory.imageUrl}
             alt={memory.caption}
-            detailed={!preview}
+            detailed
             className="memory-book-photo"
             onAspectRatio={(aspectRatio) => setPhotoLayout((current) => (
               current.src === memory.imageUrl && current.aspectRatio === aspectRatio
@@ -55,6 +61,15 @@ export function MemoryBookPage({
                 : { src: memory.imageUrl, aspectRatio }
             ))}
           />
+          {savedHarvestWord && (
+            <div className="memory-book-harvest-word" role="note" aria-label={`思い出の木から収穫した言葉「${savedHarvestWord}」`}>
+              <span className="memory-book-harvest-text" data-long={harvestWordLength > 8 || undefined}>{savedHarvestWord}</span>
+              <svg className="memory-book-harvest-flourish" viewBox="0 0 48 38" aria-hidden="true">
+                <path d="M5 34 C17 29 27 23 38 11" />
+                <path d="M25 23 C25 13 31 6 41 4 C41 14 35 21 25 23 Z M31 25 C39 20 45 22 47 29 C40 32 35 30 31 25 Z" />
+              </svg>
+            </div>
+          )}
           <svg className="memory-book-frame-doodle" viewBox="0 0 320 34" preserveAspectRatio="none" aria-hidden="true">
             <path d="M3 22 C38 9 66 28 101 16 C137 4 165 27 201 16 C237 5 269 24 317 10" />
             <path d="M69 20 C61 14 59 8 61 3 C68 7 72 12 69 20 Z M235 16 C242 10 247 5 254 5 C252 13 246 17 235 16 Z" />
@@ -63,7 +78,9 @@ export function MemoryBookPage({
         </div>
 
         <div className="memory-book-copy">
-          <p className="memory-book-date">{formatJapaneseDate(memory.date)}</p>
+          <div className="memory-book-copy-heading">
+            <p className="memory-book-date">{formatJapaneseDate(memory.date)}</p>
+          </div>
           <h2 className={`memory-book-caption${memory.caption.length > 44 ? " memory-book-caption--long" : ""}`}>{memory.caption}</h2>
         </div>
 

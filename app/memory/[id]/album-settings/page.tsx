@@ -1,14 +1,47 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { AlbumSettingsPanel } from "@/components/album-settings-panel";
 import { SettingsHeader } from "@/components/settings-header";
+import type { AlbumAppearance } from "@/lib/album-appearance";
 import { useMemories } from "@/lib/memories-context";
+import { usePreferences } from "@/lib/preferences-context";
+import { createClient } from "@/lib/supabase/client";
+import { updateMemoryAlbumAppearance } from "@/lib/supabase/memories";
+import { useTree } from "@/lib/tree-context";
 
 export default function MemoryAlbumSettingsPage() {
   const params = useParams<{ id: string }>();
-  const { getMemory, isLoading, error } = useMemories();
+  const { getMemory, isLoading, error, refreshMemories } = useMemories();
+  const { albumAppearance: defaultAppearance } = usePreferences();
+  const tree = useTree();
   const memory = getMemory(params.id);
+  const [individualAppearance, setIndividualAppearance] = useState<AlbumAppearance | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIndividualAppearance(memory?.albumAppearance ?? null);
+  }, [memory?.albumAppearance, memory?.id]);
+
+  const handleAppearanceChange = async (next: AlbumAppearance) => {
+    if (!memory || saving) return;
+    const previous = individualAppearance;
+    setIndividualAppearance(next);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const saved = await updateMemoryAlbumAppearance(createClient(), memory.id, next);
+      setIndividualAppearance(saved);
+      void refreshMemories();
+    } catch (cause) {
+      setIndividualAppearance(previous);
+      setSaveError(cause instanceof Error ? cause.message : "個別の見た目を保存できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="page-pad">
@@ -25,7 +58,15 @@ export default function MemoryAlbumSettingsPage() {
       ) : error && !memory ? (
         <p role="alert" className="mt-12 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{error}</p>
       ) : memory ? (
-        <AlbumSettingsPanel memory={memory} contextual />
+        <AlbumSettingsPanel
+          memory={memory}
+          contextual
+          appearance={individualAppearance ?? defaultAppearance}
+          onAppearanceChange={(next) => void handleAppearanceChange(next)}
+          saving={saving}
+          saveError={saveError}
+          harvestWord={tree.harvestWordFor(memory.id)}
+        />
       ) : (
         <p className="mt-12 text-center text-sm text-ink/55">思い出が見つかりません。</p>
       )}

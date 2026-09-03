@@ -1,12 +1,14 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, LayoutTemplate, Palette, Sparkles, Type } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, LayoutTemplate, Palette, Ratio, Sparkles, Type } from "lucide-react";
 import { MemoryBookPage } from "@/components/memory-book-page";
+import type { AlbumAppearance } from "@/lib/album-appearance";
 import {
   ALBUM_BACKGROUNDS,
   ALBUM_FONTS,
   ALBUM_LAYOUTS,
+  ALBUM_ORIENTATIONS,
   ALBUM_PATTERNS,
   ALBUM_TEXT_COLORS,
   usePreferences,
@@ -14,19 +16,21 @@ import {
 import type { Memory } from "@/lib/types";
 
 const steps = [
-  { id: "font", label: "フォント", description: "一言・日付・手紙の書体", icon: Type },
+  { id: "font", label: "フォント", description: "一言・日付・手紙・花びらの書体", icon: Type },
   { id: "layout", label: "レイアウト", description: "写真と言葉の並べ方", icon: LayoutTemplate },
+  { id: "orientation", label: "縦横", description: "画面・プレビュー・印刷に共通するL判の向き", icon: Ratio },
   { id: "text", label: "文字の色", description: "紙面に書く文字の色", icon: Palette },
   { id: "background", label: "背景の色", description: "アルバム用紙の色", icon: Palette },
   { id: "pattern", label: "デザイン", description: "背景に重ねる模様", icon: Sparkles },
 ] as const;
 
-function ChoiceButton({ selected, label, description, children, onClick }: {
+function ChoiceButton({ selected, label, description, children, onClick, disabled = false }: {
   selected: boolean;
   label: string;
   description?: string;
   children?: ReactNode;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -34,6 +38,7 @@ function ChoiceButton({ selected, label, description, children, onClick }: {
       role="radio"
       aria-checked={selected}
       onClick={onClick}
+      disabled={disabled}
       className={`album-setting-choice ${selected ? "album-setting-choice--selected" : ""}`}
     >
       <span className="min-w-0 flex-1">
@@ -48,32 +53,44 @@ function ChoiceButton({ selected, label, description, children, onClick }: {
   );
 }
 
-export function AlbumSettingsPanel({ memory, contextual = false }: { memory: Memory; contextual?: boolean }) {
+export function AlbumSettingsPanel({
+  memory,
+  contextual = false,
+  appearance,
+  onAppearanceChange,
+  saving = false,
+  saveError = null,
+  harvestWord,
+}: {
+  memory: Memory;
+  contextual?: boolean;
+  appearance?: AlbumAppearance;
+  onAppearanceChange?: (appearance: AlbumAppearance) => void;
+  saving?: boolean;
+  saveError?: string | null;
+  harvestWord?: string | null;
+}) {
   const [stepIndex, setStepIndex] = useState(0);
   const {
-    albumFont,
-    albumLayout,
-    albumTextColor,
-    albumBackground,
-    albumPattern,
-    setAlbumFont,
-    setAlbumLayout,
-    setAlbumTextColor,
-    setAlbumBackground,
-    setAlbumPattern,
+    albumAppearance,
+    setAlbumAppearance,
   } = usePreferences();
+  const selectedAppearance = appearance ?? albumAppearance;
   const step = steps[stepIndex];
   const StepIcon = step.icon;
   const moveStep = (amount: number) => setStepIndex((current) => (current + amount + steps.length) % steps.length);
-  const placeholderLetter = contextual
-    ? "手紙をまだ書いていない場合は、編集の鉛筆から追加できます。書いた言葉はここに続きます。"
-    : "あの日の空気や、言えなかったありがとう。写真だけでは残しきれないことを、ここに手紙のように書いておけます。";
+  const choose = <Key extends keyof AlbumAppearance>(key: Key, value: AlbumAppearance[Key]) => {
+    if (selectedAppearance[key] === value) return;
+    const next = { ...selectedAppearance, [key]: value };
+    if (onAppearanceChange) onAppearanceChange(next);
+    else setAlbumAppearance(next);
+  };
 
   return (
     <div className="mt-6">
       <section aria-label="アルバム設定のプレビュー">
         <div className="album-settings-preview">
-          <MemoryBookPage memory={memory} preview previewLetter={placeholderLetter} />
+          <MemoryBookPage memory={memory} appearance={selectedAppearance} harvestWord={harvestWord} />
         </div>
         <p className="mt-3 text-center text-[10px] leading-5 text-ink/45">
           {contextual ? "この思い出で組み合わせを確認しています" : "すべての設定を組み合わせた仕上がり例です"}
@@ -97,40 +114,47 @@ export function AlbumSettingsPanel({ memory, contextual = false }: { memory: Mem
 
         <div className="mt-5 grid gap-3" role="radiogroup" aria-label={step.label}>
           {step.id === "font" && ALBUM_FONTS.map((option) => (
-            <ChoiceButton key={option.id} selected={albumFont === option.id} label={option.label} description={option.description} onClick={() => setAlbumFont(option.id)}>
+            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.font === option.id} label={option.label} description={option.description} onClick={() => choose("font", option.id)}>
               <span className={`album-font-preview album-font-${option.id} mt-2 block text-[20px] leading-8 text-ink`}>忘れたくない、今日のこと。</span>
             </ChoiceButton>
           ))}
 
           {step.id === "layout" && ALBUM_LAYOUTS.map((option) => (
-            <ChoiceButton key={option.id} selected={albumLayout === option.id} label={option.label} description={option.description} onClick={() => setAlbumLayout(option.id)}>
+            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.layout === option.id} label={option.label} description={option.description} onClick={() => choose("layout", option.id)}>
               <span className={`album-layout-swatch album-layout-swatch--${option.id}`} aria-hidden="true"><i /><i /><i /></span>
             </ChoiceButton>
           ))}
 
+          {step.id === "orientation" && ALBUM_ORIENTATIONS.map((option) => (
+            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.orientation === option.id} label={option.label} description={option.description} onClick={() => choose("orientation", option.id)}>
+              <span className={`album-orientation-swatch album-orientation-swatch--${option.id}`} aria-hidden="true" />
+            </ChoiceButton>
+          ))}
+
           {step.id === "text" && ALBUM_TEXT_COLORS.map((option) => (
-            <ChoiceButton key={option.id} selected={albumTextColor === option.id} label={option.label} onClick={() => setAlbumTextColor(option.id)}>
+            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.textColor === option.id} label={option.label} onClick={() => choose("textColor", option.id)}>
               <span className="mt-3 flex items-center gap-3">
                 <span className="h-7 w-7 rounded-full border border-black/10 shadow-inner" style={{ backgroundColor: option.color }} />
-                <span className={`album-font-preview album-font-${albumFont} text-lg`} style={{ color: option.color }}>大切な一日</span>
+                <span className={`album-font-preview album-font-${selectedAppearance.font} text-lg`} style={{ color: option.color }}>大切な一日</span>
               </span>
             </ChoiceButton>
           ))}
 
           {step.id === "background" && ALBUM_BACKGROUNDS.map((option) => (
-            <ChoiceButton key={option.id} selected={albumBackground === option.id} label={option.label} onClick={() => setAlbumBackground(option.id)}>
+            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.background === option.id} label={option.label} onClick={() => choose("background", option.id)}>
               <span className="mt-3 block h-10 rounded-xl border border-black/10 shadow-inner" style={{ backgroundColor: option.color }} />
             </ChoiceButton>
           ))}
 
           {step.id === "pattern" && ALBUM_PATTERNS.map((option) => (
-            <ChoiceButton key={option.id} selected={albumPattern === option.id} label={option.label} description={option.description} onClick={() => setAlbumPattern(option.id)}>
+            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.pattern === option.id} label={option.label} description={option.description} onClick={() => choose("pattern", option.id)}>
               <span className={`album-pattern-swatch album-pattern-swatch--${option.id}`} aria-hidden="true" />
             </ChoiceButton>
           ))}
         </div>
 
-        <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">選ぶたびに保存され、上の例へすぐ反映されます。</p>
+        {saveError && <p role="alert" className="mt-4 rounded-xl border border-red-300/60 bg-red-50/60 px-3 py-2 text-center text-[10px] leading-5 text-ink">{saveError}</p>}
+        <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">{saving ? "保存しています…" : "選ぶたびに保存され、上の例へすぐ反映されます。"}</p>
       </section>
     </div>
   );

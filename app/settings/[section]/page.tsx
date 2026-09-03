@@ -156,7 +156,7 @@ export default function SettingDetailPage() {
       )}
 
       {section === "album" && (
-        <AlbumSettingsPanel memory={SAMPLE_MEMORIES[0]} />
+        <AlbumSettingsPanel memory={SAMPLE_MEMORIES[0]} harvestWord="帰り道" />
       )}
 
       {section !== "style" && section !== "sound" && section !== "album" && (

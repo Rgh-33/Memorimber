@@ -8,6 +8,16 @@ export type Harvests = Record<string, Harvest>;
 export type HarvestedItem = Extract<MemoryTreeItem, { stage: "harvested" }>;
 const LATER_UPLOADS_TO_HARVEST = 7;
 
+/** The album keeps the word as harvest history even after its home-screen
+ * petal has finished floating. Preview harvests use the same lookup contract. */
+export function getHarvestWordForMemory(memoryId: string, harvests: Harvests, fruits: MemoryFruits) {
+  const previewWord = harvests[memoryId]?.word.trim();
+  if (previewWord) return previewWord;
+  const fruit = fruits[memoryId];
+  const savedWord = fruit?.harvestedAt ? fruit.harvestWord?.trim() : "";
+  return savedWord || null;
+}
+
 export function buildPetals(memories: Memory[], date: string, harvests: Harvests): HarvestedItem[] {
   return [...new Map(memories.map((memory) => [memory.id, memory])).values()]
     .filter((memory) => uploadDate(memory) <= date && harvests[memory.id]?.harvestedAt.slice(0, 10) <= date)

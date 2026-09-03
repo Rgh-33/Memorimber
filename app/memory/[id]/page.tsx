@@ -10,6 +10,7 @@ import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
 import { SAMPLE_MEMORIES } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { usePreferences } from "@/lib/preferences-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { loadMemoryDetail, type MemoryDetail } from "@/lib/supabase/memories";
@@ -17,6 +18,25 @@ import { useTree } from "@/lib/tree-context";
 import type { Memory } from "@/lib/types";
 
 type LoadState = "idle" | "loading" | "loaded" | "not-found" | "error";
+
+const ALBUM_PRINT_PAGE_STYLE_ID = "memory-album-print-page-size";
+
+function applyAlbumPrintPageSize(orientation: "portrait" | "landscape") {
+  const [width, height] = orientation === "landscape" ? [127, 89] : [89, 127];
+  let style = document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID) as HTMLStyleElement | null;
+
+  if (!style) {
+    style = document.createElement("style");
+    style.id = ALBUM_PRINT_PAGE_STYLE_ID;
+    style.media = "print";
+    document.head.appendChild(style);
+  }
+
+  // An unnamed page rule is supported more consistently than CSS named pages,
+  // especially by Safari and Firefox print preview.
+  style.textContent = `@page { size: ${width}mm ${height}mm; margin: 0; }`;
+  document.documentElement.dataset.albumPrintOrientation = orientation;
+}
 
 function compareMemories(a: Memory, b: Memory) {
   return a.date.localeCompare(b.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id.localeCompare(b.id);
@@ -26,6 +46,7 @@ export default function MemoryDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { memories, getRelatedMemories, refreshMemories } = useMemories();
+  const { albumAppearance: defaultAlbumAppearance } = usePreferences();
   const tree = useTree();
   const configured = isSupabaseConfigured();
   const requestVersion = useRef(0);
@@ -36,6 +57,9 @@ export default function MemoryDetailPage() {
   const [loadState, setLoadState] = useState<LoadState>(prototypeMemory ? "loaded" : "idle");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
+  const [draftMemory, setDraftMemory] = useState<Memory | null>(null);
+  const [printPreparing, setPrintPreparing] = useState(false);
+  const printPageRef = useRef<HTMLDivElement>(null);
 
   const fetchDetail = useCallback(async (showLoading = true) => {
     const version = ++requestVersion.current;
@@ -73,6 +97,11 @@ export default function MemoryDetailPage() {
     return () => { requestVersion.current += 1; };
   }, [configured, fetchDetail, prototypeMemory]);
 
+  useEffect(() => {
+    setActionMode(null);
+    setDraftMemory(null);
+  }, [params.id]);
+
   const localNavigation = useMemo(() => {
     if (!prototypeMemory) return null;
     const source = previewMemory ? tree.memories : SAMPLE_MEMORIES;
@@ -95,6 +124,18 @@ export default function MemoryDetailPage() {
     return getRelatedMemories(memories.find((item) => item.id === memory.id) ?? memory);
   }, [getRelatedMemories, memories, memory, previewMemory, tree.memories]);
 
+  const renderedMemory = memory ? (draftMemory ?? memory) : null;
+  const resolvedAppearance = renderedMemory?.albumAppearance ?? defaultAlbumAppearance;
+
+  useEffect(() => {
+    applyAlbumPrintPageSize(resolvedAppearance.orientation);
+
+    return () => {
+      document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID)?.remove();
+      delete document.documentElement.dataset.albumPrintOrientation;
+    };
+  }, [resolvedAppearance.orientation]);
+
   if (loadState === "idle" || loadState === "loading") {
     return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p role="status">思い出を読み込んでいます…</p></div></div>;
   }
@@ -109,6 +150,7 @@ export default function MemoryDetailPage() {
 
   const handleUpdated = (updated: Memory) => {
     setDetail((current) => current ? { ...current, memory: updated } : current);
+    setDraftMemory(null);
     setActionMode(null);
     void refreshMemories();
     void fetchDetail(false);
@@ -119,6 +161,51 @@ export default function MemoryDetailPage() {
     router.replace("/album");
     router.refresh();
   };
+
+  const closeAction = () => {
+    setActionMode(null);
+    setDraftMemory(null);
+  };
+
+  const openEditor = () => {
+    setDraftMemory(memory);
+    setActionMode("edit");
+  };
+
+  const handlePrint = async () => {
+    if (printPreparing) return;
+    setPrintPreparing(true);
+    try {
+      // Apply again immediately before printing so Safari snapshots the current
+      // orientation even when the user changed it just before this click.
+      applyAlbumPrintPageSize(resolvedAppearance.orientation);
+      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          promise,
+          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
+        ]);
+        if (timeout) clearTimeout(timeout);
+      };
+      if (document.fonts) await waitAtMost(document.fonts.ready);
+      const images = Array.from(printPageRef.current?.querySelectorAll("img") ?? []);
+      await Promise.all(images.map(async (image) => {
+        if (!image.complete) {
+          await waitAtMost(new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          }));
+        }
+        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
+      }));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      window.print();
+    } finally {
+      setPrintPreparing(false);
+    }
+  };
+
+  const harvestWord = tree.harvestWordFor(memory.id);
 
   return (
     <div className="memory-detail-page page-pad">
@@ -133,19 +220,21 @@ export default function MemoryDetailPage() {
           <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
             <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
           </Link>
-          <button type="button" onClick={() => window.print()} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出を印刷する">
-            <Printer size={16} className="text-coral" aria-hidden="true" /> 印刷
+          <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をL判サイズで印刷する">
+            <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "準備中…" : "L判で印刷"}
           </button>
         </div>
       </div>
       {sampleMemory && <p className="print-hide mt-2 text-xs text-ink/55">サンプルの思い出です</p>}
       {detail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
 
-      <div className="memory-book-page-shell mt-5">
+      <div ref={printPageRef} className={`memory-book-page-shell memory-book-page-shell--${resolvedAppearance.orientation} mt-5`}>
         <MemoryBookPage
-          memory={memory}
+          memory={renderedMemory ?? memory}
+          appearance={resolvedAppearance}
+          harvestWord={harvestWord}
           editControl={!prototypeMemory && detail ? (
-            <button type="button" onClick={() => setActionMode("edit")} className="memory-book-pencil" aria-label="思い出と手紙を編集" title="編集">
+            <button type="button" onClick={openEditor} className="memory-book-pencil" aria-label="思い出と手紙を編集" title="編集">
               <Pencil size={19} aria-hidden="true" />
             </button>
           ) : undefined}
@@ -154,7 +243,15 @@ export default function MemoryDetailPage() {
 
       {!prototypeMemory && detail && actionMode === "edit" && (
         <div className="print-hide">
-          <MemoryDetailActions key={`edit-${memory.id}`} memory={memory} mode="edit" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={() => setActionMode(null)} />
+          <MemoryDetailActions
+            key={`edit-${memory.id}`}
+            memory={memory}
+            mode="edit"
+            onDraftChange={(draft) => setDraftMemory({ ...memory, ...draft })}
+            onUpdated={handleUpdated}
+            onDeleted={handleDeleted}
+            onClose={closeAction}
+          />
         </div>
       )}
 
@@ -172,7 +269,7 @@ export default function MemoryDetailPage() {
       {!prototypeMemory && detail && (
         <div className="print-hide mt-8 border-t border-line pt-4">
           {actionMode === "delete" ? (
-            <MemoryDetailActions key={`delete-${memory.id}`} memory={memory} mode="delete" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={() => setActionMode(null)} />
+            <MemoryDetailActions key={`delete-${memory.id}`} memory={memory} mode="delete" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={closeAction} />
           ) : (
             <div className="flex justify-end">
               <button type="button" onClick={() => setActionMode("delete")} className="flex items-center gap-1.5 px-1 py-2 text-[11px] text-red-500/75 transition hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60" aria-label="思い出を削除">

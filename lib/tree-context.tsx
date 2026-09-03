@@ -5,7 +5,7 @@ import { SAMPLE_MEMORIES } from "./data";
 import { useMemories } from "./memories-context";
 import { createClient } from "./supabase/client";
 import { completeMemoryHarvest, loadMemoryFruits, type MemoryFruits } from "./supabase/memory-fruits";
-import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
+import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getHarvestWordForMemory, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
 import { placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
 
@@ -119,6 +119,9 @@ function useTreeState() {
       : buildPersistedPetals(source, date, fruits, now);
   }, [ready, state.preview, state.previewHarvests, source, date, fruits, now]);
   const count = ready ? monthlyQueue(source, date).length : 0;
+  const harvestWordFor = useCallback((memoryId: string) => (
+    getHarvestWordForMemory(memoryId, state.previewHarvests, fruits)
+  ), [fruits, state.previewHarvests]);
   const slotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
   const placement = useMemo(() => placeTreeItems(items, state.slots[slotKey]), [items, state.slots, slotKey]);
 
@@ -133,7 +136,7 @@ function useTreeState() {
 
   return {
     ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
-    date, preview: state.preview, items, visibleItems: placement.visibleItems, petals, memories: source, count,
+    date, preview: state.preview, items, visibleItems: placement.visibleItems, petals, memories: source, count, harvestWordFor,
     setPreview: (preview: boolean) => setState((current) => ({ ...current, preview })),
     setDate: (next: string) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));

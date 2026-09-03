@@ -1,3 +1,5 @@
+import type { AlbumAppearance } from "./album-appearance";
+
 export type Memory = {
   id: string;
   date: string;
@@ -8,6 +10,7 @@ export type Memory = {
   people: string[];
   tags: string[];
   letter?: string;
+  albumAppearance?: AlbumAppearance | null;
 };
 
 export type QuizQuestion = {

@@ -1,14 +1,29 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  DEFAULT_ALBUM_APPEARANCE,
+  type AlbumAppearance,
+  type AlbumBackground,
+  type AlbumFont,
+  type AlbumLayout,
+  type AlbumOrientation,
+  type AlbumPattern,
+  type AlbumTextColor,
+} from "./album-appearance";
+
+export type {
+  AlbumAppearance,
+  AlbumBackground,
+  AlbumFont,
+  AlbumLayout,
+  AlbumOrientation,
+  AlbumPattern,
+  AlbumTextColor,
+} from "./album-appearance";
 
 export type AppTheme = "light-blue" | "orange" | "blue" | "black" | "green" | "purple";
 export type AppColorMode = "light" | "dark";
-export type AlbumFont = "zen-kurenaido" | "gothic" | "mincho" | "rounded";
-export type AlbumLayout = "scrapbook" | "gallery" | "diary";
-export type AlbumTextColor = "cocoa" | "navy" | "rose" | "forest";
-export type AlbumBackground = "cream" | "white" | "blush" | "mist";
-export type AlbumPattern = "botanical" | "plain" | "dots" | "grid";
 
 export const APP_THEMES: Array<{ id: AppTheme; label: string; swatch: string }> = [
   { id: "light-blue", label: "ライトブルー", swatch: "#4a90e2" },
@@ -58,6 +73,11 @@ export const ALBUM_PATTERNS: Array<{ id: AlbumPattern; label: string; descriptio
   { id: "grid", label: "方眼ノート", description: "淡い方眼を重ねたノート風の紙面" },
 ];
 
+export const ALBUM_ORIENTATIONS: Array<{ id: AlbumOrientation; label: string; description: string }> = [
+  { id: "portrait", label: "L判・縦向き", description: "89 × 127mm。縦写真や本の1ページ向け" },
+  { id: "landscape", label: "L判・横向き", description: "127 × 89mm。横写真を広く見せる向き" },
+];
+
 type PreferencesContextValue = {
   theme: AppTheme;
   colorMode: AppColorMode;
@@ -66,6 +86,8 @@ type PreferencesContextValue = {
   albumTextColor: AlbumTextColor;
   albumBackground: AlbumBackground;
   albumPattern: AlbumPattern;
+  albumOrientation: AlbumOrientation;
+  albumAppearance: AlbumAppearance;
   bgmVolume: number;
   soundEffectVolume: number;
   setTheme: (theme: AppTheme) => void;
@@ -75,6 +97,8 @@ type PreferencesContextValue = {
   setAlbumTextColor: (color: AlbumTextColor) => void;
   setAlbumBackground: (background: AlbumBackground) => void;
   setAlbumPattern: (pattern: AlbumPattern) => void;
+  setAlbumOrientation: (orientation: AlbumOrientation) => void;
+  setAlbumAppearance: (appearance: AlbumAppearance) => void;
   setBgmVolume: (volume: number) => void;
   setSoundEffectVolume: (volume: number) => void;
 };
@@ -86,6 +110,7 @@ const ALBUM_LAYOUT_STORAGE_KEY = "memorimber-album-layout";
 const ALBUM_TEXT_COLOR_STORAGE_KEY = "memorimber-album-text-color";
 const ALBUM_BACKGROUND_STORAGE_KEY = "memorimber-album-background";
 const ALBUM_PATTERN_STORAGE_KEY = "memorimber-album-pattern";
+const ALBUM_ORIENTATION_STORAGE_KEY = "memorimber-album-orientation";
 const BGM_VOLUME_STORAGE_KEY = "memorimber-bgm-volume";
 const SOUND_EFFECT_VOLUME_STORAGE_KEY = "memorimber-sound-effect-volume";
 
@@ -123,14 +148,19 @@ function isAlbumPattern(value: string | null): value is AlbumPattern {
   return ALBUM_PATTERNS.some((pattern) => pattern.id === value);
 }
 
+function isAlbumOrientation(value: string | null): value is AlbumOrientation {
+  return ALBUM_ORIENTATIONS.some((orientation) => orientation.id === value);
+}
+
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<AppTheme>("light-blue");
   const [colorMode, setColorModeState] = useState<AppColorMode>("light");
-  const [albumFont, setAlbumFontState] = useState<AlbumFont>("zen-kurenaido");
-  const [albumLayout, setAlbumLayoutState] = useState<AlbumLayout>("scrapbook");
-  const [albumTextColor, setAlbumTextColorState] = useState<AlbumTextColor>("cocoa");
-  const [albumBackground, setAlbumBackgroundState] = useState<AlbumBackground>("cream");
-  const [albumPattern, setAlbumPatternState] = useState<AlbumPattern>("botanical");
+  const [albumFont, setAlbumFontState] = useState<AlbumFont>(DEFAULT_ALBUM_APPEARANCE.font);
+  const [albumLayout, setAlbumLayoutState] = useState<AlbumLayout>(DEFAULT_ALBUM_APPEARANCE.layout);
+  const [albumTextColor, setAlbumTextColorState] = useState<AlbumTextColor>(DEFAULT_ALBUM_APPEARANCE.textColor);
+  const [albumBackground, setAlbumBackgroundState] = useState<AlbumBackground>(DEFAULT_ALBUM_APPEARANCE.background);
+  const [albumPattern, setAlbumPatternState] = useState<AlbumPattern>(DEFAULT_ALBUM_APPEARANCE.pattern);
+  const [albumOrientation, setAlbumOrientationState] = useState<AlbumOrientation>(DEFAULT_ALBUM_APPEARANCE.orientation);
   const [bgmVolume, setBgmVolumeState] = useState(55);
   const [soundEffectVolume, setSoundEffectVolumeState] = useState(70);
 
@@ -142,6 +172,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     const savedAlbumTextColor = window.localStorage.getItem(ALBUM_TEXT_COLOR_STORAGE_KEY);
     const savedAlbumBackground = window.localStorage.getItem(ALBUM_BACKGROUND_STORAGE_KEY);
     const savedAlbumPattern = window.localStorage.getItem(ALBUM_PATTERN_STORAGE_KEY);
+    const savedAlbumOrientation = window.localStorage.getItem(ALBUM_ORIENTATION_STORAGE_KEY);
     const savedBgmVolume = window.localStorage.getItem(BGM_VOLUME_STORAGE_KEY);
     const savedSoundEffectVolume = window.localStorage.getItem(SOUND_EFFECT_VOLUME_STORAGE_KEY);
 
@@ -160,6 +191,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     if (isAlbumTextColor(savedAlbumTextColor)) setAlbumTextColorState(savedAlbumTextColor);
     if (isAlbumBackground(savedAlbumBackground)) setAlbumBackgroundState(savedAlbumBackground);
     if (isAlbumPattern(savedAlbumPattern)) setAlbumPatternState(savedAlbumPattern);
+    if (isAlbumOrientation(savedAlbumOrientation)) setAlbumOrientationState(savedAlbumOrientation);
     if (savedBgmVolume !== null && Number.isFinite(Number(savedBgmVolume))) {
       setBgmVolumeState(clampVolume(Number(savedBgmVolume)));
     }
@@ -205,6 +237,26 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     window.localStorage.setItem(ALBUM_PATTERN_STORAGE_KEY, nextPattern);
   }, []);
 
+  const setAlbumOrientation = useCallback((nextOrientation: AlbumOrientation) => {
+    setAlbumOrientationState(nextOrientation);
+    window.localStorage.setItem(ALBUM_ORIENTATION_STORAGE_KEY, nextOrientation);
+  }, []);
+
+  const setAlbumAppearance = useCallback((appearance: AlbumAppearance) => {
+    setAlbumFontState(appearance.font);
+    setAlbumLayoutState(appearance.layout);
+    setAlbumTextColorState(appearance.textColor);
+    setAlbumBackgroundState(appearance.background);
+    setAlbumPatternState(appearance.pattern);
+    setAlbumOrientationState(appearance.orientation);
+    window.localStorage.setItem(ALBUM_FONT_STORAGE_KEY, appearance.font);
+    window.localStorage.setItem(ALBUM_LAYOUT_STORAGE_KEY, appearance.layout);
+    window.localStorage.setItem(ALBUM_TEXT_COLOR_STORAGE_KEY, appearance.textColor);
+    window.localStorage.setItem(ALBUM_BACKGROUND_STORAGE_KEY, appearance.background);
+    window.localStorage.setItem(ALBUM_PATTERN_STORAGE_KEY, appearance.pattern);
+    window.localStorage.setItem(ALBUM_ORIENTATION_STORAGE_KEY, appearance.orientation);
+  }, []);
+
   const setBgmVolume = useCallback((volume: number) => {
     const nextVolume = clampVolume(volume);
     setBgmVolumeState(nextVolume);
@@ -217,6 +269,15 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     window.localStorage.setItem(SOUND_EFFECT_VOLUME_STORAGE_KEY, String(nextVolume));
   }, []);
 
+  const albumAppearance = useMemo<AlbumAppearance>(() => ({
+    font: albumFont,
+    layout: albumLayout,
+    textColor: albumTextColor,
+    background: albumBackground,
+    pattern: albumPattern,
+    orientation: albumOrientation,
+  }), [albumBackground, albumFont, albumLayout, albumOrientation, albumPattern, albumTextColor]);
+
   const value = useMemo(() => ({
     theme,
     colorMode,
@@ -225,6 +286,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     albumTextColor,
     albumBackground,
     albumPattern,
+    albumOrientation,
+    albumAppearance,
     bgmVolume,
     soundEffectVolume,
     setTheme,
@@ -234,9 +297,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     setAlbumTextColor,
     setAlbumBackground,
     setAlbumPattern,
+    setAlbumOrientation,
+    setAlbumAppearance,
     setBgmVolume,
     setSoundEffectVolume,
-  }), [theme, colorMode, albumFont, albumLayout, albumTextColor, albumBackground, albumPattern, bgmVolume, soundEffectVolume, setTheme, setColorMode, setAlbumFont, setAlbumLayout, setAlbumTextColor, setAlbumBackground, setAlbumPattern, setBgmVolume, setSoundEffectVolume]);
+  }), [theme, colorMode, albumFont, albumLayout, albumTextColor, albumBackground, albumPattern, albumOrientation, albumAppearance, bgmVolume, soundEffectVolume, setTheme, setColorMode, setAlbumFont, setAlbumLayout, setAlbumTextColor, setAlbumBackground, setAlbumPattern, setAlbumOrientation, setAlbumAppearance, setBgmVolume, setSoundEffectVolume]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }
