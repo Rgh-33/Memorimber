@@ -22,16 +22,43 @@ const BASE_BRANCHES: readonly TreeBranch[] = [
 export const TREE_NODE_CAPACITY = BASE_BRANCHES.length;
 export const TREE_PROPORTION = { x: .98, y: 1.06 } as const;
 
-export const TREE_EXTENSION_ROW_SIZE = 6;
-export const TREE_EXTENSION_STEP = 90;
-export const TREE_SLOT_STORAGE_LIMIT = 2_048;
+export const TREE_VISIBLE_CAPACITY = 33;
+export const TREE_SLOT_STORAGE_LIMIT = TREE_VISIBLE_CAPACITY;
 
-// A new crown grows from the leader outward. This keeps the newest tier
-// rounded while it fills instead of making a full-width branch appear at once.
-const EXTRA_COLUMN_ORDER = [2, 3, 1, 4, 0, 5] as const;
-const EXTRA_FRUIT_X = [34, 96, 158, 222, 284, 346] as const;
-const EXTRA_Y_DRIFT = [-4, 6, -6, 4, -2, 7] as const;
-const EXTRA_ROW_SHIFT = [0, 8, -6, 5, -8, 3] as const;
+// Added tips form an upright triangle: a narrow crown at the top, then pairs
+// that become progressively wider toward the lower skirt. The order matters;
+// it lets the silhouette keep growing downward and outward without ever
+// becoming an inverted triangle.
+// Coordinates describe the leaf/fruit anchor before the fruit's own 23px
+// hanging stem is added.
+const EXTRA_FRUIT_CENTERS: readonly Point[] = [
+  [190, 30], [120, 90], [260, 90],
+  [105, 145], [275, 145], [35, 200], [345, 200],
+  [0, 250], [380, 250], [-75, 285], [455, 285],
+  [150, 125], [230, 125], [115, 180], [265, 180],
+  [110, 220], [270, 220], [-120, 315], [500, 315],
+  [155, 300], [225, 300],
+];
+
+// Every added limb grows from the trunk or an already-connected bough. This
+// keeps even the exaggerated outer silhouette botanically plausible.
+const EXTRA_BRANCH_ORIGINS: readonly TreeBranch["origin"][] = [
+  [190, 218], { branch: 2, at: .48 }, { branch: 5, at: .48 },
+  { branch: 0, at: .48 }, { branch: 1, at: .48 },
+  { branch: 4, at: .52 }, { branch: 3, at: .52 },
+  { branch: 6, at: .42 }, { branch: 7, at: .42 },
+  { branch: 17, at: .62 }, { branch: 18, at: .62 },
+  { branch: 0, at: .38 }, { branch: 1, at: .38 }, [190, 260],
+  { branch: 13, at: .56 }, { branch: 14, at: .56 },
+  { branch: 19, at: .58 }, { branch: 20, at: .58 },
+  { branch: 0, at: .3 }, { branch: 1, at: .3 }, [190, 300],
+];
+
+const EXTRA_BRANCH_WIDTHS = [
+  3.35, 2.75, 2.75, 2.3, 2.3, 2.1, 2.1,
+  1.85, 1.85, 1.55, 1.55, 1.8, 1.8, 2.15,
+  1.45, 1.45, 1.25, 1.25, 1.55, 1.55, 1.65,
+] as const;
 // Keep these twelve offsets in step with tree-fruit-layout. They are repeated
 // here so this geometry module remains dependency-free in Node's type-stripped
 // tests as well as in the browser bundle.
@@ -43,27 +70,60 @@ const GENERATED_BRANCHES: TreeBranch[] = [...BASE_BRANCHES];
 type RenderedBranch = { x: number; y: number; origin: Point; width: number; path: string; surface: string };
 const RENDERED_BRANCHES = new Map<string, RenderedBranch>();
 
-export function getTreeExtensionRows(count: number) {
-  return Math.max(0, Math.ceil((Math.max(0, Math.floor(count)) - TREE_NODE_CAPACITY) / TREE_EXTENSION_ROW_SIZE));
+export function getTreeVisibleCount(count: number) {
+  return Math.min(TREE_VISIBLE_CAPACITY, Math.max(0, Math.floor(count)));
+}
+
+export function getTreeAddedFruitCenter(index: number): Point {
+  const offset = Math.max(0, Math.min(EXTRA_FRUIT_CENTERS.length - 1,
+    Math.floor(index) - TREE_NODE_CAPACITY));
+  return EXTRA_FRUIT_CENTERS[offset];
+}
+
+export function getTreeTrunkScale(count: number) {
+  const photos = getTreeVisibleCount(count);
+  const smoothstep = (value: number) => {
+    const progress = Math.max(0, Math.min(1, value));
+    return progress * progress * (3 - 2 * progress);
+  };
+  // Once the added crown is carrying several fruit, the established trunk
+  // gains girth without moving its roots, forks, or the outer crown.
+  const matureGrowth = smoothstep((photos - 20) / 16) * .24;
+  const elderGrowth = smoothstep((photos - 36) / 36) * .12;
+  return 1 + matureGrowth + elderGrowth;
 }
 
 export function getTreeCanvasMetrics(count: number) {
-  const extensionRows = getTreeExtensionRows(count);
-  // The whole tree is stretched slightly upward by TREE_PROPORTION. Reserve
-  // the transformed height plus the top leaves instead of relying on SVG
-  // overflow, so a long-lived tree also pushes the following UI down.
-  const extraHeight = extensionRows > 0
-    ? Math.ceil(extensionRows * TREE_EXTENSION_STEP * TREE_PROPORTION.y + 41)
-    : 0;
-  return { extensionRows, extraHeight, minY: extraHeight === 0 ? 0 : -extraHeight, height: 420 + extraHeight };
+  const photos = getTreeVisibleCount(count);
+  const hasAddedCrown = photos > TREE_NODE_CAPACITY;
+  // Keep the familiar framing while the new upper crown remains inside it.
+  // Pull back in steps as each successively wider lower tier appears.
+  const horizontal = photos <= 17
+    ? { minX: 0, width: 380 }
+    : photos === 18
+      ? { minX: -25, width: 410 }
+      : photos === 19
+        ? { minX: -25, width: 430 }
+        : photos <= 21
+          ? { minX: -55, width: 490 }
+          : photos <= 29
+            ? { minX: -145, width: 670 }
+            : { minX: -190, width: 760 };
+  return {
+    ...horizontal,
+    minY: hasAddedCrown ? -20 : 0,
+    height: hasAddedCrown ? 440 : 420,
+    addedTips: Math.max(0, photos - TREE_NODE_CAPACITY),
+  };
 }
 
-/** Keep occupied tips still and add only the slots the month has needed. A
- * harvested vacancy is reused first, but no unharvested photo waits off-tree. */
+/** Keep occupied tips still and render at most one month's thirty-three positions.
+ * Additional unharvested photos stay in insertion order until a harvested
+ * vacancy can receive the oldest waiting photo. */
 export function placeTreeItems(items: MemoryTreeItem[], previousSlots: readonly (string | null)[] = []) {
   const pending = new Map(items.flatMap(item => item.stage === "harvested" ? [] : [[item.id, item] as const]));
   const assigned = new Set<string>();
-  const capacity = Math.max(TREE_NODE_CAPACITY, items.length, Math.min(previousSlots.length, TREE_SLOT_STORAGE_LIMIT));
+  const capacity = Math.max(TREE_NODE_CAPACITY, Math.min(TREE_VISIBLE_CAPACITY, items.length));
   const slots = Array.from({ length: capacity }, (_, index) => {
     const id = previousSlots[index];
     if (!id || !pending.has(id) || assigned.has(id)) return null;
@@ -99,33 +159,24 @@ function branchOrigin(branch: TreeBranch, branches: readonly TreeBranch[]): Poin
 function appendBranch() {
   const index = GENERATED_BRANCHES.length;
   const offset = index - TREE_NODE_CAPACITY;
-  const row = Math.floor(offset / TREE_EXTENSION_ROW_SIZE) + 1;
-  const withinRow = offset % TREE_EXTENSION_ROW_SIZE;
-  const column = EXTRA_COLUMN_ORDER[withinRow];
   const [hangX, hangY] = FRUIT_HANG_OFFSETS[index % FRUIT_HANG_OFFSETS.length];
-  const fruitCenterX = EXTRA_FRUIT_X[column] + EXTRA_ROW_SHIFT[(row - 1) % EXTRA_ROW_SHIFT.length];
-  const rowCenterY = 52 - row * TREE_EXTENSION_STEP;
-  const fruitCenterY = rowCenterY + EXTRA_Y_DRIFT[withinRow];
+  const [fruitCenterX, fruitCenterY] = EXTRA_FRUIT_CENTERS[offset];
   const tip: Point = [fruitCenterX - hangX, fruitCenterY - hangY];
-  const rowStart = TREE_NODE_CAPACITY + (row - 1) * TREE_EXTENSION_ROW_SIZE;
-  const main = withinRow < 2;
-  const origin: TreeBranch["origin"] = main
-    ? [190 + ((row % 3) - 1) * 4, rowCenterY + 76]
-    : { branch: rowStart + (withinRow % 2 === 0 ? 0 : 1), at: withinRow >= 4 ? .38 : .66 };
+  const origin = EXTRA_BRANCH_ORIGINS[offset];
   const start = "branch" in origin
     ? pointOnBranch(GENERATED_BRANCHES[origin.branch], origin.at, GENERATED_BRANCHES)
     : origin;
   const end: Point = [tip[0], tip[1] + 14];
   const dx = end[0] - start[0];
   const dy = end[1] - start[1];
-  const direction = column < 3 ? -1 : 1;
-  const curve = direction * (main ? 10 : 5);
+  const direction = Math.sign(fruitCenterX - 190) || (offset % 2 === 0 ? -1 : 1);
+  const curve = direction * Math.min(18, 4 + Math.abs(dx) * .055);
   GENERATED_BRANCHES.push({
     tip,
     origin,
     bend: [start[0] + dx * .32 + curve, start[1] + dy * .23],
     shoulder: [start[0] + dx * .78 - curve * .24, start[1] + dy * .7],
-    width: main ? Math.max(1.7, 3.2 - row * .07) : Math.max(1.1, 2.05 - row * .035),
+    width: EXTRA_BRANCH_WIDTHS[offset],
   });
 }
 
@@ -178,7 +229,7 @@ export function getTreeStructure(count: number, mirrored: boolean, photoCount = 
   // only the number of photo tips this month has actually needed.
   const boughCount = stage < 7
     ? [0, 0, 0, 3, 6, 8, 10][stage]
-    : Math.max(TREE_NODE_CAPACITY, Math.floor(photoCount));
+    : Math.max(TREE_NODE_CAPACITY, getTreeVisibleCount(photoCount));
   // Before the trunk thickens at stage seven, boughs stay slimmer than the
   // young trunk. Their center lines remain fixed, so only wood thickness grows.
   const widthScale = [0, 0, 0, .28, .33, .38, .42, 1][stage];

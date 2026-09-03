@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { getTreeBranch, getTreeExtensionRows, getTreeStructure, TREE_EXTENSION_ROW_SIZE, TREE_EXTENSION_STEP, TREE_NODE_CAPACITY } from "@/lib/tree-branches";
+import { getTreeAddedFruitCenter, getTreeStructure, getTreeTrunkScale, TREE_NODE_CAPACITY } from "@/lib/tree-branches";
 
 const TRUNK = "M153 388 C169 376 173 357 172 338 C171 315 183 287 180 264 C177 246 174 227 180 214 L187 220 C188 237 186 249 192 254 C203 237 214 211 216 190 L223 185 C225 214 208 246 204 267 C208 293 196 322 199 342 C202 363 215 379 237 390 L211 386 199 381 Q181 385 164 390Z";
 
@@ -50,21 +50,31 @@ const CROWN = CLUMPS.map(([x, y, rx, ry, front], index) => ({
   birth: [5, 4, 4, 5, 6, 6, 6, 4, 4, 3, 6, 5, 4, 4, 5, 6, 5, 4, 3, 4, 5, 4, 6, 6, 6, 6, 6][index],
 }));
 
-const EXTENSION_CLUMPS = [
-  { x: 61, y: -8, source: 0, front: false, scale: .92, birth: 5 },
-  { x: 126, y: -19, source: 1, front: false, scale: .9, birth: 3 },
-  { x: 193, y: -23, source: 2, front: false, scale: .92, birth: 1 },
-  { x: 260, y: -18, source: 3, front: false, scale: .9, birth: 2 },
-  { x: 320, y: -5, source: 4, front: false, scale: 1, birth: 6 },
-  { x: 86, y: 28, source: 11, front: true, scale: .98, birth: 5 },
-  { x: 158, y: 18, source: 12, front: true, scale: .96, birth: 1 },
-  { x: 233, y: 20, source: 18, front: true, scale: .94, birth: 2 },
-  { x: 302, y: 30, source: 14, front: true, scale: .96, birth: 6 },
-  { x: 120, y: 54, source: 17, front: true, scale: .9, birth: 3 },
-  { x: 190, y: 50, source: 18, front: true, scale: .92, birth: 1 },
-  { x: 260, y: 55, source: 19, front: true, scale: .9, birth: 4 },
-  { x: 69, y: 45, source: 10, front: true, scale: .86, birth: 5 },
-  { x: 311, y: 46, source: 4, front: true, scale: .82, birth: 6 },
+// Each new fruit grows a pair of overlapping leaf masses around its connected
+// branch tip. Their order matches slots 13-33: crown first, then shoulders,
+// sides and finally the low skirt of the umbrella-shaped canopy.
+const ADDED_FOLIAGE = [
+  { source: 9, frontSource: 18, scaleX: 1.35, scaleY: .78 },
+  { source: 0, frontSource: 12, scaleX: 1.1, scaleY: .78 },
+  { source: 2, frontSource: 19, scaleX: 1.12, scaleY: .8 },
+  { source: 7, frontSource: 16, scaleX: 1.12, scaleY: .92 },
+  { source: 8, frontSource: 20, scaleX: 1.08, scaleY: .92 },
+  { source: 0, frontSource: 11, scaleX: 1.08, scaleY: .92 },
+  { source: 3, frontSource: 14, scaleX: 1.08, scaleY: .9 },
+  { source: 10, frontSource: 11, scaleX: 1.08, scaleY: .88 },
+  { source: 4, frontSource: 14, scaleX: 1.05, scaleY: .88 },
+  { source: 0, frontSource: 16, scaleX: 1.15, scaleY: .92 },
+  { source: 3, frontSource: 15, scaleX: 1.15, scaleY: .92 },
+  { source: 7, frontSource: 17, scaleX: .98, scaleY: .8 },
+  { source: 8, frontSource: 19, scaleX: .96, scaleY: .8 },
+  { source: 9, frontSource: 18, scaleX: .9, scaleY: .78 },
+  { source: 1, frontSource: 12, scaleX: 1.05, scaleY: .82 },
+  { source: 2, frontSource: 13, scaleX: 1.05, scaleY: .82 },
+  { source: 10, frontSource: 11, scaleX: 1.15, scaleY: .86 },
+  { source: 4, frontSource: 14, scaleX: 1.1, scaleY: .86 },
+  { source: 7, frontSource: 16, scaleX: 1.08, scaleY: .86 },
+  { source: 8, frontSource: 20, scaleX: 1.04, scaleY: .86 },
+  { source: 9, frontSource: 18, scaleX: 1.15, scaleY: .78 },
 ] as const;
 
 export function TreeArtDefs({ uid }: { uid: string }) {
@@ -108,41 +118,64 @@ export function TreeArtDefs({ uid }: { uid: string }) {
   </>;
 }
 
-export const TreeCanopy = memo(function TreeCanopy({ uid, front, stage, count = stage }: { uid: string; front: boolean; stage: number; count?: number }) {
-  const extensionRows = stage >= 7 ? getTreeExtensionRows(count) : 0;
-  return <g className={`konoha-foliage konoha-foliage--${front ? "front" : "back"}`}>
-    {!front && <defs>
-      {CROWN.map((clump, index) => clump.birth <= stage && <g key={index} id={`${uid}-leaf-clump-${index}`}>
-        {clump.mesh.map((mesh, shade) => <g key={shade}>
-          <path d={mesh.leaves} fill={`url(#${uid}-leaf-${shade})`} />
-          <path d={mesh.folds} fill={`var(--konoha-leaf-${Math.min(7, shade + 1)})`} opacity=".52" />
-        </g>)}
+const LeafClumpDefinitions = memo(function LeafClumpDefinitions({ uid, stage }: { uid: string; stage: number }) {
+  return <defs>
+    {CROWN.map((clump, index) => clump.birth <= stage && <g key={index} id={`${uid}-leaf-clump-${index}`}>
+      {clump.mesh.map((mesh, shade) => <g key={shade}>
+        <path d={mesh.leaves} fill={`url(#${uid}-leaf-${shade})`} />
+        <path d={mesh.folds} fill={`var(--konoha-leaf-${Math.min(7, shade + 1)})`} opacity=".52" />
       </g>)}
-    </defs>}
+    </g>)}
+  </defs>;
+});
+
+const BaseCanopy = memo(function BaseCanopy({ uid, front, stage }: { uid: string; front: boolean; stage: number }) {
+  return <>
     {CROWN.map((clump, index) => clump.front === front && clump.birth <= stage && <g key={index} className="konoha-canopy-clump" transform={`translate(${clump.x} ${clump.y})`}>
       <g className="konoha-canopy-drift" style={{ animationDelay: `${index * -.73}s` }}>
         <use href={`#${uid}-leaf-clump-${index}`} />
       </g>
     </g>)}
-    {Array.from({ length: extensionRows }, (_, rowIndex) => {
-      // Let the first added crown overlap the existing top, then keep the
-      // same overlap between later rows. Fruit tips remain above its middle.
-      const centerY = 76 - (rowIndex + 1) * TREE_EXTENSION_STEP;
-      const occupied = Math.min(TREE_EXTENSION_ROW_SIZE,
-        Math.max(0, count - TREE_NODE_CAPACITY - rowIndex * TREE_EXTENSION_ROW_SIZE));
-      const crownSpan = Math.max(.76, 1 - rowIndex * .055);
-      const crownDrift = [0, 4, -3, 2][rowIndex % 4];
-      return EXTENSION_CLUMPS.map((layout, index) => {
-        if (layout.front !== front || layout.birth > occupied) return null;
-        const x = 190 + (layout.x - 190) * crownSpan + crownDrift;
-        return <g key={`extension-${rowIndex}-${index}`} className="konoha-canopy-clump konoha-canopy-clump--extension"
-          transform={`translate(${x} ${centerY + layout.y}) scale(${layout.scale})`}>
-          <g className="konoha-canopy-drift" style={{ animationDelay: `${(rowIndex * EXTENSION_CLUMPS.length + index + 29) * -.43}s` }}>
-            <use href={`#${uid}-leaf-clump-${layout.source}`} />
+  </>;
+});
+
+const AddedCanopy = memo(function AddedCanopy({ uid, front, count }: { uid: string; front: boolean; count: number }) {
+  const added = Math.max(0, Math.min(ADDED_FOLIAGE.length, count - TREE_NODE_CAPACITY));
+  return <>
+    {ADDED_FOLIAGE.slice(0, added).map((layout, index) => {
+      const slot = TREE_NODE_CAPACITY + index;
+      const [anchorX, anchorY] = getTreeAddedFruitCenter(slot);
+      const frontDrift = front ? (index % 2 === 0 ? -4 : 4) : 0;
+      const xScale = front ? layout.scaleX * .78 : layout.scaleX;
+      const yScale = front ? layout.scaleY * .78 : layout.scaleY;
+      const needsConnector = anchorX < 55 || anchorX > 325;
+      const connectorX = 190 + (anchorX - 190) * .64;
+      const connectorY = anchorY < 80 ? anchorY + 34 : anchorY > 250 ? anchorY - 30 : anchorY;
+      const canopyY = anchorY > 250 ? anchorY - 28 : anchorY;
+      const connectorSource = front ? (anchorX < 190 ? 17 : 19) : (anchorX < 190 ? 0 : 3);
+      return <g key={slot} data-added-canopy-slot={slot}>
+        {needsConnector && <g className="konoha-canopy-clump konoha-canopy-clump--extension konoha-canopy-clump--connector"
+          transform={`translate(${connectorX + frontDrift} ${connectorY + (front ? 7 : -4)}) scale(${front ? .92 : 1.2} ${front ? .68 : .8})`}>
+          <g className="konoha-canopy-drift" style={{ animationDelay: `${(index + (front ? 71 : 67)) * -.39}s` }}>
+            <use href={`#${uid}-leaf-clump-${connectorSource}`} />
           </g>
-        </g>;
-      });
+        </g>}
+        <g className="konoha-canopy-clump konoha-canopy-clump--extension"
+          transform={`translate(${anchorX + frontDrift} ${canopyY + (front ? 8 : -6)}) scale(${xScale} ${yScale})`}>
+          <g className="konoha-canopy-drift" style={{ animationDelay: `${(index + (front ? 53 : 31)) * -.43}s` }}>
+            <use href={`#${uid}-leaf-clump-${front ? layout.frontSource : layout.source}`} />
+          </g>
+        </g>
+      </g>;
     })}
+  </>;
+});
+
+export const TreeCanopy = memo(function TreeCanopy({ uid, front, stage, count = stage }: { uid: string; front: boolean; stage: number; count?: number }) {
+  return <g className={`konoha-foliage konoha-foliage--${front ? "front" : "back"}`}>
+    {!front && <LeafClumpDefinitions uid={uid} stage={stage} />}
+    <BaseCanopy uid={uid} front={front} stage={stage} />
+    {stage >= 7 && <AddedCanopy uid={uid} front={front} count={count} />}
   </g>;
 });
 
@@ -219,19 +252,28 @@ export function TreeSeedling({ uid, stage }: { uid: string; stage: number }) {
   </g>;
 }
 
+const TreeBough = memo(function TreeBough({ uid, branch }: { uid: string; branch: ReturnType<typeof getTreeStructure>[number] }) {
+  return <g className="konoha-bough">
+    <path d={branch.surface} fill={`url(#${uid}-bough)`} />
+    <path d={branch.path} fill="none" stroke="#b3ab81" strokeWidth={branch.width > 10 ? 1.1 : .55} strokeLinecap="round" opacity=".38" />
+  </g>;
+});
+
+function matureTrunkPath(scale: number) {
+  const spread = Math.max(0, scale - 1) * 42;
+  return `M${153 - spread} 388 C${169 - spread * .55} 376 ${173 - spread * .42} 357 ${172 - spread * .4} 338
+    C${171 - spread * .32} 315 ${183 - spread * .12} 287 180 264 C177 246 174 227 180 214 L187 220
+    C188 237 186 249 192 254 C203 237 214 211 216 190 L223 185 C225 214 208 246 204 267
+    C${208 + spread * .12} 293 ${196 + spread * .42} 322 ${199 + spread * .45} 342
+    C${202 + spread * .5} 363 ${215 + spread * .65} 379 ${237 + spread} 390
+    L${211 + spread * .42} 386 ${199 + spread * .18} 381 Q${181 - spread * .18} 385 ${164 - spread * .42} 390Z`;
+}
+
 export const TreeWood = memo(function TreeWood({ uid, stage, count = stage }: { uid: string; stage: number; count?: number }) {
-  const branches = getTreeStructure(stage, false, count);
-  const extensionRows = stage >= 7 ? getTreeExtensionRows(count) : 0;
-  const leaderOrigins = Array.from({ length: extensionRows }, (_, rowIndex) =>
-    getTreeBranch(TREE_NODE_CAPACITY + rowIndex * TREE_EXTENSION_ROW_SIZE, false).origin);
-  let previous: readonly [number, number] = [211, 205];
-  const leaderPath = leaderOrigins.reduce((path, origin, index) => {
-    const controlX = (previous[0] + origin[0]) / 2 + (index % 2 === 0 ? -5 : 5);
-    const controlY = (previous[1] + origin[1]) / 2;
-    const next = `${path} Q${controlX.toFixed(1)} ${controlY.toFixed(1)} ${origin[0].toFixed(1)} ${origin[1].toFixed(1)}`;
-    previous = origin;
-    return next;
-  }, "M211 205");
+  // Extra tips still have connected branch geometry for placement, but their
+  // slender supporting wood stays inside the dense canopy. Rendering only the
+  // established skeleton prevents stray twigs from poking below or sideways.
+  const branches = getTreeStructure(stage, false, TREE_NODE_CAPACITY);
   const youngTrunks = {
     3: { d: "M190 384 C193 354 184 313 192 238", width: 7.4 },
     4: { d: "M190 384 C197 346 181 287 194 207", width: 7.1 },
@@ -239,11 +281,13 @@ export const TreeWood = memo(function TreeWood({ uid, stage, count = stage }: { 
     6: { d: "M189 384 C199 336 180 252 198 165", width: 6.3 },
   } as const;
   const youngTrunk = youngTrunks[stage as keyof typeof youngTrunks] ?? youngTrunks[6];
+  const trunkScale = getTreeTrunkScale(count);
+  const matureTrunk = matureTrunkPath(trunkScale);
   return <>
     <g className="konoha-trunk-detail" opacity={stage >= 7 ? 1 : 0}>
       <g filter={`url(#${uid}-wood-grain)`}>
         <path d="M182 363 Q165 381 132 390 Q155 393 177 384 L185 374 M201 367 Q222 386 255 392 Q229 394 207 383Z" fill="#586045" />
-        <path d={TRUNK} fill={`url(#${uid}-bark)`} />
+        <path d={matureTrunk} fill={`url(#${uid}-bark)`} />
         <g clipPath={`url(#${uid}-trunk-clip)`}>
           <path d="M181 387 C205 359 179 341 193 307 S187 266 202 238 L209 218 C206 253 215 278 205 307 S205 357 214 387Z" fill="#373e30" opacity=".4" />
           <path d="M169 389 C187 366 180 345 187 322 S194 284 190 270" fill="none" stroke="#bbb18a" strokeWidth="3.5" opacity=".36" />
@@ -265,14 +309,7 @@ export const TreeWood = memo(function TreeWood({ uid, stage, count = stage }: { 
       <path d={youngTrunk.d} fill="none" stroke="#bdb58d" strokeWidth=".75" strokeLinecap="round" opacity=".42" />
     </g>
     <g className="konoha-wood-branches" data-branch-count={branches.length}>
-      {extensionRows > 0 && <g className="konoha-tree-leader">
-        <path d={leaderPath} fill="none" stroke={`url(#${uid}-bough)`} strokeWidth="4.6" strokeLinecap="round" />
-        <path d={leaderPath} fill="none" stroke="#b3ab81" strokeWidth=".65" strokeLinecap="round" opacity=".36" />
-      </g>}
-      {branches.map((branch, index) => <g key={index} className="konoha-bough">
-        <path d={branch.surface} fill={`url(#${uid}-bough)`} />
-        <path d={branch.path} fill="none" stroke="#b3ab81" strokeWidth={branch.width > 10 ? 1.1 : .55} strokeLinecap="round" opacity=".38" />
-      </g>)}
+      {branches.map((branch, index) => <TreeBough key={index} uid={uid} branch={branch} />)}
     </g>
   </>;
 });

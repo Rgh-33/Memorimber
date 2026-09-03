@@ -22,9 +22,9 @@ function QuizContent() {
   if (!tree.ready) return <div className="page-pad"><AppHeader /></div>;
 
   if (memoryId === null) {
-    const choices = tree.items.flatMap((item) => {
+    const choices = tree.visibleItems.flatMap((item) => {
       if (item.stage !== "quiz-ready") return [];
-      const quiz = getFruitQuiz(tree.memories, tree.items, item.memoryId ?? null);
+      const quiz = getFruitQuiz(tree.memories, tree.visibleItems, item.memoryId ?? null);
       return quiz ? [{ href: item.href, memory: quiz.memory }] : [];
     });
     return <div className="page-pad">
@@ -40,7 +40,7 @@ function QuizContent() {
     </div>;
   }
 
-  const quiz = getFruitQuiz(tree.memories, tree.items, memoryId);
+  const quiz = getFruitQuiz(tree.memories, tree.visibleItems, memoryId);
   if (!quiz) return <div className="page-pad"><AppHeader /><p className="mt-10 text-center text-sm">クイズの思い出が見つかりません。</p></div>;
   return <QuizSession key={`${tree.preview}-${quiz.memory.id}`} quiz={quiz} />;
 }

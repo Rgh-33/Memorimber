@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { SAMPLE_MEMORIES } from "./data";
 import { useMemories } from "./memories-context";
 import { advanceDate, buildPetals, buildTreeItems, localDate, monthlyQueue, recordHarvest, type Harvests } from "./tree-growth";
-import { placeTreeItems, TREE_SLOT_STORAGE_LIMIT } from "./tree-branches";
+import { getTreeVisibleCount, placeTreeItems, TREE_SLOT_STORAGE_LIMIT } from "./tree-branches";
 import type { Memory } from "./types";
 
 type TreeState = { preview: boolean; date: string; uploads: Memory[]; harvests: Harvests; previewHarvests: Harvests; serial: number; slots: Record<string, (string | null)[]> };
@@ -67,7 +67,7 @@ function useTreeState() {
   const harvests = state.preview ? state.previewHarvests : state.harvests;
   const items = useMemo(() => ready ? buildTreeItems(source, date, harvests) : [], [source, date, harvests, ready]);
   const petals = useMemo(() => ready ? buildPetals(source, date, harvests) : [], [source, date, harvests, ready]);
-  const count = ready ? monthlyQueue(source, date).length : 0;
+  const count = ready ? getTreeVisibleCount(monthlyQueue(source, date).length) : 0;
   const slotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
   const placement = useMemo(() => placeTreeItems(items, state.slots[slotKey]), [items, state.slots, slotKey]);
 
@@ -75,7 +75,8 @@ function useTreeState() {
     if (!ready) return;
     setState(current => {
       const previous = current.slots[slotKey] ?? [];
-      if (placement.slots.every((id, index) => id === (previous[index] ?? null))) return current;
+      if (placement.slots.length === previous.length
+        && placement.slots.every((id, index) => id === (previous[index] ?? null))) return current;
       return { ...current, slots: { ...current.slots, [slotKey]: placement.slots } };
     });
   }, [placement.slots, ready, slotKey]);
@@ -100,7 +101,8 @@ function useTreeState() {
     reset: () => setState((current) => ({ ...emptyState(true), harvests: current.harvests,
       slots: Object.fromEntries(Object.entries(current.slots).filter(([key]) => key.startsWith("real:"))) })),
     harvest: (id: string, word: string) => {
-      if (!ready || !items.some((item) => item.id === id && item.stage === "quiz-ready") || !word.trim() || [...word.trim()].length > 12) return false;
+      if (!ready || !placement.visibleItems.some((item) => item.id === id && item.stage === "quiz-ready")
+        || !word.trim() || [...word.trim()].length > 12) return false;
       setState((current) => current.preview
         ? { ...current, previewHarvests: recordHarvest(current.uploads, current.date, current.previewHarvests, id, word) }
         : { ...current, harvests: recordHarvest(memories, today, current.harvests, id, word) });

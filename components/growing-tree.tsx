@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useId, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useState, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
-import { getTreeBranch, getTreeCanvasMetrics, TREE_PROPORTION } from "@/lib/tree-branches";
+import { getTreeBranch, getTreeCanvasMetrics, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
 import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeed, TreeSeedling, TreeWood } from "@/components/tree-art";
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
@@ -93,12 +93,15 @@ function GrowingSeedling({ uid, stage, count, imageUrl }: { uid: string; stage: 
   </g>;
 }
 
-export function GrowthNode({ stage, treeStage, fruitAppearance, fruitHang, eventKey, delay, newPhotoUrl, newlyAdded, newlyFruited, newlyRipened }: {
+type GrowthNodeProps = {
   stage: number; fruitAppearance: FruitAppearance; fruitHang: { x: number; y: number }; eventKey: string; delay: number;
   newPhotoUrl?: string;
   treeStage: number;
+  concealBaseTwig?: boolean;
   newlyAdded: boolean; newlyFruited: boolean; newlyRipened: boolean;
-}) {
+};
+
+export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppearance, fruitHang, eventKey, delay, newPhotoUrl, concealBaseTwig = false, newlyAdded, newlyFruited, newlyRipened }: GrowthNodeProps) {
   const uid = useId().replace(/:/g, "");
   const stemY = fruitHang.y + 8;
   const advancesThisUpload = newlyAdded || newlyFruited || newlyRipened || (stage >= 2 && stage <= 5);
@@ -135,8 +138,9 @@ export function GrowthNode({ stage, treeStage, fruitAppearance, fruitHang, event
     </defs>
     <g key={eventKey} className="konoha-stage-enter"
       style={{ "--growth-delay": `${magicDelay}ms` } as CSSProperties}>
-      {visibleStage > 0 && <g key={`${eventKey}-${visibleStage}`} className={`konoha-growth-result ${revealedEvent === eventKey ? "konoha-growth-result--reveal" : ""}`}>
-        <path d="M0 14 Q0 3 -8 -5" fill="none" stroke="#859a6d" strokeWidth="1.3" strokeLinecap="round" />
+      {visibleStage > 0 && <g key={`${eventKey}-${visibleStage}`}>
+        <g className={`konoha-growth-result ${revealedEvent === eventKey ? "konoha-growth-result--reveal" : ""}`}>
+        {!concealBaseTwig && <path d="M0 14 Q0 3 -8 -5" fill="none" stroke="#859a6d" strokeWidth="1.3" strokeLinecap="round" />}
         <g className="konoha-leaf">
           <path d="M-1 9 C-16 8 -24 -1 -28 -14 C-11 -12 3 -3 -1 9Z" fill={`url(#${uid}-leaf)`} stroke="#536a44" strokeWidth=".5" />
           <path d="M-2 8 Q-12 -5 -25 -12 M-9 0 L-17 0 M-14 -5 L-15 -9" fill="none" stroke="#f4f4d9" strokeOpacity=".48" strokeWidth=".7" />
@@ -163,12 +167,25 @@ export function GrowthNode({ stage, treeStage, fruitAppearance, fruitHang, event
               justRipened={newlyRipened} x={fruitHang.x} y={fruitHang.y} />
           </g>
         </>}
+        </g>
       </g>}
       {advancesThisUpload && <GrowthMagic x={fruitHang.x} y={fruitHang.y + 18} golden={newlyAdded} />}
       {newlyAdded && <MemoryAbsorption x={fruitHang.x} y={fruitHang.y + 18} imageUrl={newPhotoUrl} />}
     </g>
   </g>;
-}
+}, (previous, next) => previous.stage === next.stage
+  && previous.treeStage === next.treeStage
+  && previous.eventKey === next.eventKey
+  && previous.delay === next.delay
+  && previous.newPhotoUrl === next.newPhotoUrl
+  && previous.newlyAdded === next.newlyAdded
+  && previous.newlyFruited === next.newlyFruited
+  && previous.newlyRipened === next.newlyRipened
+  && previous.fruitAppearance.variety === next.fruitAppearance.variety
+  && previous.fruitAppearance.tilt === next.fruitAppearance.tilt
+  && previous.fruitAppearance.size === next.fruitAppearance.size
+  && previous.fruitHang.x === next.fruitHang.x
+  && previous.fruitHang.y === next.fruitHang.y);
 
 export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
   items: MemoryTreeItem[];
@@ -200,9 +217,9 @@ export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
   };
   const growthTransform = `translate(190 383) scale(${spread} ${heightSpread}) translate(-190 -383)`;
   return <>
-    <div className="konoha-tree-canvas" data-tree-growth={stage} data-tree-photos={count} data-tree-extension-rows={canvas.extensionRows}
-      data-month={month} style={{ "--leaf-color": leafColor, aspectRatio: `380 / ${canvas.height}` } as CSSProperties}>
-      <svg viewBox={`0 ${canvas.minY} 380 ${canvas.height}`} className="konoha-tree-svg" aria-hidden="true">
+    <div className="konoha-tree-canvas" data-tree-growth={stage} data-tree-photos={count} data-tree-added-tips={canvas.addedTips}
+      data-month={month} style={{ "--leaf-color": leafColor, aspectRatio: `${canvas.width} / ${canvas.height}` } as CSSProperties}>
+      <svg viewBox={`${canvas.minX} ${canvas.minY} ${canvas.width} ${canvas.height}`} className="konoha-tree-svg" aria-hidden="true">
         <defs><TreeArtDefs uid={uid} /></defs>
         <TreeGround uid={uid} stage={stage} front={false} />
         {stage === 1 && <TreeSeed uid={uid} />}
@@ -230,8 +247,9 @@ export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
                   <g className="konoha-node-size" style={{ transform: `translate(0px, 14px) scale(${1 / scale}) translate(0px, -14px)` }}>
                     <g className="konoha-node-wind" style={{ animationDelay: `${item.fruitSlot * -0.57}s` }}>
                       <GrowthNode stage={item.growthStage ?? 1} treeStage={stage} fruitAppearance={fruitAppearanceFor(memoryId)} fruitHang={fruitHang}
-                        eventKey={`${count}-${item.growthStage ?? 1}`} delay={Math.min(item.fruitSlot, 7) * 42}
+                        eventKey={`${item.id}-${item.growthStage ?? 1}-${item.newlyAdded ? "added" : item.newlyFruited ? "fruited" : item.newlyRipened ? "ripened" : "stable"}`} delay={Math.min(item.fruitSlot, 7) * 42}
                         newPhotoUrl={item.newlyAdded ? imageById.get(memoryId) : undefined}
+                        concealBaseTwig={item.fruitSlot >= TREE_NODE_CAPACITY}
                         newlyAdded={item.newlyAdded === true} newlyFruited={item.newlyFruited === true}
                         newlyRipened={item.newlyRipened === true} />
                     </g>
@@ -254,7 +272,7 @@ export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
         const memoryId = item.memoryId ?? item.id;
         return <button key={item.id} type="button" onClick={() => onFruitSelect(memoryId)} className="konoha-fruit-target" data-memory-id={memoryId}
           style={{
-            left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x + fruitHang.x) / 380 * 100}%`,
+            left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x + fruitHang.x - canvas.minX) / canvas.width * 100}%`,
             top: `${(383 + (slot.y + 23 - 383) * scale * TREE_PROPORTION.y + fruitHang.y - canvas.minY) / canvas.height * 100}%`,
           }}
           aria-label="育った実で思い出クイズに挑戦" aria-haspopup="dialog" />;
