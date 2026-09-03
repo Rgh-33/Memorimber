@@ -21,6 +21,7 @@ function QuizContent() {
   const tree = useTree();
   const memoryId = search.get("memory");
 
+  if (tree.error) return <div className="page-pad"><AppHeader /><div role="alert" className="mt-10 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{tree.error}<button type="button" onClick={() => void tree.refresh()} className="mt-2 block text-coral underline">再読み込み</button></div></div>;
   if (!tree.ready) return <div className="page-pad"><AppHeader /></div>;
 
   if (memoryId === null) {
@@ -102,7 +103,7 @@ function QuizSession({ quiz }: { quiz: NonNullable<ReturnType<typeof getFruitQui
           <form className="konoha-harvest-form" onSubmit={(event) => {
             event.preventDefault();
             input.current?.blur();
-            harvest.launch(memory.id, word);
+            void harvest.launch(memory.id, word);
           }}>
             <input ref={input} value={word} onChange={(event) => setWord([...event.target.value].slice(0, 12).join(""))}
               onKeyDown={event => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }}
@@ -110,6 +111,7 @@ function QuizSession({ quiz }: { quiz: NonNullable<ReturnType<typeof getFruitQui
             <button type="submit" disabled={!word.trim() || harvest.busy} aria-label="この言葉で収穫する"><Check size={18} /></button>
           </form>
       )}
+      {harvest.error && <p role="alert" className="mt-3 rounded-lg border border-red-400/40 p-3 text-xs leading-6 text-ink">{harvest.error}</p>}
     </div>
   );
 }
