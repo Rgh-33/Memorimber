@@ -65,15 +65,15 @@ export function MemoryBookPage({
             <div className="memory-book-harvest-word" role="note" aria-label={`思い出の木から収穫した言葉「${savedHarvestWord}」`}>
               <span className="memory-book-harvest-text" data-long={harvestWordLength > 8 || undefined}>{savedHarvestWord}</span>
               <svg className="memory-book-harvest-flourish" viewBox="0 0 48 38" aria-hidden="true">
-                <path d="M5 34 C17 29 27 23 38 11" />
-                <path d="M25 23 C25 13 31 6 41 4 C41 14 35 21 25 23 Z M31 25 C39 20 45 22 47 29 C40 32 35 30 31 25 Z" />
+                <path d="M5 34 C17 29 27 23 38 11" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+                <path d="M25 23 C25 13 31 6 41 4 C41 14 35 21 25 23 Z M31 25 C39 20 45 22 47 29 C40 32 35 30 31 25 Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
               </svg>
             </div>
           )}
           <svg className="memory-book-frame-doodle" viewBox="0 0 320 34" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M3 22 C38 9 66 28 101 16 C137 4 165 27 201 16 C237 5 269 24 317 10" />
-            <path d="M69 20 C61 14 59 8 61 3 C68 7 72 12 69 20 Z M235 16 C242 10 247 5 254 5 C252 13 246 17 235 16 Z" />
-            <path d="M278 18 l3 5 5 2-5 2-3 5-2-5-5-2 5-2 Z" />
+            <path d="M3 22 C38 9 66 28 101 16 C137 4 165 27 201 16 C237 5 269 24 317 10" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.35" vectorEffect="non-scaling-stroke" />
+            <path d="M69 20 C61 14 59 8 61 3 C68 7 72 12 69 20 Z M235 16 C242 10 247 5 254 5 C252 13 246 17 235 16 Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.35" vectorEffect="non-scaling-stroke" />
+            <path d="M278 18 l3 5 5 2-5 2-3 5-2-5-5-2 5-2 Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.35" vectorEffect="non-scaling-stroke" />
           </svg>
         </div>
 
@@ -98,10 +98,10 @@ export function MemoryBookPage({
         )}
 
         <svg className="memory-book-corner-doodle" viewBox="0 0 180 92" aria-hidden="true">
-          <path d="M3 88 C37 75 52 54 69 31 C83 12 103 18 112 39 C123 65 145 66 178 39" />
-          <path d="M50 56 C37 53 30 45 28 35 C41 36 50 43 50 56 Z M74 25 C68 16 69 8 74 2 C81 10 81 18 74 25 Z M119 50 C128 39 137 36 146 39 C140 49 132 54 119 50 Z" />
-          <circle cx="159" cy="51" r="4" />
-          <path d="M159 43 v-7 M159 66 v-7 M151 51 h-7 M174 51 h-7" />
+          <path d="M3 88 C37 75 52 54 69 31 C83 12 103 18 112 39 C123 65 145 66 178 39" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+          <path d="M50 56 C37 53 30 45 28 35 C41 36 50 43 50 56 Z M74 25 C68 16 69 8 74 2 C81 10 81 18 74 25 Z M119 50 C128 39 137 36 146 39 C140 49 132 54 119 50 Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+          <circle cx="159" cy="51" r="4" fill="none" stroke="currentColor" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+          <path d="M159 43 v-7 M159 66 v-7 M151 51 h-7 M174 51 h-7" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
         </svg>
 
         <p className="memory-book-signature" aria-hidden="true">MEMORINBER</p>
