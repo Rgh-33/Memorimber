@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useId, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 import { getTreeBranch, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
@@ -89,7 +88,12 @@ export function GrowthNode({ stage, fruitAppearance, fruitHang, eventKey, delay,
   </g>;
 }
 
-export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; count: number; month: string }) {
+export function GrowingTree({ items, count, month, onQuizSelect }: {
+  items: MemoryTreeItem[];
+  count: number;
+  month: string;
+  onQuizSelect?: (memoryId: string) => void;
+}) {
   const uid = useId().replace(/:/g, "");
   const visible = items.filter(item => item.stage !== "harvested").slice(0, TREE_NODE_CAPACITY);
   const stage = Math.min(7, count);
@@ -159,11 +163,12 @@ export function GrowingTree({ items, count, month }: { items: MemoryTreeItem[]; 
         if (item.stage !== "quiz-ready") return null;
         const slot = position(item.fruitSlot);
         const fruitHang = fruitHangAt(item.fruitSlot, mirrored);
-        return <Link key={item.id} href={item.href} className="konoha-fruit-target" data-memory-id={item.id}
+        return <button key={item.id} type="button" className="konoha-fruit-target" data-memory-id={item.id}
           style={{
             left: `${(190 + (slot.x - 190) * scale * TREE_PROPORTION.x + fruitHang.x) / 380 * 100}%`,
             top: `${(383 + (slot.y + 23 - 383) * scale * TREE_PROPORTION.y + fruitHang.y) / 420 * 100}%`,
           }}
+          onClick={() => onQuizSelect?.(item.memoryId ?? item.id)}
           aria-label="育った実で思い出クイズに挑戦" />;
       })}
     </div>
