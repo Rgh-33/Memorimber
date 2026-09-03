@@ -118,7 +118,8 @@ function useTreeState() {
       ? buildPetals(source, date, state.previewHarvests)
       : buildPersistedPetals(source, date, fruits, now);
   }, [ready, state.preview, state.previewHarvests, source, date, fruits, now]);
-  const count = ready ? getTreeVisibleCount(monthlyQueue(source, date).length) : 0;
+  const totalCount = ready ? monthlyQueue(source, date).length : 0;
+  const count = getTreeVisibleCount(totalCount);
   const slotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
   const placement = useMemo(() => placeTreeItems(items, state.slots[slotKey]), [items, state.slots, slotKey]);
 
@@ -134,7 +135,7 @@ function useTreeState() {
 
   return {
     ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
-    date, preview: state.preview, items, visibleItems: placement.visibleItems, petals, memories: source, count,
+    date, preview: state.preview, items, visibleItems: placement.visibleItems, petals, memories: source, count, totalCount,
     setPreview: (preview: boolean) => setState((current) => ({ ...current, preview })),
     setDate: (next: string) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));

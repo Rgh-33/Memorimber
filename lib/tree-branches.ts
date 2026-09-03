@@ -74,6 +74,25 @@ export function getTreeVisibleCount(count: number) {
   return Math.min(TREE_VISIBLE_CAPACITY, Math.max(0, Math.floor(count)));
 }
 
+/** Visual growth is based on every upload in the selected month, including
+ * photos waiting beyond the thirty-three visible fruit positions. */
+export function getTreeAppearanceStage(count: number) {
+  const photos = Math.max(0, Math.floor(count));
+  if (photos === 0) return 0;
+  if (photos === 1) return 1;
+  if (photos === 2) return 2;
+  if (photos <= 4) return 3;
+  if (photos <= 7) return 4;
+  if (photos <= 11) return 5;
+  if (photos <= 16) return 6;
+  if (photos <= 22) return 7;
+  if (photos <= 28) return 8;
+  if (photos <= 35) return 9;
+  if (photos <= 45) return 10;
+  if (photos <= 55) return 11;
+  return 12;
+}
+
 export function getTreeAddedFruitCenter(index: number): Point {
   const offset = Math.max(0, Math.min(EXTRA_FRUIT_CENTERS.length - 1,
     Math.floor(index) - TREE_NODE_CAPACITY));

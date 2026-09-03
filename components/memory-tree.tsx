@@ -363,7 +363,14 @@ function FloatingWord({
   );
 }
 
-export function MemoryTree({ items, petals, memories, count, month }: { items: MemoryTreeItem[]; petals: HarvestedTreeItem[]; memories: Memory[]; count: number; month: string }) {
+export function MemoryTree({ items, petals, memories, count, totalCount, month }: {
+  items: MemoryTreeItem[];
+  petals: HarvestedTreeItem[];
+  memories: Memory[];
+  count: number;
+  totalCount: number;
+  month: string;
+}) {
   const harvest = useHarvest();
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
   const [quizMemoryId, setQuizMemoryId] = useState<string | null>(null);
@@ -415,7 +422,7 @@ export function MemoryTree({ items, petals, memories, count, month }: { items: M
       </div>
 
       <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
-        <GrowingTree items={items} memories={memories} count={count} month={month} onFruitSelect={(memoryId) => {
+        <GrowingTree items={items} memories={memories} count={count} totalCount={totalCount} month={month} onFruitSelect={(memoryId) => {
           setRevealedItem(null);
           setQuizMemoryId(memoryId);
         }} />

@@ -2,8 +2,8 @@
 
 import { memo, useEffect, useId, useState, type CSSProperties } from "react";
 import type { MemoryTreeItem } from "@/lib/tree-data";
-import { getTreeBranch, getTreeCanvasMetrics, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
-import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeed, TreeSeedling, TreeWood } from "@/components/tree-art";
+import { getTreeAppearanceStage, getTreeBranch, getTreeCanvasMetrics, TREE_NODE_CAPACITY, TREE_PROPORTION } from "@/lib/tree-branches";
+import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeedling, TreeWood } from "@/components/tree-art";
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
 import type { Memory } from "@/lib/types";
@@ -187,16 +187,18 @@ export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppe
   && previous.fruitHang.x === next.fruitHang.x
   && previous.fruitHang.y === next.fruitHang.y);
 
-export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
+export function GrowingTree({ items, memories, count, totalCount, month, onFruitSelect }: {
   items: MemoryTreeItem[];
   memories: Memory[];
   count: number;
+  totalCount: number;
   month: string;
   onFruitSelect: (memoryId: string) => void;
 }) {
   const uid = useId().replace(/:/g, "");
   const visible = items.filter(item => item.stage !== "harvested");
   const stage = Math.min(7, count);
+  const appearanceStage = getTreeAppearanceStage(totalCount);
   const canvas = getTreeCanvasMetrics(count);
   const scale = [0.18, 0.18, 0.32, 0.34, 0.52, 0.69, 0.85, 1][stage];
   const spread = [1, 1, 1, .5, .66, .8, .91, 1][stage];
@@ -217,12 +219,12 @@ export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
   };
   const growthTransform = `translate(190 383) scale(${spread} ${heightSpread}) translate(-190 -383)`;
   return <>
-    <div className="konoha-tree-canvas" data-tree-growth={stage} data-tree-photos={count} data-tree-added-tips={canvas.addedTips}
+    <div className="konoha-tree-canvas" data-tree-growth={stage} data-tree-appearance={appearanceStage}
+      data-tree-photos={totalCount} data-tree-visible-fruits={count} data-tree-added-tips={canvas.addedTips}
       data-month={month} style={{ "--leaf-color": leafColor, aspectRatio: `${canvas.width} / ${canvas.height}` } as CSSProperties}>
       <svg viewBox={`${canvas.minX} ${canvas.minY} ${canvas.width} ${canvas.height}`} className="konoha-tree-svg" aria-hidden="true">
         <defs><TreeArtDefs uid={uid} /></defs>
-        <TreeGround uid={uid} stage={stage} front={false} />
-        {stage === 1 && <TreeSeed uid={uid} />}
+        <TreeGround uid={uid} stage={appearanceStage} front={false} />
         {stage === 1 || stage === 2
           ? <GrowingSeedling uid={uid} stage={stage} count={count} imageUrl={latestImageUrl} />
           : <TreeSeedling uid={uid} stage={stage} />}
@@ -231,9 +233,9 @@ export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
           <g className="konoha-tree-wind">
             <g transform={mirrored ? "translate(380 0) scale(-1 1)" : undefined}>
               <g transform={growthTransform}>
-                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} stage={stage} count={count} /></g>}
-                <TreeWood uid={uid} stage={stage} count={count} />
-                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front stage={stage} count={count} /></g>}
+                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front={false} stage={appearanceStage} count={count} /></g>}
+                <TreeWood uid={uid} stage={stage} appearanceStage={appearanceStage} />
+                {stage >= 3 && <g className="konoha-crown"><TreeCanopy uid={uid} front stage={appearanceStage} count={count} /></g>}
               </g>
             </g>
             {visible.map((item) => {
@@ -263,7 +265,7 @@ export function GrowingTree({ items, memories, count, month, onFruitSelect }: {
           </g>
           </g>
         </g>
-        <TreeGround uid={uid} stage={stage} front />
+        <TreeGround uid={uid} stage={appearanceStage} front />
       </svg>
       {visible.map((item) => {
         if (item.stage !== "quiz-ready") return null;

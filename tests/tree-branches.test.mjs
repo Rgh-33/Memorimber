@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   getTreeBranch,
   getTreeAddedFruitCenter,
+  getTreeAppearanceStage,
   getTreeCanvasMetrics,
   getTreeTrunkScale,
   getTreeStructure,
@@ -13,6 +14,17 @@ import {
   TREE_VISIBLE_CAPACITY,
 } from "../lib/tree-branches.ts";
 import { fruitHangAt } from "../lib/tree-fruit-layout.ts";
+
+test("the tree exterior follows all twelve monthly upload stages beyond the fruit cap", () => {
+  const stages = [
+    [0, 0], [1, 1], [2, 2], [3, 3], [4, 3], [5, 4], [7, 4],
+    [8, 5], [11, 5], [12, 6], [16, 6], [17, 7], [22, 7],
+    [23, 8], [28, 8], [29, 9], [35, 9], [36, 10], [45, 10],
+    [46, 11], [55, 11], [56, 12], [365, 12],
+  ];
+  stages.forEach(([photos, stage]) => assert.equal(getTreeAppearanceStage(photos), stage));
+  assert.equal(getTreeVisibleCount(56), TREE_VISIBLE_CAPACITY);
+});
 
 test("photo tips stay in the leafy crown, away from the bare lower trunk", () => {
   for (const mirrored of [false, true]) {
