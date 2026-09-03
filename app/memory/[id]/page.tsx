@@ -9,6 +9,7 @@ import { MemoryBookPage } from "@/components/memory-book-page";
 import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
 import { SAMPLE_MEMORIES } from "@/lib/data";
+import { createAlbumPdf, getAlbumPdfFilename } from "@/lib/album-pdf";
 import { useMemories } from "@/lib/memories-context";
 import { usePreferences } from "@/lib/preferences-context";
 import { createClient } from "@/lib/supabase/client";
@@ -59,6 +60,10 @@ export default function MemoryDetailPage() {
   const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
   const [draftMemory, setDraftMemory] = useState<Memory | null>(null);
   const [printPreparing, setPrintPreparing] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const pdfUrlRef = useRef<string | null>(null);
   const printPageRef = useRef<HTMLDivElement>(null);
 
   const fetchDetail = useCallback(async (showLoading = true) => {
@@ -100,7 +105,16 @@ export default function MemoryDetailPage() {
   useEffect(() => {
     setActionMode(null);
     setDraftMemory(null);
+    setPrintError(null);
+    if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+    pdfUrlRef.current = null;
+    setPdfUrl(null);
+    setPdfBlob(null);
   }, [params.id]);
+
+  useEffect(() => () => {
+    if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+  }, []);
 
   const localNavigation = useMemo(() => {
     if (!prototypeMemory) return null;
@@ -175,34 +189,39 @@ export default function MemoryDetailPage() {
   const handlePrint = async () => {
     if (printPreparing) return;
     setPrintPreparing(true);
+    setPrintError(null);
     try {
-      // Apply again immediately before printing so Safari snapshots the current
-      // orientation even when the user changed it just before this click.
-      applyAlbumPrintPageSize(resolvedAppearance.orientation);
-      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
-        let timeout: ReturnType<typeof setTimeout> | undefined;
-        await Promise.race([
-          promise,
-          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
-        ]);
-        if (timeout) clearTimeout(timeout);
-      };
-      if (document.fonts) await waitAtMost(document.fonts.ready);
-      const images = Array.from(printPageRef.current?.querySelectorAll("img") ?? []);
-      await Promise.all(images.map(async (image) => {
-        if (!image.complete) {
-          await waitAtMost(new Promise<void>((resolve) => {
-            image.addEventListener("load", () => resolve(), { once: true });
-            image.addEventListener("error", () => resolve(), { once: true });
-          }));
-        }
-        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
-      }));
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      window.print();
+      const page = printPageRef.current?.querySelector<HTMLElement>(".memory-book-page");
+      if (!page) throw new Error("アルバム紙面を見つけられませんでした。");
+      const blob = await createAlbumPdf(page, resolvedAppearance.orientation);
+      const url = URL.createObjectURL(blob);
+      if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+      pdfUrlRef.current = url;
+      setPdfUrl(url);
+      setPdfBlob(blob);
+    } catch (cause) {
+      setPrintError(cause instanceof Error ? cause.message : "L判PDFを作成できませんでした。もう一度お試しください。");
     } finally {
       setPrintPreparing(false);
     }
+  };
+
+  const handleOpenPdf = async () => {
+    if (!pdfBlob || !pdfUrl) return;
+    const file = new File([pdfBlob], getAlbumPdfFilename(memory.date), { type: "application/pdf" });
+    const shareData = { files: [file], title: "Memorinber L判アルバム" };
+
+    if (typeof navigator.share === "function" && (!navigator.canShare || navigator.canShare(shareData))) {
+      try {
+        await navigator.share(shareData);
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setPrintError("共有画面を開けませんでした。「PDFを開く」から印刷してください。");
+      }
+      return;
+    }
+
+    window.open(pdfUrl, "_blank", "noopener,noreferrer");
   };
 
   const harvestWord = tree.harvestWordFor(memory.id);
@@ -220,13 +239,24 @@ export default function MemoryDetailPage() {
           <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
             <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
           </Link>
-          <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をL判サイズで印刷する">
-            <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "準備中…" : "L判で印刷"}
+          <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をL判PDFにして印刷する">
+            <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "PDF作成中…" : pdfUrl ? "PDFを作り直す" : "L判PDFで印刷"}
           </button>
         </div>
       </div>
       {sampleMemory && <p className="print-hide mt-2 text-xs text-ink/55">サンプルの思い出です</p>}
       {detail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
+      {pdfUrl && (
+        <div role="status" className="print-hide mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-coral/30 bg-ivory px-4 py-3 text-xs leading-5 text-ink/70">
+          <span>余白なしのL判PDFができました。iPhoneでは「共有して印刷」から「プリント」を選んでください。</span>
+          <span className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={() => void handleOpenPdf()} className="rounded-full bg-coral px-4 py-2 font-semibold text-white shadow-sm">共有して印刷</button>
+            <a href={pdfUrl} target="_blank" rel="noreferrer" className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">PDFを開く</a>
+            <a href={pdfUrl} download={getAlbumPdfFilename(memory.date)} className="rounded-full border border-coral/35 px-3 py-2 font-semibold text-ink">保存</a>
+          </span>
+        </div>
+      )}
+      {printError && <p role="alert" className="print-hide mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">{printError}</p>}
 
       <div ref={printPageRef} className={`memory-book-page-shell memory-book-page-shell--${resolvedAppearance.orientation} mt-5`}>
         <MemoryBookPage
