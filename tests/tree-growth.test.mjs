@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getFruitQuiz, getHarvestWordForMemory, memoryQuestion, monthlyQueue, recordHarvest, tokyoDate, uploadDate } from "../lib/tree-growth.ts";
+import { advanceDate, applyUploadPresentation, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getFruitQuiz, getHarvestWordForMemory, memoryQuestion, monthlyQueue, recordHarvest, tokyoDate, uploadDate } from "../lib/tree-growth.ts";
 
 const memory = (index, changes = {}) => ({ id: `photo-${String(index).padStart(3, "0")}`, date: "2020-01-01",
   createdAt: `2026-08-01T12:00:${String(index).padStart(2, "0")}`, imageUrl: "test.jpg", caption: "思い出", people: [], tags: [], ...changes });
@@ -33,6 +33,21 @@ test("only the latest photo and the fruit formed or ripened by it are marked for
     assert.ok(newlyFruited.every(item => item.growthStage === 6 && item.stage === "growing"));
     assert.ok(newlyRipened.every(item => item.growthStage === 7 && item.stage === "quiz-ready"));
   }
+});
+
+test("upload presentation runs only for an explicitly pending upload", () => {
+  const source = buildTreeItems(photos(8), "2026-08-01", {});
+  const stable = applyUploadPresentation(source, null);
+  assert.equal(stable.some((item) => item.newlyAdded || item.newlyFruited || item.newlyRipened || item.advancedThisUpload), false);
+
+  const arriving = applyUploadPresentation(source, "photo-007");
+  assert.deepEqual(arriving.filter((item) => item.newlyAdded).map((item) => item.id), ["photo-007"]);
+  assert.deepEqual(arriving.filter((item) => item.newlyFruited).map((item) => item.id), ["photo-002"]);
+  assert.deepEqual(arriving.filter((item) => item.newlyRipened).map((item) => item.id), ["photo-000"]);
+  assert.ok(arriving.some((item) => item.advancedThisUpload));
+
+  const unrelated = applyUploadPresentation(source, "another-month");
+  assert.equal(unrelated.some((item) => item.newlyAdded || item.newlyFruited || item.newlyRipened || item.advancedThisUpload), false);
 });
 
 test("growth follows uploads, remains stable after refresh and does not double count", () => {

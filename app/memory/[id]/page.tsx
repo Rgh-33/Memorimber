@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Pencil, Printer, Settings2, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Printer, Settings2, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { MemoryBookPage } from "@/components/memory-book-page";
 import { MemoryCard } from "@/components/memory-card";
@@ -295,7 +295,17 @@ export default function MemoryDetailPage() {
 
   return (
     <div className="memory-detail-page page-pad">
-      <div className="print-hide"><AppHeader /></div>
+      <div className="print-hide">
+        <AppHeader />
+        <Link
+          href="/album?restore=1"
+          scroll={false}
+          className="mt-4 grid h-9 w-9 place-items-center rounded-full border border-line bg-ivory text-ink transition hover:border-coral hover:bg-paper hover:text-coral"
+          aria-label="全体アルバムの元の位置へ戻る"
+        >
+          <ArrowLeft size={20} strokeWidth={1.8} />
+        </Link>
+      </div>
 
       <div className="print-hide mt-3 flex items-baseline gap-2.5 whitespace-nowrap">
         <p className="text-[10px] font-semibold tracking-[0.22em] text-coral">MEMORY PAGE</p>

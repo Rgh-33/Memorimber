@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SAMPLE_MEMORIES, getMonthKey } from "./data";
+import { orderAlbumMemories } from "./album-grid";
 import { Memory } from "./types";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
@@ -105,9 +106,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
       // still resolve their sample IDs without mixing samples into the album.
       getMemory: (id) => memories.find((memory) => memory.id === id) ?? SAMPLE_MEMORIES.find((memory) => memory.id === id),
       getMonthMemories: (monthKey) =>
-        memories
-          .filter((memory) => getMonthKey(memory.date) === monthKey)
-          .sort((a, b) => b.date.localeCompare(a.date)),
+        orderAlbumMemories(memories.filter((memory) => getMonthKey(memory.date) === monthKey)),
       getRelatedMemories: (memory) =>
         (SAMPLE_MEMORIES.some((sample) => sample.id === memory.id) ? SAMPLE_MEMORIES : memories)
           .filter((candidate) => candidate.id !== memory.id)

@@ -62,14 +62,14 @@ function MemoryAbsorption({ x, y, imageUrl }: { x: number; y: number; imageUrl?:
   </g>;
 }
 
-function GrowingSeedling({ uid, stage, count, imageUrl }: { uid: string; stage: 1 | 2; count: number; imageUrl?: string }) {
+function GrowingSeedling({ uid, stage, count, imageUrl, animate }: { uid: string; stage: 1 | 2; count: number; imageUrl?: string; animate: boolean }) {
   const eventKey = `seedling-${count}-${stage}`;
-  const [visibleStage, setVisibleStage] = useState<0 | 1 | 2>(stage === 1 ? 0 : 1);
+  const [visibleStage, setVisibleStage] = useState<0 | 1 | 2>(animate ? (stage === 1 ? 0 : 1) : stage);
   const [revealedEvent, setRevealedEvent] = useState<string | null>(null);
   const targetY = stage === 1 ? 356 : 339;
 
   useEffect(() => {
-    if (visibleStage === stage) return;
+    if (!animate || visibleStage === stage) return;
     if (visibleStage > stage) {
       setVisibleStage(stage);
       setRevealedEvent(null);
@@ -81,7 +81,7 @@ function GrowingSeedling({ uid, stage, count, imageUrl }: { uid: string; stage: 
       setRevealedEvent(eventKey);
     }, reducedMotion ? 0 : 1_470);
     return () => window.clearTimeout(timer);
-  }, [eventKey, stage, visibleStage]);
+  }, [animate, eventKey, stage, visibleStage]);
 
   return <g key={eventKey} className="konoha-seedling-growth" data-growth-stage={stage}
     data-visible-growth-stage={visibleStage} style={{ "--growth-delay": "720ms" } as CSSProperties}>
@@ -89,8 +89,8 @@ function GrowingSeedling({ uid, stage, count, imageUrl }: { uid: string; stage: 
       className={`konoha-growth-result ${revealedEvent === eventKey ? "konoha-growth-result--reveal" : ""}`}>
       <TreeSeedling uid={uid} stage={visibleStage} />
     </g>}
-    <GrowthMagic x={190} y={targetY} golden />
-    <MemoryAbsorption x={190} y={targetY} imageUrl={imageUrl} />
+    {animate && <><GrowthMagic x={190} y={targetY} golden />
+    <MemoryAbsorption x={190} y={targetY} imageUrl={imageUrl} /></>}
   </g>;
 }
 
@@ -99,13 +99,13 @@ type GrowthNodeProps = {
   newPhotoUrl?: string;
   treeStage: number;
   concealBaseTwig?: boolean;
-  newlyAdded: boolean; newlyFruited: boolean; newlyRipened: boolean;
+  newlyAdded: boolean; newlyFruited: boolean; newlyRipened: boolean; advancedThisUpload: boolean;
 };
 
-export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppearance, fruitHang, eventKey, delay, newPhotoUrl, concealBaseTwig = false, newlyAdded, newlyFruited, newlyRipened }: GrowthNodeProps) {
+export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppearance, fruitHang, eventKey, delay, newPhotoUrl, concealBaseTwig = false, newlyAdded, newlyFruited, newlyRipened, advancedThisUpload }: GrowthNodeProps) {
   const uid = useId().replace(/:/g, "");
   const stemY = fruitHang.y + 8;
-  const advancesThisUpload = newlyAdded || newlyFruited || newlyRipened || (stage >= 2 && stage <= 5);
+  const advancesThisUpload = newlyAdded || newlyFruited || newlyRipened || advancedThisUpload;
   const previousStage = newlyAdded ? 0 : advancesThisUpload ? Math.max(1, stage - 1) : stage;
   const [visibleStage, setVisibleStage] = useState(previousStage);
   const [revealedEvent, setRevealedEvent] = useState<string | null>(null);
@@ -182,13 +182,14 @@ export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppe
   && previous.newlyAdded === next.newlyAdded
   && previous.newlyFruited === next.newlyFruited
   && previous.newlyRipened === next.newlyRipened
+  && previous.advancedThisUpload === next.advancedThisUpload
   && previous.fruitAppearance.variety === next.fruitAppearance.variety
   && previous.fruitAppearance.tilt === next.fruitAppearance.tilt
   && previous.fruitAppearance.size === next.fruitAppearance.size
   && previous.fruitHang.x === next.fruitHang.x
   && previous.fruitHang.y === next.fruitHang.y);
 
-export function GrowingTree({ items, memories, count, totalCount, month, mode, onFruitSelect }: {
+export function GrowingTree({ items, memories, count, totalCount, month, mode, onFruitSelect, onUploadAnimationComplete }: {
   items: MemoryTreeItem[];
   memories: Memory[];
   count: number;
@@ -196,6 +197,7 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
   month: string;
   mode: TreeDisplayMode;
   onFruitSelect: (memoryId: string) => void;
+  onUploadAnimationComplete: (memoryId: string) => void;
 }) {
   const uid = useId().replace(/:/g, "");
   const visible = useMemo(() => items.filter(item => item.stage !== "harvested"), [items]);
@@ -209,6 +211,12 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
   const imageById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory.imageUrl])), [memories]);
   const latestItem = visible.find((item) => item.newlyAdded);
   const latestImageUrl = latestItem ? imageById.get(latestItem.memoryId ?? latestItem.id) : undefined;
+  useEffect(() => {
+    if (!latestItem) return;
+    const memoryId = latestItem.memoryId ?? latestItem.id;
+    const timer = window.setTimeout(() => onUploadAnimationComplete(memoryId), 3_600);
+    return () => window.clearTimeout(timer);
+  }, [latestItem, onUploadAnimationComplete]);
   return <>
     <div className="konoha-tree-canvas" data-tree-growth={nodeTreeStage} data-tree-appearance={model.stage}
       data-tree-mode={mode}
@@ -218,7 +226,7 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
         <defs><TreeArtDefs uid={uid} /></defs>
         <TreeGround uid={uid} stage={model.soilStage} front={false} />
         {nodeTreeStage === 1 || nodeTreeStage === 2
-          ? <GrowingSeedling uid={uid} stage={nodeTreeStage} count={count} imageUrl={latestImageUrl} />
+          ? <GrowingSeedling uid={uid} stage={nodeTreeStage} count={count} imageUrl={latestImageUrl} animate={Boolean(latestItem)} />
           : <TreeSeedling uid={uid} stage={nodeTreeStage} />}
         <g className="konoha-tree-size" style={{
           opacity: model.stage >= 3 ? 1 : 0,
@@ -244,10 +252,10 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
                   }}>
                     <g className="konoha-node-wind" style={{ animationDelay: `${item.fruitSlot * -0.57}s` }}>
                       <GrowthNode stage={item.growthStage ?? 1} treeStage={nodeTreeStage} fruitAppearance={fruitAppearanceFor(memoryId)} fruitHang={fruitHang}
-                        eventKey={`${item.id}-${item.growthStage ?? 1}-${item.newlyAdded ? "added" : item.newlyFruited ? "fruited" : item.newlyRipened ? "ripened" : "stable"}`} delay={Math.min(item.fruitSlot, 7) * 42}
+                        eventKey={`${item.id}-${item.growthStage ?? 1}-${item.newlyAdded ? "added" : item.newlyFruited ? "fruited" : item.newlyRipened ? "ripened" : item.advancedThisUpload ? "advanced" : "stable"}`} delay={Math.min(item.fruitSlot, 7) * 42}
                         newPhotoUrl={item.newlyAdded ? imageById.get(memoryId) : undefined}
                         newlyAdded={item.newlyAdded === true} newlyFruited={item.newlyFruited === true}
-                        newlyRipened={item.newlyRipened === true} />
+                        newlyRipened={item.newlyRipened === true} advancedThisUpload={item.advancedThisUpload === true} />
                     </g>
                   </g>
                 </g>

@@ -99,7 +99,7 @@ export function AlbumSettingsPanel({
           <MemoryBookPage memory={memory} appearance={selectedAppearance} harvestWord={harvestWord} />
         </div>
         <p className="mt-3 text-center text-[10px] leading-5 text-ink/45">
-          {contextual ? "この思い出で組み合わせを確認しています" : "すべての設定を組み合わせた仕上がり例です"}
+          {contextual ? "この思い出で組み合わせを確認しています" : "一度も編集されたことがないアルバムにのみ反映されます。"}
         </p>
       </section>
 
@@ -165,9 +165,11 @@ export function AlbumSettingsPanel({
             {onRetry && <button type="button" onClick={onRetry} className="mt-1 font-semibold text-coral underline">再読み込み</button>}
           </div>
         )}
-        <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">
-          {loading ? "設定を読み込んでいます…" : saving ? "保存しています…" : "選ぶたびに保存され、上の例へすぐ反映されます。"}
-        </p>
+        {(loading || saving || contextual) && (
+          <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">
+            {loading ? "設定を読み込んでいます…" : saving ? "保存しています…" : "このアルバムにのみ反映されます。"}
+          </p>
+        )}
       </section>
     </div>
   );

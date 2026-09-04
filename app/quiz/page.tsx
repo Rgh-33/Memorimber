@@ -100,7 +100,7 @@ function ModeMenu({ memoryCount, onStart, onMixedSetup, onHistory }: {
           <span className="quiz-mode-mixed-icon" aria-hidden="true"><Camera size={17} /><Type size={17} /></span>
           <span>
             <strong>写真と一言クイズ</strong>
-            <small>2つの出題数を決めて、ランダムに挑戦</small>
+            <small>2つの出題数を決めて挑戦</small>
           </span>
           <ChevronRight size={18} aria-hidden="true" />
         </button>
@@ -161,9 +161,8 @@ function MixedQuizSetup({ photoCount, captionCount, onPhotoCount, onCaptionCount
         <span>合計</span>
         <strong>{total}問</strong>
       </div>
-      <p className="quiz-setup-note">問題数はこのブラウザに保存され、次回も同じ設定になります。</p>
       <button type="button" className="quiz-primary-button" onClick={onStart} disabled={total === 0}>
-        {total > 0 ? `${total}問をはじめる` : "問題数を設定してください"}
+        始める
       </button>
     </section>
   );

@@ -183,6 +183,12 @@ a {
 
 .app-shell {
   background: var(--ivory);
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.app-shell--album {
+  overflow: visible;
 }
 
 .brand-home-link {
@@ -221,6 +227,27 @@ a {
 
 .page-pad {
   padding: 22px 20px 34px;
+}
+
+.album-page {
+  display: flex;
+  min-height: calc(100dvh - 128px);
+  flex-direction: column;
+}
+
+.album-page-memory-slot {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.album-month-switcher {
+  margin-top: 28px;
+  padding: 20px 0 10px;
+  border-top: 1px solid rgb(var(--line-rgb) / .7);
+  scroll-margin-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
 .album-font-zen-kurenaido {
@@ -1785,6 +1812,15 @@ details > summary::-webkit-details-marker {
 
   .page-pad {
     padding: 0;
+  }
+
+  .album-page {
+    display: block;
+    min-height: 0;
+  }
+
+  .album-page-memory-slot {
+    display: block;
   }
 
   .print-hide {
