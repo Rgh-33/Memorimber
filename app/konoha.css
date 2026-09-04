@@ -171,6 +171,25 @@
 .konoha-petal-sway { position: absolute; inset: 0; transform-style: preserve-3d; animation: konoha-petal-turn 6.5s ease-in-out var(--float-delay) infinite; }
 .konoha-word-petal { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 2px 1px rgb(var(--ink-rgb) / .1)); }
 .konoha-scene .memory-floating-word-label { position: absolute; inset: 26% 9% 20% 15%; display: flex; align-items: center; justify-content: center; opacity: 1; }
+.konoha-scene .memory-floating-word[data-fading="true"] .memory-floating-word-label { opacity: 0 !important; filter: none; }
+.konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive {
+  filter: saturate(.62) contrast(.92) opacity(.78);
+  animation: konoha-fading-memory-glitch 7.6s steps(1, end) infinite;
+}
+.konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::before,
+.konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::after {
+  position: absolute;
+  z-index: 5;
+  right: 13%;
+  left: 11%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgb(var(--ink-rgb) / .16), transparent);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+}
+.konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::before { top: 38%; animation: konoha-fading-memory-scan 7.6s steps(1, end) infinite; }
+.konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::after { top: 61%; animation: konoha-fading-memory-scan 7.6s steps(1, end) -1.15s infinite; }
 .konoha-scene .memory-floating-word[data-gesture="pressing"] .konoha-petal-sway,
 .konoha-scene .memory-floating-word[data-gesture="armed"] .konoha-petal-sway { animation-play-state: paused; }
 .konoha-scene .memory-floating-word[data-gesture="pressing"],
@@ -366,6 +385,20 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
   42% { transform: rotateY(17deg) rotateX(-7deg) rotateZ(3deg); }
   72% { transform: rotateY(-5deg) rotateX(9deg) rotateZ(-1deg); }
 }
+@keyframes konoha-fading-memory-glitch {
+  0%, 64%, 68%, 80%, 84%, 100% { transform: translate(0, 0); clip-path: inset(0); }
+  65% { transform: translate(-2px, 1px); clip-path: inset(12% 0 38%); }
+  66% { transform: translate(3px, -1px); clip-path: inset(48% 0 14%); }
+  67% { transform: translate(-1px, 0); clip-path: inset(0); }
+  81% { transform: translate(1px, -1px); clip-path: inset(22% 0 44%); }
+  82% { transform: translate(-3px, 1px); clip-path: inset(52% 0 8%); }
+  83% { transform: translate(2px, 0); clip-path: inset(8% 0 60%); }
+}
+@keyframes konoha-fading-memory-scan {
+  0%, 64%, 68%, 80%, 84%, 100% { opacity: 0; transform: translateX(0); }
+  65%, 67%, 81%, 83% { opacity: .72; transform: translateX(-2px); }
+  66%, 82% { opacity: .36; transform: translateX(3px); }
+}
 @media (prefers-reduced-motion: reduce) {
   .konoha-tree-size, .konoha-seedling, .konoha-seedling-stem, .konoha-cotyledon-joint, .konoha-cotyledon, .konoha-trunk-detail, .konoha-young-wood, .konoha-young-trunk, .konoha-node-size { transition: none; }
   .konoha-tree-wind, .konoha-node-wind, .konoha-stage-enter, .konoha-growth-result, .konoha-magic-aura, .konoha-magic-orbit,
@@ -380,4 +413,7 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
   .konoha-ripe-sparkles { opacity: .78; }
   .konoha-new-fruit-halo { opacity: .42; }
   .konoha-new-fruit-glint, .konoha-just-ripe-ring, .konoha-just-ripe-burst { opacity: .55; }
+  .konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive,
+  .konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::before,
+  .konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::after { animation: none; }
 }

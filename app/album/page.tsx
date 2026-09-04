@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { MemoryCard } from "@/components/memory-card";
+import { getAlbumFirstColumn } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
 
@@ -14,6 +15,8 @@ export default function AlbumPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const didInitialScroll = useRef(false);
   const months = useMemo(() => [...new Set([
     currentMonth, ...allMemories.map((memory) => memory.date.slice(0, 7)),
     ...(isDemo ? ALBUM_MONTHS.map((month) => month.key) : []),
@@ -21,18 +24,20 @@ export default function AlbumPage() {
   const monthIndex = months.indexOf(selectedMonth);
   const monthLabel = `${Number(selectedMonth.slice(0, 4))}年${Number(selectedMonth.slice(5))}月`;
   const memories = getMonthMemories(selectedMonth);
+  const firstColumn = getAlbumFirstColumn(memories.length);
+
+  useEffect(() => {
+    if (isLoading || didInitialScroll.current) return;
+    didInitialScroll.current = true;
+    const frame = window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: "end" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [isLoading]);
 
   return (
     <div className="page-pad">
       <AppHeader />
       <section className="pt-7 text-center">
         <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">月間アルバム</h1>
-        <div className="mx-auto mt-3 flex max-w-[270px] items-center justify-between">
-          <button type="button" onClick={() => setSelectedMonth(months[monthIndex + 1])} className="rounded-full p-2 text-ink hover:bg-paper disabled:opacity-20" disabled={monthIndex === months.length - 1} aria-label="前の月"><ChevronLeft size={19} /></button>
-          <p className="text-lg font-medium tracking-[0.05em] text-ink">{monthLabel}</p>
-          <button type="button" onClick={() => setSelectedMonth(months[monthIndex - 1])} className="rounded-full p-2 text-ink hover:bg-paper disabled:opacity-20" disabled={monthIndex === 0} aria-label="次の月"><ChevronRight size={19} /></button>
-        </div>
-        <p className="mt-1 text-xs text-ink/65">今月は <span className="text-xl font-semibold text-coral">{memories.length}</span> の思い出</p>
       </section>
 
       <section className="mt-5">
@@ -40,7 +45,9 @@ export default function AlbumPage() {
         {warning && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">{warning}<button type="button" onClick={() => void refreshMemories()} className="ml-2 text-coral underline">再読み込み</button></p>}
         {isLoading ? <p role="status" className="py-12 text-center text-sm text-ink/65">思い出を読み込んでいます…</p> : error ? <div role="alert" className="rounded-xl border border-line p-4 text-sm leading-6 text-ink">{error}<button type="button" onClick={() => void refreshMemories()} className="mt-2 block text-coral underline">再読み込み</button></div> : memories.length > 0 ? (
           <div className="grid grid-cols-3 gap-2.5">
-            {memories.map((memory) => <MemoryCard key={memory.id} memory={memory} dateOnly />)}
+            {memories.map((memory, index) => <div key={memory.id} style={index === 0 ? { gridColumnStart: firstColumn } : undefined}>
+              <MemoryCard memory={memory} dateOnly />
+            </div>)}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-coral/45 bg-paper px-5 py-12 text-center text-sm text-ink/55">この月の思い出はまだありません</div>
@@ -48,6 +55,15 @@ export default function AlbumPage() {
       </section>
 
       <button type="button" onClick={() => window.print()} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper print-hide"><Printer size={18} /> {Number(selectedMonth.slice(5))}月をプリントする</button>
+
+      <div ref={bottomRef} className="mt-7 scroll-mb-[92px] border-t border-line/70 pb-2 pt-5 print-hide">
+        <div className="mx-auto flex max-w-[270px] items-center justify-between">
+          <button type="button" onClick={() => setSelectedMonth(months[monthIndex + 1])} className="rounded-full p-2 text-ink hover:bg-paper disabled:opacity-20" disabled={monthIndex === months.length - 1} aria-label="前の月"><ChevronLeft size={19} /></button>
+          <p className="text-lg font-medium tracking-[0.05em] text-ink">{monthLabel}</p>
+          <button type="button" onClick={() => setSelectedMonth(months[monthIndex - 1])} className="rounded-full p-2 text-ink hover:bg-paper disabled:opacity-20" disabled={monthIndex === 0} aria-label="次の月"><ChevronRight size={19} /></button>
+        </div>
+        <p className="mt-1 text-center text-xs text-ink/65">今月は <span className="text-xl font-semibold text-coral">{memories.length}</span> の思い出</p>
+      </div>
     </div>
   );
 }

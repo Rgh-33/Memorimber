@@ -23,7 +23,7 @@ export function buildPetals(memories: Memory[], date: string, harvests: Harvests
     .filter((memory) => uploadDate(memory) <= date && harvests[memory.id]?.harvestedAt.slice(0, 10) <= date)
     .sort((a, b) => harvests[a.id].harvestedAt.localeCompare(harvests[b.id].harvestedAt) || a.id.localeCompare(b.id))
     .map((memory, wordSlot) => ({ id: memory.id, memoryId: memory.id, stage: "harvested", word: harvests[memory.id].word,
-      wordSlot, relatedMemoryIds: [memory.id] }));
+      wordSlot, harvestedAt: harvests[memory.id].harvestedAt, relatedMemoryIds: [memory.id] }));
 }
 
 /** Real fruit state is authoritative from Supabase. Visual growth between
@@ -66,7 +66,29 @@ export function buildPersistedPetals(memories: Memory[], date: string, fruits: M
     })
     .sort((a, b) => fruits[a.id].harvestedAt!.localeCompare(fruits[b.id].harvestedAt!) || a.id.localeCompare(b.id))
     .map((memory, wordSlot) => ({ id: memory.id, memoryId: memory.id, stage: "harvested",
-      word: fruits[memory.id].harvestWord!, wordSlot, relatedMemoryIds: [memory.id] }));
+      word: fruits[memory.id].harvestWord!, wordSlot, harvestedAt: fruits[memory.id].harvestedAt!, relatedMemoryIds: [memory.id] }));
+}
+
+/** Growth flags describe what the latest upload changed in the data. They are
+ * presented only while that exact upload is arriving, so revisiting the tree
+ * cannot replay a photo being absorbed. */
+export function applyUploadPresentation(items: MemoryTreeItem[], arrivingMemoryId: string | null) {
+  const hasArrival = Boolean(arrivingMemoryId && items.some((item) => item.id === arrivingMemoryId && item.newlyAdded));
+  return items.map((item) => {
+    if (item.stage === "harvested") return item;
+    const newlyAdded = hasArrival && item.id === arrivingMemoryId;
+    const newlyFruited = hasArrival && !newlyAdded && item.newlyFruited === true;
+    const newlyRipened = hasArrival && !newlyAdded && item.newlyRipened === true;
+    const growthStage = item.growthStage ?? 1;
+    return {
+      ...item,
+      newlyAdded,
+      newlyFruited,
+      newlyRipened,
+      advancedThisUpload: hasArrival && !newlyAdded && !newlyFruited && !newlyRipened
+        && growthStage >= 2 && growthStage <= 6,
+    };
+  });
 }
 
 export function localDate(date = new Date()) {

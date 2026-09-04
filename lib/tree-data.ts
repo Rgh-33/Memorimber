@@ -9,6 +9,7 @@ type MemoryTreeItemBase = {
   newlyAdded?: boolean;
   newlyFruited?: boolean;
   newlyRipened?: boolean;
+  advancedThisUpload?: boolean;
 };
 
 export type MemoryTreeItem =
@@ -34,6 +35,7 @@ export type MemoryTreeItem =
       stage: "harvested";
       word: string;
       wordSlot: number;
+      harvestedAt?: string;
       relatedMemoryIds?: string[];
       href?: string;
       fruitSlot?: never;

@@ -93,7 +93,7 @@ export function AlbumSettingsPanel({
           <MemoryBookPage memory={memory} appearance={selectedAppearance} harvestWord={harvestWord} />
         </div>
         <p className="mt-3 text-center text-[10px] leading-5 text-ink/45">
-          {contextual ? "この思い出で組み合わせを確認しています" : "すべての設定を組み合わせた仕上がり例です"}
+          {contextual ? "この思い出で組み合わせを確認しています" : "一度も編集されたことがないアルバムにのみ反映されます。"}
         </p>
       </section>
 
@@ -154,7 +154,9 @@ export function AlbumSettingsPanel({
         </div>
 
         {saveError && <p role="alert" className="mt-4 rounded-xl border border-red-300/60 bg-red-50/60 px-3 py-2 text-center text-[10px] leading-5 text-ink">{saveError}</p>}
-        <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">{saving ? "保存しています…" : "選ぶたびに保存され、上の例へすぐ反映されます。"}</p>
+        {(saving || contextual) && <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">
+          {saving ? "保存しています…" : "このアルバムにのみ反映されます。"}
+        </p>}
       </section>
     </div>
   );

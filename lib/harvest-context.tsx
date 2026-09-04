@@ -7,6 +7,7 @@ import { useTree } from "@/lib/tree-context";
 type Flight = { memoryId: string; word: string };
 type HarvestContextValue = {
   launch: (id: string, word: string) => Promise<boolean>;
+  relaunch: (id: string, word: string) => boolean;
   busy: boolean;
   error: string | null;
   arrivingMemoryId: string | null;
@@ -53,6 +54,17 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const relaunch = (id: string, word: string) => {
+    const normalizedWord = word.trim();
+    if (active.current || !normalizedWord) return false;
+    active.current = true;
+    setArrivingMemoryId(null);
+    setError(null);
+    lastMemory.current = id;
+    setFlight({ memoryId: id, word: normalizedWord });
+    return true;
+  };
+
   useEffect(() => {
     if (flight || !lastMemory.current) return;
     const petal = document.querySelector<HTMLButtonElement>(`.memory-floating-word[data-memory-id="${CSS.escape(lastMemory.current)}"]`);
@@ -68,7 +80,7 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [arrivingMemoryId]);
 
-  return <HarvestContext.Provider value={{ launch, busy: saving || Boolean(flight), error, arrivingMemoryId, completeArrival }}>
+  return <HarvestContext.Provider value={{ launch, relaunch, busy: saving || Boolean(flight), error, arrivingMemoryId, completeArrival }}>
     <div inert={flight ? true : undefined}>{children}</div>
     {flight && <HarvestFlight word={flight.word} saved={tree.petals.some(petal => petal.id === flight.memoryId)} onFinish={finish} />}
   </HarvestContext.Provider>;

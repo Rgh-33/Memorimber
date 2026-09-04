@@ -6,11 +6,12 @@ import { useMemories } from "./memories-context";
 import { usePreferences } from "./preferences-context";
 import { createClient } from "./supabase/client";
 import { completeMemoryHarvest, loadMemoryFruits, type MemoryFruits } from "./supabase/memory-fruits";
-import { advanceDate, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getHarvestWordForMemory, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
+import { advanceDate, applyUploadPresentation, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getHarvestWordForMemory, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
 import { getTreeVisibleCount, placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
 
 type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; serial: number; slots: Record<string, (string | null)[]> };
+const TREE_ARRIVAL_STORAGE_KEY = "memorimber-pending-tree-arrival-v1";
 const emptyState = (preview: boolean): TreeState => ({ preview, date: `${localDate().slice(0, 7)}-01`, uploads: [], previewHarvests: {}, serial: 0, slots: {} });
 
 function readState(raw: string | null, preview: boolean): TreeState {
@@ -44,11 +45,17 @@ function useTreeState() {
   const [fruits, setFruits] = useState<MemoryFruits>({});
   const [fruitsLoading, setFruitsLoading] = useState(!isDemo);
   const [fruitError, setFruitError] = useState<string | null>(null);
+  const [arrivingUploadId, setArrivingUploadId] = useState<string | null>(null);
   const fruitRequestVersion = useRef(0);
   // Preview records and branch placements remain tab-local. Real harvest words
   // come only from memory_fruits and are never restored from sessionStorage.
   const owner = isDemo ? "demo" : memories[0]?.imagePath?.split("/")[0] ?? "anonymous";
   const storageKey = `memorimber-konohaan-v1:${owner}`;
+
+  useEffect(() => {
+    try { setArrivingUploadId(sessionStorage.getItem(TREE_ARRIVAL_STORAGE_KEY)); }
+    catch { /* The one-time animation can remain in memory. */ }
+  }, []);
 
   useEffect(() => {
     let raw: string | null = null;
@@ -110,10 +117,11 @@ function useTreeState() {
     && (state.preview || isDemo || (!fruitsLoading && !fruitError));
   const items = useMemo(() => {
     if (!ready) return [];
-    return state.preview
+    const rawItems = state.preview
       ? buildTreeItems(source, date, state.previewHarvests)
       : buildPersistedTreeItems(source, date, fruits);
-  }, [ready, state.preview, state.previewHarvests, source, date, fruits]);
+    return applyUploadPresentation(rawItems, arrivingUploadId);
+  }, [ready, state.preview, state.previewHarvests, source, date, fruits, arrivingUploadId]);
   const petals = useMemo(() => {
     if (!ready) return [];
     return state.preview
@@ -144,25 +152,43 @@ function useTreeState() {
     });
   }, [placement.slots, ready, slotKey]);
 
+  const queueUploadArrival = useCallback((id: string) => {
+    setArrivingUploadId(id);
+    try { sessionStorage.setItem(TREE_ARRIVAL_STORAGE_KEY, id); } catch { /* In-memory animation still works. */ }
+  }, []);
+
+  const completeUploadArrival = useCallback((id: string) => {
+    setArrivingUploadId((current) => current === id ? null : current);
+    try {
+      if (sessionStorage.getItem(TREE_ARRIVAL_STORAGE_KEY) === id) sessionStorage.removeItem(TREE_ARRIVAL_STORAGE_KEY);
+    } catch { /* Nothing else to clean up. */ }
+  }, []);
+
+  const uploadPreview = () => {
+    const serial = state.serial + 1;
+    const sample = SAMPLE_MEMORIES[(serial - 1) % SAMPLE_MEMORIES.length];
+    const lastUploadTime = Math.max(0, ...state.uploads.filter((entry) => entry.createdAt?.slice(0, 10) === state.date)
+      .map((entry) => Date.parse(entry.createdAt!)));
+    const time = Math.max(new Date(`${state.date}T12:00:00`).getTime(), lastUploadTime + 1);
+    const createdAt = `${state.date}T${new Date(time).toTimeString().slice(0, 8)}.${String(time % 1000).padStart(3, "0")}`;
+    const memory = { ...sample, id: `konoha-preview-${String(serial).padStart(8, "0")}`, date: state.date, createdAt };
+    setState({ ...state, preview: true, serial, uploads: [...state.uploads, memory] });
+    queueUploadArrival(memory.id);
+  };
+
   return {
     ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
     date, preview: state.preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source,
     count, totalCount, harvestWordFor,
+    arrivingUploadId,
+    queueUploadArrival,
+    completeUploadArrival,
     setPreview: (preview: boolean) => setState((current) => ({ ...current, preview })),
     setDate: (next: string) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));
     },
     advance: (days: number, months = 0) => setState((current) => ({ ...current, preview: true, date: advanceDate(current.date, days, months) })),
-    upload: () => setState((current) => {
-      const serial = current.serial + 1;
-      const sample = SAMPLE_MEMORIES[(serial - 1) % SAMPLE_MEMORIES.length];
-      const lastUploadTime = Math.max(0, ...current.uploads.filter((entry) => entry.createdAt?.slice(0, 10) === current.date)
-        .map((entry) => Date.parse(entry.createdAt!)));
-      const time = Math.max(new Date(`${current.date}T12:00:00`).getTime(), lastUploadTime + 1);
-      const createdAt = `${current.date}T${new Date(time).toTimeString().slice(0, 8)}.${String(time % 1000).padStart(3, "0")}`;
-      const memory = { ...sample, id: `konoha-preview-${String(serial).padStart(8, "0")}`, date: current.date, createdAt };
-      return { ...current, preview: true, serial, uploads: [...current.uploads, memory] };
-    }),
+    upload: uploadPreview,
     reset: () => setState((current) => ({ ...emptyState(true),
       slots: Object.fromEntries(Object.entries(current.slots).filter(([key]) => key.startsWith("real:"))) })),
     harvest: async (id: string, word: string) => {

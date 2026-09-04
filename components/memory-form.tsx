@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Check, ChevronRight, ImagePlus, Sprout, Tag, Users } from "lucide-react";
 import { useMemories } from "@/lib/memories-context";
 import { useProcessing } from "@/lib/processing-context";
+import { useTree } from "@/lib/tree-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getMemoryImageType, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
@@ -26,6 +27,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const { refreshMemories } = useMemories();
   const { startProcessing, stopProcessing } = useProcessing();
+  const tree = useTree();
   const configured = isSupabaseConfigured();
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
@@ -81,7 +83,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setter((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]));
   };
 
-  const onSaved = async () => {
+  const onSaved = async (memoryId: string) => {
     setSaveError(null);
     clearPending();
     setImage(null);
@@ -92,6 +94,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setTags([]);
     setErrors({});
     formRef.current?.reset();
+    tree.queueUploadArrival(memoryId);
     await refreshMemories();
     router.replace("/", { scroll: true });
   };
@@ -131,8 +134,8 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setStage("auth");
     startProcessing();
     try {
-      await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
-      await onSaved();
+      const saved = await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
+      await onSaved(saved.id);
     } catch (cause) {
       showSaveError(cause);
     } finally {
@@ -149,7 +152,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     startProcessing();
     try {
       const result = await recoverMemorySave(createClient(), pending);
-      if (result.saved) await onSaved();
+      if (result.saved) await onSaved(result.id);
       else {
         clearPending();
         setSaveError("未保存の画像を取り消しました。入力内容を確認して、もう一度投稿できます。");
