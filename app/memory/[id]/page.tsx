@@ -299,6 +299,7 @@ export default function MemoryDetailPage() {
         <AppHeader />
         <Link
           href="/album?restore=1"
+          scroll={false}
           className="mt-4 grid h-9 w-9 place-items-center rounded-full border border-line bg-ivory text-ink transition hover:border-coral hover:bg-paper hover:text-coral"
           aria-label="全体アルバムの元の位置へ戻る"
         >

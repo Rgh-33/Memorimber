@@ -40,6 +40,7 @@ export default function AlbumPage() {
   const [scrollRestoreReady, setScrollRestoreReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const didInitialScroll = useRef(false);
+  const didPrepareScrollRestore = useRef(false);
   const returnPositionRef = useRef<AlbumReturnPosition | null>(null);
   const months = useMemo(() => [...new Set([
     currentMonth, ...allMemories.map((memory) => memory.date.slice(0, 7)),
@@ -60,6 +61,8 @@ export default function AlbumPage() {
   const placeholderCount = Math.max(0, gridSlotCount - memories.length);
 
   useEffect(() => {
+    if (didPrepareScrollRestore.current) return;
+    didPrepareScrollRestore.current = true;
     const url = new URL(window.location.href);
     const shouldRestore = url.searchParams.get("restore") === "1";
     const saved = shouldRestore ? readAlbumReturnPosition() : null;

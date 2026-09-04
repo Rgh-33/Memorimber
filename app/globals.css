@@ -187,6 +187,10 @@ a {
   overflow-y: visible;
 }
 
+.app-shell--album {
+  overflow: visible;
+}
+
 .brand-home-link {
   transform-origin: left center;
 }

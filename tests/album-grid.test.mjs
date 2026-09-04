@@ -35,10 +35,15 @@ test("month navigation stays after print in normal flow and the app allows verti
   assert.ok(albumPage.indexOf("album-month-switcher") > albumPage.indexOf("月をプリントする"));
   assert.doesNotMatch(appShell, /overflow-hidden/);
   assert.match(css, /\.app-shell\s*\{[^}]*overflow-y:\s*visible/s);
+  assert.match(appShell, /pathname === "\/album"/);
+  assert.match(appShell, /app-shell--album/);
+  assert.match(css, /\.app-shell--album\s*\{[^}]*overflow:\s*visible/s);
   assert.doesNotMatch(switcherRule, /position:\s*(?:fixed|sticky)/);
   assert.match(switcherRule, /scroll-margin-bottom/);
   assert.match(albumPage, /onClickCapture=\{rememberAlbumPosition\}/);
   assert.match(albumPage, /scrollAlbumImmediately\(\(\) => bottomRef\.current\?\.scrollIntoView/);
   assert.match(albumPage, /url\.searchParams\.get\("restore"\) === "1"/);
+  assert.match(albumPage, /if \(didPrepareScrollRestore\.current\) return/);
   assert.match(memoryPage, /href="\/album\?restore=1"/);
+  assert.match(memoryPage, /href="\/album\?restore=1"[\s\S]*?scroll=\{false\}/);
 });
