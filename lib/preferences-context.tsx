@@ -1,8 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_ALBUM_APPEARANCE,
+  isAlbumAppearance,
+  resolveAlbumAppearance,
   type AlbumAppearance,
   type AlbumBackground,
   type AlbumFont,
@@ -11,6 +13,9 @@ import {
   type AlbumPattern,
   type AlbumTextColor,
 } from "./album-appearance";
+import { createClient } from "./supabase/client";
+import { isSupabaseConfigured } from "./supabase/config";
+import { loadAccountAlbumAppearance, updateAccountAlbumAppearance } from "./supabase/album-preferences";
 
 export type {
   AlbumAppearance,
@@ -87,26 +92,20 @@ export const ALBUM_ORIENTATIONS: Array<{ id: AlbumOrientation; label: string; de
 type PreferencesContextValue = {
   theme: AppTheme;
   colorMode: AppColorMode;
-  albumFont: AlbumFont;
-  albumLayout: AlbumLayout;
-  albumTextColor: AlbumTextColor;
-  albumBackground: AlbumBackground;
-  albumPattern: AlbumPattern;
-  albumOrientation: AlbumOrientation;
+  accountAlbumAppearance: AlbumAppearance | null;
   albumAppearance: AlbumAppearance;
+  albumAppearanceReady: boolean;
+  albumAppearanceLoading: boolean;
+  albumAppearanceSaving: boolean;
+  albumAppearanceError: string | null;
   bgmVolume: number;
   soundEffectVolume: number;
   treeMode: TreeDisplayMode;
   preferencesReady: boolean;
   setTheme: (theme: AppTheme) => void;
   setColorMode: (mode: AppColorMode) => void;
-  setAlbumFont: (font: AlbumFont) => void;
-  setAlbumLayout: (layout: AlbumLayout) => void;
-  setAlbumTextColor: (color: AlbumTextColor) => void;
-  setAlbumBackground: (background: AlbumBackground) => void;
-  setAlbumPattern: (pattern: AlbumPattern) => void;
-  setAlbumOrientation: (orientation: AlbumOrientation) => void;
-  setAlbumAppearance: (appearance: AlbumAppearance) => void;
+  setAlbumAppearance: (appearance: AlbumAppearance) => Promise<void>;
+  reloadAlbumAppearance: () => Promise<void>;
   setBgmVolume: (volume: number) => void;
   setSoundEffectVolume: (volume: number) => void;
   setTreeMode: (mode: TreeDisplayMode) => void;
@@ -162,18 +161,20 @@ function isAlbumOrientation(value: string | null): value is AlbumOrientation {
 }
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
+  const configured = isSupabaseConfigured();
   const [theme, setThemeState] = useState<AppTheme>("light-blue");
   const [colorMode, setColorModeState] = useState<AppColorMode>("light");
-  const [albumFont, setAlbumFontState] = useState<AlbumFont>(DEFAULT_ALBUM_APPEARANCE.font);
-  const [albumLayout, setAlbumLayoutState] = useState<AlbumLayout>(DEFAULT_ALBUM_APPEARANCE.layout);
-  const [albumTextColor, setAlbumTextColorState] = useState<AlbumTextColor>(DEFAULT_ALBUM_APPEARANCE.textColor);
-  const [albumBackground, setAlbumBackgroundState] = useState<AlbumBackground>(DEFAULT_ALBUM_APPEARANCE.background);
-  const [albumPattern, setAlbumPatternState] = useState<AlbumPattern>(DEFAULT_ALBUM_APPEARANCE.pattern);
-  const [albumOrientation, setAlbumOrientationState] = useState<AlbumOrientation>(DEFAULT_ALBUM_APPEARANCE.orientation);
+  const [accountAlbumAppearance, setAccountAlbumAppearance] = useState<AlbumAppearance | null>(null);
+  const [albumAppearanceReady, setAlbumAppearanceReady] = useState(false);
+  const [albumAppearanceLoading, setAlbumAppearanceLoading] = useState(configured);
+  const [albumAppearanceSaving, setAlbumAppearanceSaving] = useState(false);
+  const [albumAppearanceError, setAlbumAppearanceError] = useState<string | null>(null);
   const [bgmVolume, setBgmVolumeState] = useState(55);
   const [soundEffectVolume, setSoundEffectVolumeState] = useState(70);
   const [treeMode, setTreeModeState] = useState<TreeDisplayMode>(DEFAULT_TREE_DISPLAY_MODE);
   const [preferencesReady, setPreferencesReady] = useState(false);
+  const albumRequestVersion = useRef(0);
+  const albumSaveInFlight = useRef(false);
 
   useEffect(() => {
     let savedTheme: string | null = null;
@@ -190,12 +191,16 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     try {
       savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
       savedColorMode = window.localStorage.getItem(COLOR_MODE_STORAGE_KEY);
-      savedAlbumFont = window.localStorage.getItem(ALBUM_FONT_STORAGE_KEY);
-      savedAlbumLayout = window.localStorage.getItem(ALBUM_LAYOUT_STORAGE_KEY);
-      savedAlbumTextColor = window.localStorage.getItem(ALBUM_TEXT_COLOR_STORAGE_KEY);
-      savedAlbumBackground = window.localStorage.getItem(ALBUM_BACKGROUND_STORAGE_KEY);
-      savedAlbumPattern = window.localStorage.getItem(ALBUM_PATTERN_STORAGE_KEY);
-      savedAlbumOrientation = window.localStorage.getItem(ALBUM_ORIENTATION_STORAGE_KEY);
+      // Album localStorage belongs only to the unconfigured demo. Authenticated
+      // accounts must never import an unscoped value left by another user.
+      if (!configured) {
+        savedAlbumFont = window.localStorage.getItem(ALBUM_FONT_STORAGE_KEY);
+        savedAlbumLayout = window.localStorage.getItem(ALBUM_LAYOUT_STORAGE_KEY);
+        savedAlbumTextColor = window.localStorage.getItem(ALBUM_TEXT_COLOR_STORAGE_KEY);
+        savedAlbumBackground = window.localStorage.getItem(ALBUM_BACKGROUND_STORAGE_KEY);
+        savedAlbumPattern = window.localStorage.getItem(ALBUM_PATTERN_STORAGE_KEY);
+        savedAlbumOrientation = window.localStorage.getItem(ALBUM_ORIENTATION_STORAGE_KEY);
+      }
       savedBgmVolume = window.localStorage.getItem(BGM_VOLUME_STORAGE_KEY);
       savedSoundEffectVolume = window.localStorage.getItem(SOUND_EFFECT_VOLUME_STORAGE_KEY);
       savedTreeMode = window.localStorage.getItem(TREE_DISPLAY_MODE_STORAGE_KEY);
@@ -209,14 +214,18 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       setColorModeState(savedColorMode);
       document.documentElement.dataset.mode = savedColorMode;
     }
-    if (isAlbumFont(savedAlbumFont)) {
-      setAlbumFontState(savedAlbumFont);
+    if (!configured) {
+      setAccountAlbumAppearance({
+        font: isAlbumFont(savedAlbumFont) ? savedAlbumFont : DEFAULT_ALBUM_APPEARANCE.font,
+        layout: isAlbumLayout(savedAlbumLayout) ? savedAlbumLayout : DEFAULT_ALBUM_APPEARANCE.layout,
+        textColor: isAlbumTextColor(savedAlbumTextColor) ? savedAlbumTextColor : DEFAULT_ALBUM_APPEARANCE.textColor,
+        background: isAlbumBackground(savedAlbumBackground) ? savedAlbumBackground : DEFAULT_ALBUM_APPEARANCE.background,
+        pattern: isAlbumPattern(savedAlbumPattern) ? savedAlbumPattern : DEFAULT_ALBUM_APPEARANCE.pattern,
+        orientation: isAlbumOrientation(savedAlbumOrientation) ? savedAlbumOrientation : DEFAULT_ALBUM_APPEARANCE.orientation,
+      });
+      setAlbumAppearanceReady(true);
+      setAlbumAppearanceLoading(false);
     }
-    if (isAlbumLayout(savedAlbumLayout)) setAlbumLayoutState(savedAlbumLayout);
-    if (isAlbumTextColor(savedAlbumTextColor)) setAlbumTextColorState(savedAlbumTextColor);
-    if (isAlbumBackground(savedAlbumBackground)) setAlbumBackgroundState(savedAlbumBackground);
-    if (isAlbumPattern(savedAlbumPattern)) setAlbumPatternState(savedAlbumPattern);
-    if (isAlbumOrientation(savedAlbumOrientation)) setAlbumOrientationState(savedAlbumOrientation);
     if (savedBgmVolume !== null && Number.isFinite(Number(savedBgmVolume))) {
       setBgmVolumeState(clampVolume(Number(savedBgmVolume)));
     }
@@ -225,7 +234,57 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
     setTreeModeState(parseTreeDisplayMode(savedTreeMode));
     setPreferencesReady(true);
-  }, []);
+  }, [configured]);
+
+  const reloadAlbumAppearance = useCallback(async () => {
+    if (!configured) return;
+    const version = ++albumRequestVersion.current;
+    setAlbumAppearanceLoading(true);
+    setAlbumAppearanceReady(false);
+    setAlbumAppearanceError(null);
+    try {
+      const appearance = await loadAccountAlbumAppearance(createClient());
+      if (version !== albumRequestVersion.current) return;
+      setAccountAlbumAppearance(appearance);
+      setAlbumAppearanceReady(true);
+    } catch (cause) {
+      if (version !== albumRequestVersion.current) return;
+      setAlbumAppearanceError(cause instanceof Error ? cause.message : "アルバム設定を読み込めませんでした。");
+    } finally {
+      if (version === albumRequestVersion.current) setAlbumAppearanceLoading(false);
+    }
+  }, [configured]);
+
+  useEffect(() => {
+    if (!configured) return;
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearPrivateAlbumPreference = () => {
+      albumRequestVersion.current += 1;
+      albumSaveInFlight.current = false;
+      setAccountAlbumAppearance(null);
+      setAlbumAppearanceReady(false);
+      setAlbumAppearanceLoading(false);
+      setAlbumAppearanceSaving(false);
+      setAlbumAppearanceError(null);
+    };
+
+    if (["/login", "/signup"].includes(window.location.pathname)) clearPrivateAlbumPreference();
+    else void reloadAlbumAppearance();
+
+    const { data: { subscription } } = createClient().auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_OUT" && event !== "SIGNED_IN") return;
+      clearTimeout(refreshTimer);
+      clearPrivateAlbumPreference();
+      // Supabase auth callbacks hold an internal lock, so defer the next auth call.
+      if (event === "SIGNED_IN") refreshTimer = setTimeout(() => { void reloadAlbumAppearance(); }, 0);
+    });
+
+    return () => {
+      albumRequestVersion.current += 1;
+      subscription.unsubscribe();
+      clearTimeout(refreshTimer);
+    };
+  }, [configured, reloadAlbumAppearance]);
 
   const setTheme = useCallback((nextTheme: AppTheme) => {
     setThemeState(nextTheme);
@@ -239,50 +298,44 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     window.localStorage.setItem(COLOR_MODE_STORAGE_KEY, nextMode);
   }, []);
 
-  const setAlbumFont = useCallback((nextFont: AlbumFont) => {
-    setAlbumFontState(nextFont);
-    window.localStorage.setItem(ALBUM_FONT_STORAGE_KEY, nextFont);
-  }, []);
+  const setAlbumAppearance = useCallback(async (appearance: AlbumAppearance) => {
+    if (albumSaveInFlight.current) return;
+    if (!isAlbumAppearance(appearance)) {
+      setAlbumAppearanceError("アルバムの見た目設定が正しくありません。");
+      return;
+    }
+    if (configured && !albumAppearanceReady) {
+      setAlbumAppearanceError("アルバム設定を読み込んでから、もう一度お試しください。");
+      return;
+    }
 
-  const setAlbumLayout = useCallback((nextLayout: AlbumLayout) => {
-    setAlbumLayoutState(nextLayout);
-    window.localStorage.setItem(ALBUM_LAYOUT_STORAGE_KEY, nextLayout);
-  }, []);
-
-  const setAlbumTextColor = useCallback((nextColor: AlbumTextColor) => {
-    setAlbumTextColorState(nextColor);
-    window.localStorage.setItem(ALBUM_TEXT_COLOR_STORAGE_KEY, nextColor);
-  }, []);
-
-  const setAlbumBackground = useCallback((nextBackground: AlbumBackground) => {
-    setAlbumBackgroundState(nextBackground);
-    window.localStorage.setItem(ALBUM_BACKGROUND_STORAGE_KEY, nextBackground);
-  }, []);
-
-  const setAlbumPattern = useCallback((nextPattern: AlbumPattern) => {
-    setAlbumPatternState(nextPattern);
-    window.localStorage.setItem(ALBUM_PATTERN_STORAGE_KEY, nextPattern);
-  }, []);
-
-  const setAlbumOrientation = useCallback((nextOrientation: AlbumOrientation) => {
-    setAlbumOrientationState(nextOrientation);
-    window.localStorage.setItem(ALBUM_ORIENTATION_STORAGE_KEY, nextOrientation);
-  }, []);
-
-  const setAlbumAppearance = useCallback((appearance: AlbumAppearance) => {
-    setAlbumFontState(appearance.font);
-    setAlbumLayoutState(appearance.layout);
-    setAlbumTextColorState(appearance.textColor);
-    setAlbumBackgroundState(appearance.background);
-    setAlbumPatternState(appearance.pattern);
-    setAlbumOrientationState(appearance.orientation);
-    window.localStorage.setItem(ALBUM_FONT_STORAGE_KEY, appearance.font);
-    window.localStorage.setItem(ALBUM_LAYOUT_STORAGE_KEY, appearance.layout);
-    window.localStorage.setItem(ALBUM_TEXT_COLOR_STORAGE_KEY, appearance.textColor);
-    window.localStorage.setItem(ALBUM_BACKGROUND_STORAGE_KEY, appearance.background);
-    window.localStorage.setItem(ALBUM_PATTERN_STORAGE_KEY, appearance.pattern);
-    window.localStorage.setItem(ALBUM_ORIENTATION_STORAGE_KEY, appearance.orientation);
-  }, []);
+    const previous = accountAlbumAppearance;
+    const version = ++albumRequestVersion.current;
+    albumSaveInFlight.current = true;
+    setAccountAlbumAppearance(appearance);
+    setAlbumAppearanceSaving(true);
+    setAlbumAppearanceError(null);
+    try {
+      if (configured) {
+        const saved = await updateAccountAlbumAppearance(createClient(), appearance);
+        if (version === albumRequestVersion.current) setAccountAlbumAppearance(saved);
+      } else {
+        window.localStorage.setItem(ALBUM_FONT_STORAGE_KEY, appearance.font);
+        window.localStorage.setItem(ALBUM_LAYOUT_STORAGE_KEY, appearance.layout);
+        window.localStorage.setItem(ALBUM_TEXT_COLOR_STORAGE_KEY, appearance.textColor);
+        window.localStorage.setItem(ALBUM_BACKGROUND_STORAGE_KEY, appearance.background);
+        window.localStorage.setItem(ALBUM_PATTERN_STORAGE_KEY, appearance.pattern);
+        window.localStorage.setItem(ALBUM_ORIENTATION_STORAGE_KEY, appearance.orientation);
+      }
+    } catch (cause) {
+      if (version !== albumRequestVersion.current) return;
+      setAccountAlbumAppearance(previous);
+      setAlbumAppearanceError(cause instanceof Error ? cause.message : "アルバム設定を保存できませんでした。");
+    } finally {
+      albumSaveInFlight.current = false;
+      if (version === albumRequestVersion.current) setAlbumAppearanceSaving(false);
+    }
+  }, [accountAlbumAppearance, albumAppearanceReady, configured]);
 
   const setBgmVolume = useCallback((volume: number) => {
     const nextVolume = clampVolume(volume);
@@ -301,45 +354,35 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     try { window.localStorage.setItem(TREE_DISPLAY_MODE_STORAGE_KEY, mode); } catch { /* In-memory choice still works. */ }
   }, []);
 
-  const albumAppearance = useMemo<AlbumAppearance>(() => ({
-    font: albumFont,
-    layout: albumLayout,
-    textColor: albumTextColor,
-    background: albumBackground,
-    pattern: albumPattern,
-    orientation: albumOrientation,
-  }), [albumBackground, albumFont, albumLayout, albumOrientation, albumPattern, albumTextColor]);
+  const albumAppearance = useMemo(
+    () => resolveAlbumAppearance(null, accountAlbumAppearance),
+    [accountAlbumAppearance],
+  );
 
   const value = useMemo(() => ({
     theme,
     colorMode,
-    albumFont,
-    albumLayout,
-    albumTextColor,
-    albumBackground,
-    albumPattern,
-    albumOrientation,
+    accountAlbumAppearance,
     albumAppearance,
+    albumAppearanceReady,
+    albumAppearanceLoading,
+    albumAppearanceSaving,
+    albumAppearanceError,
     bgmVolume,
     soundEffectVolume,
     treeMode,
     preferencesReady,
     setTheme,
     setColorMode,
-    setAlbumFont,
-    setAlbumLayout,
-    setAlbumTextColor,
-    setAlbumBackground,
-    setAlbumPattern,
-    setAlbumOrientation,
     setAlbumAppearance,
+    reloadAlbumAppearance,
     setBgmVolume,
     setSoundEffectVolume,
     setTreeMode,
-  }), [theme, colorMode, albumFont, albumLayout, albumTextColor, albumBackground, albumPattern,
-    albumOrientation, albumAppearance, bgmVolume, soundEffectVolume, treeMode, preferencesReady,
-    setTheme, setColorMode, setAlbumFont, setAlbumLayout, setAlbumTextColor, setAlbumBackground,
-    setAlbumPattern, setAlbumOrientation, setAlbumAppearance, setBgmVolume, setSoundEffectVolume, setTreeMode]);
+  }), [theme, colorMode, accountAlbumAppearance, albumAppearance, albumAppearanceReady,
+    albumAppearanceLoading, albumAppearanceSaving, albumAppearanceError, bgmVolume, soundEffectVolume,
+    treeMode, preferencesReady, setTheme, setColorMode, setAlbumAppearance, reloadAlbumAppearance,
+    setBgmVolume, setSoundEffectVolume, setTreeMode]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }

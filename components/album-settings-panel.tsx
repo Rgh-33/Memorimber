@@ -58,16 +58,22 @@ export function AlbumSettingsPanel({
   contextual = false,
   appearance,
   onAppearanceChange,
+  loading = false,
   saving = false,
+  controlsDisabled = false,
   saveError = null,
+  onRetry,
   harvestWord,
 }: {
   memory: Memory;
   contextual?: boolean;
   appearance?: AlbumAppearance;
   onAppearanceChange?: (appearance: AlbumAppearance) => void;
+  loading?: boolean;
   saving?: boolean;
+  controlsDisabled?: boolean;
   saveError?: string | null;
+  onRetry?: () => void;
   harvestWord?: string | null;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
@@ -114,25 +120,25 @@ export function AlbumSettingsPanel({
 
         <div className="mt-5 grid gap-3" role="radiogroup" aria-label={step.label}>
           {step.id === "font" && ALBUM_FONTS.map((option) => (
-            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.font === option.id} label={option.label} description={option.description} onClick={() => choose("font", option.id)}>
+            <ChoiceButton key={option.id} disabled={loading || saving || controlsDisabled} selected={selectedAppearance.font === option.id} label={option.label} description={option.description} onClick={() => choose("font", option.id)}>
               <span className={`album-font-preview album-font-${option.id} mt-2 block text-[20px] leading-8 text-ink`}>忘れたくない、今日のこと。</span>
             </ChoiceButton>
           ))}
 
           {step.id === "layout" && ALBUM_LAYOUTS.map((option) => (
-            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.layout === option.id} label={option.label} description={option.description} onClick={() => choose("layout", option.id)}>
+            <ChoiceButton key={option.id} disabled={loading || saving || controlsDisabled} selected={selectedAppearance.layout === option.id} label={option.label} description={option.description} onClick={() => choose("layout", option.id)}>
               <span className={`album-layout-swatch album-layout-swatch--${option.id}`} aria-hidden="true"><i /><i /><i /></span>
             </ChoiceButton>
           ))}
 
           {step.id === "orientation" && ALBUM_ORIENTATIONS.map((option) => (
-            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.orientation === option.id} label={option.label} description={option.description} onClick={() => choose("orientation", option.id)}>
+            <ChoiceButton key={option.id} disabled={loading || saving || controlsDisabled} selected={selectedAppearance.orientation === option.id} label={option.label} description={option.description} onClick={() => choose("orientation", option.id)}>
               <span className={`album-orientation-swatch album-orientation-swatch--${option.id}`} aria-hidden="true" />
             </ChoiceButton>
           ))}
 
           {step.id === "text" && ALBUM_TEXT_COLORS.map((option) => (
-            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.textColor === option.id} label={option.label} onClick={() => choose("textColor", option.id)}>
+            <ChoiceButton key={option.id} disabled={loading || saving || controlsDisabled} selected={selectedAppearance.textColor === option.id} label={option.label} onClick={() => choose("textColor", option.id)}>
               <span className="mt-3 flex items-center gap-3">
                 <span className="h-7 w-7 rounded-full border border-black/10 shadow-inner" style={{ backgroundColor: option.color }} />
                 <span className={`album-font-preview album-font-${selectedAppearance.font} text-lg`} style={{ color: option.color }}>大切な一日</span>
@@ -141,20 +147,27 @@ export function AlbumSettingsPanel({
           ))}
 
           {step.id === "background" && ALBUM_BACKGROUNDS.map((option) => (
-            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.background === option.id} label={option.label} onClick={() => choose("background", option.id)}>
+            <ChoiceButton key={option.id} disabled={loading || saving || controlsDisabled} selected={selectedAppearance.background === option.id} label={option.label} onClick={() => choose("background", option.id)}>
               <span className="mt-3 block h-10 rounded-xl border border-black/10 shadow-inner" style={{ backgroundColor: option.color }} />
             </ChoiceButton>
           ))}
 
           {step.id === "pattern" && ALBUM_PATTERNS.map((option) => (
-            <ChoiceButton key={option.id} disabled={saving} selected={selectedAppearance.pattern === option.id} label={option.label} description={option.description} onClick={() => choose("pattern", option.id)}>
+            <ChoiceButton key={option.id} disabled={loading || saving || controlsDisabled} selected={selectedAppearance.pattern === option.id} label={option.label} description={option.description} onClick={() => choose("pattern", option.id)}>
               <span className={`album-pattern-swatch album-pattern-swatch--${option.id}`} aria-hidden="true" />
             </ChoiceButton>
           ))}
         </div>
 
-        {saveError && <p role="alert" className="mt-4 rounded-xl border border-red-300/60 bg-red-50/60 px-3 py-2 text-center text-[10px] leading-5 text-ink">{saveError}</p>}
-        <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">{saving ? "保存しています…" : "選ぶたびに保存され、上の例へすぐ反映されます。"}</p>
+        {saveError && (
+          <div role="alert" className="mt-4 rounded-xl border border-red-300/60 bg-red-50/60 px-3 py-2 text-center text-[10px] leading-5 text-ink">
+            <p>{saveError}</p>
+            {onRetry && <button type="button" onClick={onRetry} className="mt-1 font-semibold text-coral underline">再読み込み</button>}
+          </div>
+        )}
+        <p className="mt-4 text-center text-[10px] leading-5 text-ink/40">
+          {loading ? "設定を読み込んでいます…" : saving ? "保存しています…" : "選ぶたびに保存され、上の例へすぐ反映されます。"}
+        </p>
       </section>
     </div>
   );
