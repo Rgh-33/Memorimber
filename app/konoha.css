@@ -240,7 +240,25 @@
 .konoha-scene .memory-floating-word[data-gesture="armed"] .memory-floating-word-label,
 .konoha-scene .memory-floating-word[data-gesture="success"] .memory-floating-word-label { opacity: var(--word-current-opacity); }
 .konoha-scene .memory-word-particle { display: none; }
+.konoha-preview-slot--fixed { height: 104px; }
 .konoha-preview { max-width: 300px; margin: 6px auto 0; padding-top: 12px; border-top: 1px solid rgb(var(--line-rgb) / .65); color: rgb(var(--ink-rgb) / .55); font-size: 11px; }
+.konoha-preview--fixed {
+  position: fixed;
+  z-index: 40;
+  bottom: 90px;
+  left: 50%;
+  width: min(calc(100% - 24px), 406px);
+  max-width: none;
+  margin: 0;
+  padding: 8px 10px 9px;
+  border: 1px solid rgb(var(--line-rgb) / .9);
+  border-radius: 14px;
+  background: rgb(var(--ivory-rgb) / .95);
+  box-shadow: 0 8px 24px rgb(var(--ink-rgb) / .14);
+  font-size: 10px;
+  backdrop-filter: blur(10px);
+  transform: translateX(-50%);
+}
 .konoha-preview-toggle { display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; }
 .konoha-preview-toggle input { width: 12px; height: 12px; accent-color: var(--accent); }
 .konoha-preview-date { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; }
@@ -248,6 +266,18 @@
 .konoha-preview-date button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
 .konoha-preview-actions { display: flex; justify-content: center; gap: 7px; margin-top: 4px; }
 .konoha-preview-actions button { display: flex; align-items: center; justify-content: center; min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.konoha-preview--fixed fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.konoha-preview--fixed .konoha-preview-date {
+  display: grid;
+  grid-template-columns: auto 36px minmax(82px, 1fr) 36px 36px;
+  gap: 4px;
+  margin-top: 0;
+}
+.konoha-preview--fixed .konoha-preview-toggle { justify-content: flex-start; gap: 5px; white-space: nowrap; }
+.konoha-preview--fixed .konoha-preview-date input { width: 100%; padding: 4px 0; }
+.konoha-preview--fixed .konoha-preview-date button { width: 36px; height: 36px; }
+.konoha-preview--fixed .konoha-preview-actions { gap: 5px; margin-top: 5px; }
+.konoha-preview--fixed .konoha-preview-actions button { flex: 1; min-height: 36px; padding: 4px 8px; }
 .konoha-preview-actions button:hover, .konoha-preview-date button:hover { background: rgb(var(--paper-rgb)); color: var(--accent); }
 .konoha-preview button:focus-visible, .konoha-preview input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .konoha-harvest-form { display: flex; gap: 8px; margin-top: 20px; }
