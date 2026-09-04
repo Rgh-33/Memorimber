@@ -9,6 +9,7 @@ import { BrandHomeLink } from "@/components/brand-home-link";
 import { useMemories } from "@/lib/memories-context";
 import { useProcessing } from "@/lib/processing-context";
 import { useProfile } from "@/lib/profile-context";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -16,12 +17,11 @@ export function AppHeader() {
   const { resetDemo } = useMemories();
   const { startProcessing } = useProcessing();
   const { avatarDataUrl, nickname } = useProfile();
+  useBodyScrollLock(menuOpen);
 
   useEffect(() => {
     if (!menuOpen) return;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     closeButtonRef.current?.focus();
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMenuOpen(false);
@@ -29,7 +29,6 @@ export function AppHeader() {
     document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleEscape);
     };
   }, [menuOpen]);

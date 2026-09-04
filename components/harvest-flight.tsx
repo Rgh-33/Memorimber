@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { MemoryPetal } from "@/components/memory-petal";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 type Phase = "writing" | "flying" | "fading" | "holding" | "returning";
 
@@ -26,16 +27,15 @@ export function HarvestFlight({ word, saved, onFinish }: { word: string; saved: 
   const writingMs = Math.max(1400, 700 + letters.length * 100);
   const fadeMs = reduced ? 180 : 650;
   const revealMs = reduced ? 180 : 550;
+  useBodyScrollLock();
 
   useEffect(() => {
     router.prefetch("/");
     surface.current?.focus({ preventScroll: true });
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduced(media.matches);
     media.addEventListener("change", update);
-    return () => { document.body.style.overflow = previous; media.removeEventListener("change", update); };
+    return () => media.removeEventListener("change", update);
   }, [router]);
 
   useEffect(() => {

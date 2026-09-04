@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/app-header";
 import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
 import { getFruitQuiz } from "@/lib/tree-growth";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 type FruitQuiz = NonNullable<ReturnType<typeof getFruitQuiz>>;
 
@@ -28,16 +29,14 @@ export function QuizSession({ quiz, variant = "page", onClose, onHarvest }: {
   const [word, setWord] = useState("");
   const { memory, question } = quiz;
   const answered = confirmed;
+  useBodyScrollLock(dialog);
 
   useEffect(() => {
     if (!dialog) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const frame = window.requestAnimationFrame(() => closeRef.current?.focus());
     return () => {
       window.cancelAnimationFrame(frame);
-      document.body.style.overflow = previousOverflow;
       previousFocus?.focus({ preventScroll: true });
     };
   }, [dialog]);
