@@ -10,6 +10,7 @@ import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
 import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
 import type { Memory } from "@/lib/types";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export function FruitQuizDialog({ memory, memories, onClose }: { memory: Memory; memories: Memory[]; onClose: () => void }) {
   const harvest = useHarvest();
@@ -23,17 +24,15 @@ export function FruitQuizDialog({ memory, memories, onClose }: { memory: Memory;
   const [answered, setAnswered] = useState(false);
   const [word, setWord] = useState("");
   const isCorrect = selected === question.correctChoiceId;
+  useBodyScrollLock();
 
   useEffect(() => {
     closeButton.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !harvest.busy) onClose();
     };
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleEscape);
     };
   }, [harvest.busy, onClose]);
