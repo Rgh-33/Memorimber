@@ -235,6 +235,15 @@ a {
   flex-direction: column;
 }
 
+.album-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin: -22px -20px 0;
+  padding: 22px 20px 0;
+  background: var(--ivory);
+}
+
 .album-page-memory-slot {
   display: flex;
   min-height: 0;

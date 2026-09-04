@@ -115,7 +115,9 @@ export default function AlbumPage() {
 
   return (
     <div className="album-page page-pad">
-      <AppHeader />
+      <div className="album-sticky-header">
+        <AppHeader />
+      </div>
       <section className="pt-7 text-center">
         <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">月間アルバム</h1>
       </section>

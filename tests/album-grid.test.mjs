@@ -47,3 +47,11 @@ test("month navigation stays after print in normal flow and the app allows verti
   assert.match(memoryPage, /href="\/album\?restore=1"/);
   assert.match(memoryPage, /href="\/album\?restore=1"[\s\S]*?scroll=\{false\}/);
 });
+
+test("album header stays visible while the album scrolls", () => {
+  const albumPage = readFileSync(new URL("../app/album/page.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(albumPage, /className="album-sticky-header"[\s\S]*?<AppHeader \/>/);
+  assert.match(css, /\.album-sticky-header\s*\{[^}]*position:\s*sticky[^}]*top:\s*0[^}]*z-index:\s*40[^}]*background:\s*var\(--ivory\)/s);
+});
