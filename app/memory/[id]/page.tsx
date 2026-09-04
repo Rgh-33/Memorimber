@@ -15,7 +15,7 @@ import { useMemories } from "@/lib/memories-context";
 import { usePreferences } from "@/lib/preferences-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { loadMemoryDetail, type MemoryDetail } from "@/lib/supabase/memories";
+import { loadMemory, type LoadedMemory } from "@/lib/supabase/memories";
 import { useTree } from "@/lib/tree-context";
 import type { Memory } from "@/lib/types";
 
@@ -47,7 +47,13 @@ function compareMemories(a: Memory, b: Memory) {
 export default function MemoryDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { memories, getRelatedMemories, refreshMemories } = useMemories();
+  const {
+    memories,
+    isLoading: memoriesLoading,
+    getRelatedMemories,
+    updateMemory: updateCachedMemory,
+    removeMemory,
+  } = useMemories();
   const {
     accountAlbumAppearance,
     albumAppearanceReady,
@@ -60,9 +66,11 @@ export default function MemoryDetailPage() {
   const requestVersion = useRef(0);
   const previewMemory = tree.preview ? tree.memories.find((item) => item.id === params.id) : undefined;
   const sampleMemory = SAMPLE_MEMORIES.find((item) => item.id === params.id);
-  const prototypeMemory = previewMemory ?? sampleMemory;
-  const [detail, setDetail] = useState<MemoryDetail | null>(null);
-  const [loadState, setLoadState] = useState<LoadState>(prototypeMemory ? "loaded" : "idle");
+  const cachedMemory = memories.find((item) => item.id === params.id);
+  const localMemory = previewMemory ?? sampleMemory ?? cachedMemory;
+  const isPrototypeMemory = Boolean(previewMemory ?? sampleMemory);
+  const [detail, setDetail] = useState<LoadedMemory | null>(null);
+  const [loadState, setLoadState] = useState<LoadState>(localMemory ? "loaded" : "idle");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
   const [draftMemory, setDraftMemory] = useState<Memory | null>(null);
@@ -79,7 +87,7 @@ export default function MemoryDetailPage() {
     if (showLoading) setLoadState("loading");
     setLoadError(null);
     try {
-      const result = await loadMemoryDetail(createClient(), params.id);
+      const result = await loadMemory(createClient(), params.id);
       if (version !== requestVersion.current) return;
       setDetail(result);
       setLoadState(result ? "loaded" : "not-found");
@@ -92,11 +100,15 @@ export default function MemoryDetailPage() {
   }, [params.id]);
 
   useEffect(() => {
-    if (prototypeMemory) {
+    if (localMemory) {
       requestVersion.current += 1;
       setDetail(null);
       setLoadError(null);
       setLoadState("loaded");
+      return;
+    }
+    if (memoriesLoading) {
+      setLoadState("loading");
       return;
     }
     if (!configured) {
@@ -108,7 +120,7 @@ export default function MemoryDetailPage() {
     }
     void fetchDetail();
     return () => { requestVersion.current += 1; };
-  }, [configured, fetchDetail, prototypeMemory]);
+  }, [configured, fetchDetail, localMemory, memoriesLoading]);
 
   useEffect(() => {
     setActionMode(null);
@@ -124,20 +136,25 @@ export default function MemoryDetailPage() {
     if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
   }, []);
 
+  const fetchedDetail = detail?.memory.id === params.id ? detail : null;
+  const memory = localMemory ?? fetchedDetail?.memory;
   const localNavigation = useMemo(() => {
-    if (!prototypeMemory) return null;
-    const source = previewMemory ? tree.memories : SAMPLE_MEMORIES;
+    if (!memory) return null;
+    const source = previewMemory
+      ? tree.memories
+      : sampleMemory
+        ? SAMPLE_MEMORIES
+        : memories.some((item) => item.id === memory.id) ? memories : [...memories, memory];
     const sorted = [...source].sort(compareMemories);
-    const currentIndex = sorted.findIndex((item) => item.id === prototypeMemory.id);
+    const currentIndex = sorted.findIndex((item) => item.id === memory.id);
     return {
       previousId: currentIndex > 0 ? sorted[currentIndex - 1].id : null,
       nextId: currentIndex < sorted.length - 1 ? sorted[currentIndex + 1].id : null,
     };
-  }, [previewMemory, prototypeMemory, tree.memories]);
+  }, [memories, memory, previewMemory, sampleMemory, tree.memories]);
 
-  const memory = prototypeMemory ?? detail?.memory;
-  const previousId = localNavigation?.previousId ?? detail?.previousId ?? null;
-  const nextId = localNavigation?.nextId ?? detail?.nextId ?? null;
+  const previousId = localNavigation?.previousId ?? null;
+  const nextId = localNavigation?.nextId ?? null;
   const related = useMemo(() => {
     if (!memory) return [];
     if (previewMemory) {
@@ -190,16 +207,14 @@ export default function MemoryDetailPage() {
 
   const handleUpdated = (updated: Memory) => {
     setDetail((current) => current ? { ...current, memory: updated } : current);
+    updateCachedMemory(updated);
     setDraftMemory(null);
     setActionMode(null);
-    void refreshMemories();
-    void fetchDetail(false);
   };
 
   const handleDeleted = () => {
-    void refreshMemories();
+    removeMemory(memory.id);
     router.replace("/album");
-    router.refresh();
   };
 
   const closeAction = () => {
@@ -313,14 +328,14 @@ export default function MemoryDetailPage() {
         <h1 className="font-sans text-[20px] font-medium tracking-[0.04em] text-ink sm:text-[23px] sm:tracking-[0.07em]">思い出の1ページ</h1>
       </div>
       {sampleMemory && <p className="print-hide mt-2 text-xs text-ink/55">サンプルの思い出です</p>}
-      {detail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{detail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
+      {fetchedDetail?.warning && <p role="status" className="print-hide mt-3 text-xs leading-5 text-ink/70">{fetchedDetail.warning}<button type="button" onClick={() => void fetchDetail(false)} className="ml-2 text-coral underline">再読み込み</button></p>}
 
       <div ref={printPageRef} className={`memory-book-page-shell memory-book-page-shell--${resolvedAppearance.orientation} mt-3`}>
         <MemoryBookPage
           memory={renderedMemory ?? memory}
           appearance={resolvedAppearance}
           harvestWord={harvestWord}
-          editControl={!prototypeMemory && detail ? (
+          editControl={!isPrototypeMemory ? (
             <button type="button" onClick={openEditor} className="memory-book-pencil" aria-label="思い出と手紙を編集" title="編集">
               <Pencil size={19} aria-hidden="true" />
             </button>
@@ -328,7 +343,7 @@ export default function MemoryDetailPage() {
         />
       </div>
 
-      {!prototypeMemory && detail && actionMode === "edit" && (
+      {!isPrototypeMemory && actionMode === "edit" && (
         <div className="print-hide">
           <MemoryDetailActions
             key={`edit-${memory.id}`}
@@ -378,7 +393,7 @@ export default function MemoryDetailPage() {
         {related.length > 0 ? <div className="grid grid-cols-3 gap-2.5">{related.map((item) => <MemoryCard key={item.id} memory={item} compact />)}</div> : <div className="rounded-xl border border-dashed border-coral/35 px-4 py-5 text-center text-xs text-ink/45">近い思い出を、これから増やしていこう。</div>}
       </section>
 
-      {!prototypeMemory && detail && (
+      {!isPrototypeMemory && (
         <div className="print-hide mt-8 border-t border-line pt-4">
           {actionMode === "delete" ? (
             <MemoryDetailActions key={`delete-${memory.id}`} memory={memory} mode="delete" onUpdated={handleUpdated} onDeleted={handleDeleted} onClose={closeAction} />

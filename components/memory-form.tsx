@@ -10,7 +10,8 @@ import { useProcessing } from "@/lib/processing-context";
 import { useTree } from "@/lib/tree-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getMemoryImageType, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
+import { getMemoryImageType, loadMemory, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
+import type { Memory } from "@/lib/types";
 
 const PEOPLE = ["友達", "家族", "クラスのみんな", "部活の仲間"];
 const TAGS = ["放課後", "帰り道", "教室", "行事", "昼休み", "8月"];
@@ -25,7 +26,7 @@ const today = () => {
 
 export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
-  const { refreshMemories } = useMemories();
+  const { addMemory } = useMemories();
   const { startProcessing, stopProcessing } = useProcessing();
   const tree = useTree();
   const configured = isSupabaseConfigured();
@@ -83,7 +84,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setter((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]));
   };
 
-  const onSaved = async (memoryId: string) => {
+  const onSaved = (memory: Memory) => {
     setSaveError(null);
     clearPending();
     setImage(null);
@@ -94,8 +95,8 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setTags([]);
     setErrors({});
     formRef.current?.reset();
-    tree.queueUploadArrival(memoryId);
-    await refreshMemories();
+    addMemory(memory);
+    tree.queueUploadArrival(memory.id);
     router.replace("/", { scroll: true });
   };
 
@@ -135,7 +136,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     startProcessing();
     try {
       const saved = await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
-      await onSaved(saved.id);
+      onSaved(saved);
     } catch (cause) {
       showSaveError(cause);
     } finally {
@@ -151,8 +152,13 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setStage("cleanup");
     startProcessing();
     try {
-      const result = await recoverMemorySave(createClient(), pending);
-      if (result.saved) await onSaved(result.id);
+      const client = createClient();
+      const result = await recoverMemorySave(client, pending);
+      if (result.saved) {
+        const loaded = await loadMemory(client, result.id);
+        if (!loaded) throw new MemorySaveError("保存済みの思い出を読み込めませんでした。もう一度、保存状態を確認してください。", pending);
+        onSaved(loaded.memory);
+      }
       else {
         clearPending();
         setSaveError("未保存の画像を取り消しました。入力内容を確認して、もう一度投稿できます。");
