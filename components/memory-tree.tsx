@@ -5,9 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { MemoryCard } from "@/components/memory-card";
 import { GrowingTree } from "@/components/growing-tree";
 import { MemoryPetal } from "@/components/memory-petal";
-import { QuizSession } from "@/components/quiz-session";
+import { FruitQuizDialog } from "@/components/fruit-quiz-dialog";
 import { useHarvest } from "@/lib/harvest-context";
-import { getFruitQuiz } from "@/lib/tree-growth";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 import type { TreeDisplayMode } from "@/lib/tree-preferences";
@@ -375,7 +374,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
 }) {
   const harvest = useHarvest();
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
-  const [quizMemoryId, setQuizMemoryId] = useState<string | null>(null);
+  const [fruitMemoryId, setFruitMemoryId] = useState<string | null>(null);
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const treeArtRef = useRef<HTMLDivElement>(null);
@@ -383,7 +382,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
   // moves the tree down instead of hiding older words behind a page control.
   const shownWords = useMemo(() => [...petals].reverse(), [petals]);
   const memoriesById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory])), [memories]);
-  const fruitQuiz = useMemo(() => getFruitQuiz(memories, items, quizMemoryId), [items, memories, quizMemoryId]);
+  const fruitQuizMemory = fruitMemoryId ? memoriesById.get(fruitMemoryId) ?? null : null;
   const relatedMemoryIds = revealedItem?.relatedMemoryIds?.length
     ? revealedItem.relatedMemoryIds
     : revealedItem?.memoryId
@@ -394,6 +393,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
     return memory ? [memory] : [];
   });
   const getTreeRect = useCallback(() => treeArtRef.current?.getBoundingClientRect() ?? null, []);
+  const closeFruitQuiz = useCallback(() => setFruitMemoryId(null), []);
 
   useEffect(() => {
     if (!revealedItem) return;
@@ -426,7 +426,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
       <div ref={treeArtRef} className="memory-tree-art konoha-tree-art">
         <GrowingTree items={items} memories={memories} count={count} totalCount={totalCount} month={month} mode={mode} onFruitSelect={(memoryId) => {
           setRevealedItem(null);
-          setQuizMemoryId(memoryId);
+          setFruitMemoryId(memoryId);
         }} />
       </div>
 
@@ -450,7 +450,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
             <h2 id="memory-reveal-title" className="mt-2 pr-8 text-xl font-semibold tracking-[0.04em] text-ink">
               「{revealedItem.word}」の思い出
             </h2>
-            <p className="mt-2 text-xs leading-5 text-ink/55">長押ししながら揺らして、記憶を呼び戻しました。</p>
+            <p className="mt-2 text-xs leading-5 text-ink/55">あの日のことが、ふっとよみがえりました。</p>
 
             <div className="memory-reveal-list">
               {relatedMemories.length > 0 ? (
@@ -464,18 +464,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
           </section>
         </div>
       )}
-
-      {fruitQuiz && (
-        <div className="konoha-quiz-overlay" onClick={() => setQuizMemoryId(null)}>
-          <QuizSession
-            key={fruitQuiz.memory.id}
-            quiz={fruitQuiz}
-            variant="dialog"
-            onClose={() => setQuizMemoryId(null)}
-            onHarvest={() => setQuizMemoryId(null)}
-          />
-        </div>
-      )}
+      {fruitQuizMemory && <FruitQuizDialog memory={fruitQuizMemory} memories={memories} onClose={closeFruitQuiz} />}
     </section>
   );
 }
