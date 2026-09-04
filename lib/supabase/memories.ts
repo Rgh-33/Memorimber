@@ -173,6 +173,23 @@ export async function saveMemory(
   const user = await requireUser(client);
   const id = createMemoryId();
   const pending = { id, userId: user.id, imagePath: `${user.id}/${id}.${extension}` };
+  const savedMemory = async (): Promise<Memory> => {
+    const signedImage = await signMemoryImage(client, pending.imagePath);
+    return {
+      id,
+      imagePath: pending.imagePath,
+      imageUrl: signedImage.imageUrl,
+      caption: fields.caption,
+      date: fields.memory_date,
+      people: fields.people,
+      tags: fields.tags,
+      letter: fields.letter ?? "",
+      albumAppearance: null,
+      // Supabase remains authoritative; this timestamp only keeps the tab-local
+      // copy stably ordered until the next intentional full refresh.
+      createdAt: new Date().toISOString(),
+    };
+  };
   // The form journals only these identifiers before upload, so reloads can
   // resume verification. No image bytes, caption, tokens or signed URLs persist.
   onPending?.(pending);
@@ -204,7 +221,7 @@ export async function saveMemory(
     // The database default auth.uid() supplies user_id. No ownership field,
     // public URL, data URL or signed URL is sent by the client.
     const { error, status } = await client.from("memories").insert({ id, image_path: pending.imagePath, ...fields });
-    if (!error) return { id };
+    if (!error) return savedMemory();
     failure = error;
     definitelyRejected = status >= 400 && status < 500 && Boolean(error.code);
   } catch (error) {
@@ -216,7 +233,7 @@ export async function saveMemory(
     // Do not delete a successfully committed photo just because its INSERT
     // response was lost. Check the fixed UUID before compensating.
     const result = await recoverMemorySave(client, pending, false);
-    if (result.saved) return { id };
+    if (result.saved) return savedMemory();
   } else {
     await removeUploadedImage(client, pending, `思い出を保存できませんでした。${errorDetail(failure)}`);
   }
@@ -259,6 +276,19 @@ function toMemory(row: MemoryRow, imageUrl = ""): Memory {
   };
 }
 
+async function signMemoryImage(client: SupabaseClient, imagePath: string) {
+  try {
+    const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
+      .createSignedUrls([imagePath], MEMORY_IMAGE_URL_LIFETIME);
+    if (error) throw error;
+    const imageUrl = data?.[0]?.signedUrl ?? "";
+    if (!imageUrl || data?.[0]?.error) throw data?.[0]?.error ?? new Error("Signed URL missing");
+    return { imageUrl, warning: null };
+  } catch {
+    return { imageUrl: "", warning: "写真を読み込めませんでした。時間をおいて再読み込みしてください。" };
+  }
+}
+
 async function loadOwnedMemoryRow(client: SupabaseClient, userId: string, id: string) {
   for (const columns of MEMORY_ROW_COLUMN_SETS) {
     const result = await client.from("memories").select(columns)
@@ -295,6 +325,18 @@ export type MemoryDetail = {
   warning: string | null;
 };
 
+export type LoadedMemory = Pick<MemoryDetail, "memory" | "warning">;
+
+/** Load one memory without also reading the complete ordering. */
+export async function loadMemory(client: SupabaseClient, id: string): Promise<LoadedMemory | null> {
+  if (!UUID_PATTERN.test(id)) return null;
+  const user = await requireUser(client);
+  const row = await loadOwnedMemoryRow(client, user.id, id);
+  if (!row) return null;
+  const signedImage = await signMemoryImage(client, row.image_path);
+  return { memory: toMemory(row, signedImage.imageUrl), warning: signedImage.warning };
+}
+
 /** Load one owned row by URL id. RLS is authoritative; user_id is extra scoping. */
 export async function loadMemoryDetail(client: SupabaseClient, id: string): Promise<MemoryDetail | null> {
   if (!UUID_PATTERN.test(id)) return null;
@@ -304,18 +346,7 @@ export async function loadMemoryDetail(client: SupabaseClient, id: string): Prom
 
   const [order, signedImage] = await Promise.all([
     loadMemoryOrder(client, user.id),
-    (async () => {
-      try {
-        const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
-          .createSignedUrls([row.image_path], MEMORY_IMAGE_URL_LIFETIME);
-        if (error) throw error;
-        const imageUrl = data?.[0]?.signedUrl ?? "";
-        if (!imageUrl || data?.[0]?.error) throw data?.[0]?.error ?? new Error("Signed URL missing");
-        return { imageUrl, warning: null };
-      } catch {
-        return { imageUrl: "", warning: "写真を読み込めませんでした。時間をおいて再読み込みしてください。" };
-      }
-    })(),
+    signMemoryImage(client, row.image_path),
   ]);
   const currentIndex = order.findIndex((item) => item.id === row.id);
   if (currentIndex < 0) throw new Error("前後の思い出を確認できませんでした。再読み込みしてください。");
@@ -485,7 +516,7 @@ export async function deleteMemory(client: SupabaseClient, id: string) {
 }
 
 /** RLS remains authoritative; the owner filter is additional query scoping. */
-export async function loadMemories(client: SupabaseClient): Promise<{ memories: Memory[]; warning: string | null }> {
+export async function loadMemories(client: SupabaseClient): Promise<{ memories: Memory[]; warning: string | null; userId: string }> {
   const user = await requireUser(client);
   const rows: MemoryRow[] = [];
   const pageSize = 100;
@@ -528,5 +559,6 @@ export async function loadMemories(client: SupabaseClient): Promise<{ memories: 
   return {
     memories: rows.map((row) => toMemory(row, urls.get(row.image_path) ?? "")),
     warning,
+    userId: user.id,
   };
 }

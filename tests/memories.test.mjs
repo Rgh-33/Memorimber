@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import {
-  deleteMemory, getMemoryImageType, loadMemories, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES, MAX_MEMORY_LETTER_LENGTH,
+  deleteMemory, getMemoryImageType, loadMemories, loadMemory, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES, MAX_MEMORY_LETTER_LENGTH,
   MEMORY_IMAGE_BUCKET, MemoryNotFoundError, MemorySaveError, readPendingMemoryUpload,
   recoverMemorySave, saveMemory, updateMemory, updateMemoryAlbumAppearance, validateMemoryFields, validateMemoryInput,
 } from "../lib/supabase/memories.ts";
@@ -142,6 +142,10 @@ for (const [extension, mime] of [["jpg", "image/jpeg"], ["png", "image/png"], ["
     assert.equal(h.rows.get(result.id).image_path, path);
     assert.equal(h.objects.get(path).type, mime);
     assert.equal(await h.objects.get(path).text(), "unchanged bytes");
+    assert.equal(result.imagePath, path);
+    assert.match(result.imageUrl, /\/object\/sign\/memory-images\//);
+    assert.equal(result.caption, "帰り道の思い出");
+    assert.deepEqual(result.people, ["友達", "家族"]);
     const insert = h.calls.find((call) => call.method === "POST" && call.url.pathname === "/rest/v1/memories");
     assert.deepEqual(Object.keys(insert.body).sort(), ["id", "image_path", "caption", "memory_date", "people", "tags"].sort());
     assert.equal(insert.body.caption, "帰り道の思い出");
@@ -341,6 +345,16 @@ test("detail loads one owned URL id, signs its private image, and orders same-da
   assert.ok(reads.every((call) => call.url.searchParams.get("user_id") === `eq.${USER_ID}`));
   const sign = h.calls.find((call) => call.url?.pathname.includes("/object/sign/"));
   assert.deepEqual(sign.body.paths, [`${USER_ID}/${DETAIL_IDS.current}.jpg`]);
+});
+
+test("single-memory loading does not query the complete navigation order", async () => {
+  const h = harness({ rows: [detailRow(DETAIL_IDS.current)] });
+  const result = await loadMemory(h.client, DETAIL_IDS.current);
+  assert.equal(result.memory.id, DETAIL_IDS.current);
+  assert.match(result.memory.imageUrl, /\/object\/sign\/memory-images\//);
+  const reads = h.calls.filter((call) => call.method === "GET" && call.url?.pathname === "/rest/v1/memories");
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].url.searchParams.get("id"), `eq.${DETAIL_IDS.current}`);
 });
 
 test("another owner's or invalid memory id is indistinguishable from not found", async () => {

@@ -13,7 +13,7 @@ import { useTree } from "@/lib/tree-context";
 
 export default function MemoryAlbumSettingsPage() {
   const params = useParams<{ id: string }>();
-  const { getMemory, isLoading, error, refreshMemories } = useMemories();
+  const { getMemory, isLoading, error, updateMemory: updateCachedMemory } = useMemories();
   const {
     albumAppearance: defaultAppearance,
     albumAppearanceReady,
@@ -41,7 +41,7 @@ export default function MemoryAlbumSettingsPage() {
     try {
       const saved = await updateMemoryAlbumAppearance(createClient(), memory.id, next);
       setIndividualAppearance(saved);
-      void refreshMemories();
+      updateCachedMemory({ ...memory, albumAppearance: saved });
     } catch (cause) {
       setIndividualAppearance(previous);
       setSaveError(cause instanceof Error ? cause.message : "個別の見た目を保存できませんでした。");
