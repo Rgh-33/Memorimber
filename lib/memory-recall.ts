@@ -29,9 +29,10 @@ export function chooseFadingMemoryId(
   petals: Extract<MemoryTreeItem, { stage: "harvested" }>[],
   state: MemoryRecallState,
   now: number,
-  random: () => number = Math.random,
+  options: { ignoreAge?: boolean; random?: () => number } = {},
 ) {
   const eligible = petals.filter((petal) => {
+    if (options.ignoreAge) return true;
     const memoryId = petal.memoryId ?? petal.id;
     const harvestedAt = Date.parse(petal.harvestedAt ?? "");
     const lastRemembered = Math.max(Number.isFinite(harvestedAt) ? harvestedAt : now, state.reviewedAt[memoryId] ?? 0);
@@ -40,7 +41,7 @@ export function chooseFadingMemoryId(
   if (eligible.length === 0) return null;
   const existing = eligible.find((petal) => (petal.memoryId ?? petal.id) === state.featuredId);
   if (existing) return state.featuredId;
-  const index = Math.min(eligible.length - 1, Math.floor(Math.max(0, random()) * eligible.length));
+  const index = Math.min(eligible.length - 1, Math.floor(Math.max(0, (options.random ?? Math.random)()) * eligible.length));
   return eligible[index].memoryId ?? eligible[index].id;
 }
 

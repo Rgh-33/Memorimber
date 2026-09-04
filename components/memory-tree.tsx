@@ -365,12 +365,17 @@ function FloatingWord({
           <MemoryPetal />
           <span className="memory-floating-word-label">{item.word}</span>
         </span>
+        {isFading && (
+          <span className="konoha-fading-pixels" aria-hidden="true">
+            {Array.from({ length: 18 }, (_, index) => <span key={index} className="konoha-fading-pixel" />)}
+          </span>
+        )}
       </span>
     </button>
   );
 }
 
-export function MemoryTree({ items, petals, memories, count, totalCount, month, mode, onUploadAnimationComplete }: {
+export function MemoryTree({ items, petals, memories, count, totalCount, month, mode, preview, onUploadAnimationComplete }: {
   items: MemoryTreeItem[];
   petals: HarvestedTreeItem[];
   memories: Memory[];
@@ -378,6 +383,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
   totalCount: number;
   month: string;
   mode: TreeDisplayMode;
+  preview: boolean;
   onUploadAnimationComplete: (memoryId: string) => void;
 }) {
   const harvest = useHarvest();
@@ -411,15 +417,16 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
 
   useEffect(() => {
     if (recallSelectionReady.current) return;
+    if (shownWords.length === 0) return;
     recallSelectionReady.current = true;
     let stored = EMPTY_MEMORY_RECALL_STATE;
     try { stored = readMemoryRecallState(localStorage.getItem(MEMORY_RECALL_STORAGE_KEY)); } catch { /* In-memory selection still works. */ }
-    const featuredId = chooseFadingMemoryId(shownWords, stored, Date.now());
+    const featuredId = chooseFadingMemoryId(shownWords, stored, Date.now(), { ignoreAge: preview });
     const next = { ...stored, featuredId };
     setRecallState(next);
     setFadingMemoryId(featuredId);
     try { localStorage.setItem(MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory selection still works. */ }
-  }, [shownWords]);
+  }, [preview, shownWords]);
 
   const rememberInteraction = useCallback((memoryId: string) => {
     setRecallState((current) => {

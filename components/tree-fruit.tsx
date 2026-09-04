@@ -39,9 +39,15 @@ export function TreeFruit({ uid, appearance, mature, newlyFormed = false, justRi
       <path className="konoha-new-fruit-glint" d="M0 -23V-16 M-3.5 -19.5H3.5 M18 -12V-7 M15.5 -9.5H20.5" />
     </g>}
     {justRipened && <g className="konoha-just-ripe-celebration" aria-hidden="true">
+      <ellipse className="konoha-just-ripe-flash" cx="0" cy="1" rx="19" ry="20" />
       <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--one" cx="0" cy="1" rx="20" ry="21" />
       <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--two" cx="0" cy="1" rx="24" ry="25" />
       <path className="konoha-just-ripe-burst" d="M0 -29V-21 M0 23V31 M-28 1H-20 M20 1H28 M-20 -19L-14 -13 M14 15L20 21 M20 -19L14 -13 M-14 15L-20 21" />
+      <g className="konoha-just-ripe-sparks">
+        <circle cx="-25" cy="-12" r="2.1" /><circle cx="24" cy="-15" r="1.7" />
+        <circle cx="29" cy="8" r="2" /><circle cx="-28" cy="11" r="1.6" />
+        <circle cx="-14" cy="27" r="1.8" /><circle cx="15" cy="28" r="1.4" />
+      </g>
     </g>}
     {mature && <ellipse className="konoha-ripe-aura" cx="0" cy="1" rx="20" ry="21" />}
     <path d="M0 -15 Q-1 -11 1 -8" fill="none" stroke="#5b4a2d" strokeWidth="2" strokeLinecap="round" />

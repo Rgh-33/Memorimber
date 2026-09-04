@@ -13,3 +13,10 @@ export function getAlbumFirstColumn(memoryCount: number) {
   const remainder = Math.max(0, memoryCount) % ALBUM_GRID_COLUMNS;
   return remainder === 0 ? 1 : ALBUM_GRID_COLUMNS - remainder + 1;
 }
+
+/** Reserve complete rows for the fullest month so changing months never
+ * moves the controls or changes the document height. */
+export function getAlbumGridSlotCount(monthCounts: number[]) {
+  const maximum = Math.max(0, ...monthCounts.map((count) => Math.max(0, count)));
+  return Math.max(ALBUM_GRID_COLUMNS, Math.ceil(maximum / ALBUM_GRID_COLUMNS) * ALBUM_GRID_COLUMNS);
+}

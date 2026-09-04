@@ -25,6 +25,7 @@ export default function HomePage() {
       ) : tree.ready ? (
         <MemoryTree key={`${tree.preview}-${tree.date.slice(0, 7)}-${tree.treeMode}`} items={tree.visibleItems} petals={tree.petals} memories={tree.memories}
           count={tree.count} totalCount={tree.totalCount} month={tree.date.slice(0, 7)} mode={tree.treeMode}
+          preview={tree.preview}
           onUploadAnimationComplete={tree.completeUploadArrival} />
       ) : (
         <p role="status" className="py-12 text-center text-sm text-ink/65">思い出の木を読み込んでいます…</p>

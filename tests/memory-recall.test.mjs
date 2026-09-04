@@ -8,8 +8,13 @@ const petal = (id, age) => ({ id, memoryId: id, stage: "harvested", word: id, wo
 
 test("only one long-unshaken memory is selected and the selection stays stable", () => {
   const petals = [petal("fresh", MEMORY_RECALL_STALE_MS - 1), petal("old-a", MEMORY_RECALL_STALE_MS), petal("old-b", MEMORY_RECALL_STALE_MS * 2)];
-  assert.equal(chooseFadingMemoryId(petals, { reviewedAt: {}, featuredId: null }, now, () => 0.99), "old-b");
-  assert.equal(chooseFadingMemoryId(petals, { reviewedAt: {}, featuredId: "old-a" }, now, () => 0.99), "old-a");
+  assert.equal(chooseFadingMemoryId(petals, { reviewedAt: {}, featuredId: null }, now, { random: () => 0.99 }), "old-b");
+  assert.equal(chooseFadingMemoryId(petals, { reviewedAt: {}, featuredId: "old-a" }, now, { random: () => 0.99 }), "old-a");
+});
+
+test("preview can feature a fresh petal immediately", () => {
+  const fresh = petal("fresh", 0);
+  assert.equal(chooseFadingMemoryId([fresh], { reviewedAt: {}, featuredId: null }, now, { ignoreAge: true }), "fresh");
 });
 
 test("shaking a petal postpones fading and clears its featured state", () => {
