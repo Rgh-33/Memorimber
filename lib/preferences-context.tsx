@@ -16,6 +16,12 @@ import {
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
 import { loadAccountAlbumAppearance, updateAccountAlbumAppearance } from "./supabase/album-preferences";
+import {
+  clampAudioVolumeLevel,
+  DEFAULT_AUDIO_VOLUME_LEVEL,
+  isAudioVolumeLevel,
+  legacyPercentToAudioVolumeLevel,
+} from "./audio-volume";
 
 export type {
   AlbumAppearance,
@@ -119,14 +125,12 @@ const ALBUM_TEXT_COLOR_STORAGE_KEY = "memorimber-album-text-color";
 const ALBUM_BACKGROUND_STORAGE_KEY = "memorimber-album-background";
 const ALBUM_PATTERN_STORAGE_KEY = "memorimber-album-pattern";
 const ALBUM_ORIENTATION_STORAGE_KEY = "memorimber-album-orientation";
-const BGM_VOLUME_STORAGE_KEY = "memorimber-bgm-volume";
-const SOUND_EFFECT_VOLUME_STORAGE_KEY = "memorimber-sound-effect-volume";
+const BGM_VOLUME_STORAGE_KEY = "memorimber-bgm-volume-level";
+const SOUND_EFFECT_VOLUME_STORAGE_KEY = "memorimber-sound-effect-volume-level";
+const LEGACY_BGM_VOLUME_STORAGE_KEY = "memorimber-bgm-volume";
+const LEGACY_SOUND_EFFECT_VOLUME_STORAGE_KEY = "memorimber-sound-effect-volume";
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
-
-function clampVolume(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
 
 function isAppTheme(value: string | null): value is AppTheme {
   return APP_THEMES.some((theme) => theme.id === value);
@@ -169,8 +173,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [albumAppearanceLoading, setAlbumAppearanceLoading] = useState(configured);
   const [albumAppearanceSaving, setAlbumAppearanceSaving] = useState(false);
   const [albumAppearanceError, setAlbumAppearanceError] = useState<string | null>(null);
-  const [bgmVolume, setBgmVolumeState] = useState(55);
-  const [soundEffectVolume, setSoundEffectVolumeState] = useState(70);
+  const [bgmVolume, setBgmVolumeState] = useState<number>(DEFAULT_AUDIO_VOLUME_LEVEL);
+  const [soundEffectVolume, setSoundEffectVolumeState] = useState<number>(DEFAULT_AUDIO_VOLUME_LEVEL);
   const [treeMode, setTreeModeState] = useState<TreeDisplayMode>(DEFAULT_TREE_DISPLAY_MODE);
   const [preferencesReady, setPreferencesReady] = useState(false);
   const albumRequestVersion = useRef(0);
@@ -203,6 +207,18 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       }
       savedBgmVolume = window.localStorage.getItem(BGM_VOLUME_STORAGE_KEY);
       savedSoundEffectVolume = window.localStorage.getItem(SOUND_EFFECT_VOLUME_STORAGE_KEY);
+      if (savedBgmVolume === null) {
+        const legacyValue = window.localStorage.getItem(LEGACY_BGM_VOLUME_STORAGE_KEY);
+        if (legacyValue !== null && Number.isFinite(Number(legacyValue))) {
+          savedBgmVolume = String(legacyPercentToAudioVolumeLevel(Number(legacyValue)));
+        }
+      }
+      if (savedSoundEffectVolume === null) {
+        const legacyValue = window.localStorage.getItem(LEGACY_SOUND_EFFECT_VOLUME_STORAGE_KEY);
+        if (legacyValue !== null && Number.isFinite(Number(legacyValue))) {
+          savedSoundEffectVolume = String(legacyPercentToAudioVolumeLevel(Number(legacyValue)));
+        }
+      }
       savedTreeMode = window.localStorage.getItem(TREE_DISPLAY_MODE_STORAGE_KEY);
     } catch { /* Keep all defaults when browser storage is unavailable. */ }
 
@@ -226,11 +242,11 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       setAlbumAppearanceReady(true);
       setAlbumAppearanceLoading(false);
     }
-    if (savedBgmVolume !== null && Number.isFinite(Number(savedBgmVolume))) {
-      setBgmVolumeState(clampVolume(Number(savedBgmVolume)));
+    if (savedBgmVolume !== null && isAudioVolumeLevel(Number(savedBgmVolume))) {
+      setBgmVolumeState(Number(savedBgmVolume));
     }
-    if (savedSoundEffectVolume !== null && Number.isFinite(Number(savedSoundEffectVolume))) {
-      setSoundEffectVolumeState(clampVolume(Number(savedSoundEffectVolume)));
+    if (savedSoundEffectVolume !== null && isAudioVolumeLevel(Number(savedSoundEffectVolume))) {
+      setSoundEffectVolumeState(Number(savedSoundEffectVolume));
     }
     setTreeModeState(parseTreeDisplayMode(savedTreeMode));
     setPreferencesReady(true);
@@ -338,13 +354,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   }, [accountAlbumAppearance, albumAppearanceReady, configured]);
 
   const setBgmVolume = useCallback((volume: number) => {
-    const nextVolume = clampVolume(volume);
+    const nextVolume = clampAudioVolumeLevel(volume);
     setBgmVolumeState(nextVolume);
     window.localStorage.setItem(BGM_VOLUME_STORAGE_KEY, String(nextVolume));
   }, []);
 
   const setSoundEffectVolume = useCallback((volume: number) => {
-    const nextVolume = clampVolume(volume);
+    const nextVolume = clampAudioVolumeLevel(volume);
     setSoundEffectVolumeState(nextVolume);
     window.localStorage.setItem(SOUND_EFFECT_VOLUME_STORAGE_KEY, String(nextVolume));
   }, []);
