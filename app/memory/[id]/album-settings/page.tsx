@@ -14,12 +14,19 @@ import { useTree } from "@/lib/tree-context";
 export default function MemoryAlbumSettingsPage() {
   const params = useParams<{ id: string }>();
   const { getMemory, isLoading, error, refreshMemories } = useMemories();
-  const { albumAppearance: defaultAppearance } = usePreferences();
+  const {
+    albumAppearance: defaultAppearance,
+    albumAppearanceReady,
+    albumAppearanceLoading,
+    albumAppearanceError,
+    reloadAlbumAppearance,
+  } = usePreferences();
   const tree = useTree();
   const memory = getMemory(params.id);
   const [individualAppearance, setIndividualAppearance] = useState<AlbumAppearance | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const inheritedAppearanceUnavailable = !memory?.albumAppearance && !albumAppearanceReady;
 
   useEffect(() => {
     setIndividualAppearance(memory?.albumAppearance ?? null);
@@ -63,8 +70,11 @@ export default function MemoryAlbumSettingsPage() {
           contextual
           appearance={individualAppearance ?? defaultAppearance}
           onAppearanceChange={(next) => void handleAppearanceChange(next)}
+          loading={inheritedAppearanceUnavailable && albumAppearanceLoading}
           saving={saving}
-          saveError={saveError}
+          controlsDisabled={inheritedAppearanceUnavailable}
+          saveError={saveError ?? (inheritedAppearanceUnavailable ? albumAppearanceError : null)}
+          onRetry={inheritedAppearanceUnavailable && !albumAppearanceLoading ? () => void reloadAlbumAppearance() : undefined}
           harvestWord={tree.harvestWordFor(memory.id)}
         />
       ) : (

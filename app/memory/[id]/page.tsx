@@ -10,6 +10,7 @@ import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
 import { SAMPLE_MEMORIES } from "@/lib/data";
 import { createAlbumPdf, getAlbumPdfFilename } from "@/lib/album-pdf";
+import { resolveAlbumAppearance } from "@/lib/album-appearance";
 import { useMemories } from "@/lib/memories-context";
 import { usePreferences } from "@/lib/preferences-context";
 import { createClient } from "@/lib/supabase/client";
@@ -47,7 +48,13 @@ export default function MemoryDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { memories, getRelatedMemories, refreshMemories } = useMemories();
-  const { albumAppearance: defaultAlbumAppearance } = usePreferences();
+  const {
+    accountAlbumAppearance,
+    albumAppearanceReady,
+    albumAppearanceLoading,
+    albumAppearanceError,
+    reloadAlbumAppearance,
+  } = usePreferences();
   const tree = useTree();
   const configured = isSupabaseConfigured();
   const requestVersion = useRef(0);
@@ -140,16 +147,18 @@ export default function MemoryDetailPage() {
   }, [getRelatedMemories, memories, memory, previewMemory, tree.memories]);
 
   const renderedMemory = memory ? (draftMemory ?? memory) : null;
-  const resolvedAppearance = renderedMemory?.albumAppearance ?? defaultAlbumAppearance;
+  const accountAppearanceRequired = Boolean(renderedMemory && !renderedMemory.albumAppearance && configured);
+  const resolvedAppearance = resolveAlbumAppearance(renderedMemory?.albumAppearance, accountAlbumAppearance);
 
   useEffect(() => {
+    if (accountAppearanceRequired && !albumAppearanceReady) return;
     applyAlbumPrintPageSize(resolvedAppearance.orientation);
 
     return () => {
       document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID)?.remove();
       delete document.documentElement.dataset.albumPrintOrientation;
     };
-  }, [resolvedAppearance.orientation]);
+  }, [accountAppearanceRequired, albumAppearanceReady, resolvedAppearance.orientation]);
 
   if (loadState === "idle" || loadState === "loading") {
     return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p role="status">思い出を読み込んでいます…</p></div></div>;
@@ -161,6 +170,22 @@ export default function MemoryDetailPage() {
 
   if (loadState === "not-found" || !memory) {
     return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center"><p className="font-medium">思い出が見つかりません</p><p className="mt-2 text-xs leading-5 text-ink/55">削除されたか、この思い出を閲覧する権限がありません。</p><Link href="/album" className="mt-4 inline-block rounded-lg bg-coral px-5 py-3 text-xs font-medium text-white">アルバムへ戻る</Link></div></div>;
+  }
+
+  if (accountAppearanceRequired && !albumAppearanceReady) {
+    return (
+      <div className="page-pad">
+        <AppHeader />
+        {albumAppearanceLoading ? (
+          <p role="status" className="mt-16 text-center text-sm text-ink/65">アルバム設定を読み込んでいます…</p>
+        ) : (
+          <div role="alert" className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6">
+            <p>{albumAppearanceError ?? "アルバム設定を読み込めませんでした。"}</p>
+            <button type="button" onClick={() => void reloadAlbumAppearance()} className="mt-3 text-coral underline">再読み込み</button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   const handleUpdated = (updated: Memory) => {

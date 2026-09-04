@@ -41,3 +41,10 @@ export function isAlbumAppearance(value: unknown): value is AlbumAppearance {
     && PATTERNS.includes(appearance.pattern as AlbumPattern)
     && ORIENTATIONS.includes(appearance.orientation as AlbumOrientation);
 }
+
+export function resolveAlbumAppearance(
+  memoryAppearance?: AlbumAppearance | null,
+  accountAppearance?: AlbumAppearance | null,
+): AlbumAppearance {
+  return memoryAppearance ?? accountAppearance ?? DEFAULT_ALBUM_APPEARANCE;
+}

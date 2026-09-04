@@ -61,6 +61,11 @@ export default function SettingDetailPage() {
     bgmVolume,
     soundEffectVolume,
     treeMode,
+    albumAppearanceReady,
+    albumAppearanceLoading,
+    albumAppearanceSaving,
+    albumAppearanceError,
+    reloadAlbumAppearance,
     setTheme,
     setColorMode,
     setBgmVolume,
@@ -193,7 +198,15 @@ export default function SettingDetailPage() {
       )}
 
       {section === "album" && (
-        <AlbumSettingsPanel memory={SAMPLE_MEMORIES[0]} harvestWord="帰り道" />
+        <AlbumSettingsPanel
+          memory={SAMPLE_MEMORIES[0]}
+          loading={albumAppearanceLoading}
+          saving={albumAppearanceSaving}
+          controlsDisabled={!albumAppearanceReady}
+          saveError={albumAppearanceError}
+          onRetry={!albumAppearanceReady && !albumAppearanceLoading ? () => void reloadAlbumAppearance() : undefined}
+          harvestWord="帰り道"
+        />
       )}
 
       {section !== "style" && section !== "sound" && section !== "tree" && section !== "album" && (
