@@ -143,15 +143,18 @@ export default function ProfilePage() {
 
       <section className="mt-7 px-1">
         <label htmlFor="profile-avatar" className="group relative z-10 mx-auto block w-fit cursor-pointer text-center">
-          <span className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2 border-coral bg-paper text-coral shadow-card ring-4 ring-coral/10">
-            {avatarDataUrl ? (
-              <Image src={avatarDataUrl} alt="選択したプロフィールアイコン" fill sizes="96px" className="object-cover" unoptimized />
-            ) : (
-              <UserRound size={45} strokeWidth={1.35} />
-            )}
-            <span className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full border-2 border-ivory bg-coral text-white shadow-sm">
+          <span className="profile-avatar-control">
+            <span className="profile-avatar-image relative grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2 border-coral bg-paper text-coral shadow-card ring-4 ring-coral/10">
+              {avatarDataUrl ? (
+                <Image src={avatarDataUrl} alt="選択したプロフィールアイコン" fill sizes="96px" className="object-cover" unoptimized />
+              ) : (
+                <UserRound size={45} strokeWidth={1.35} />
+              )}
+            </span>
+            <span className="profile-avatar-camera grid h-8 w-8 place-items-center rounded-full border-2 border-ivory bg-coral text-white shadow-sm" aria-hidden="true">
               <Camera size={15} />
             </span>
+            <span className="sr-only">プロフィール画像を変更</span>
           </span>
         </label>
         <input id="profile-avatar" type="file" accept="image/*" className="sr-only" onChange={handleAvatarChange} />

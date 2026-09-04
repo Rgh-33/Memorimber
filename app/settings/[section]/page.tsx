@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { Moon, Sun, Trees } from "lucide-react";
 import { AlbumSettingsPanel } from "@/components/album-settings-panel";
 import { SettingsHeader } from "@/components/settings-header";
+import { AUDIO_VOLUME_LEVELS } from "@/lib/audio-volume";
 import { SAMPLE_MEMORIES } from "@/lib/data";
 import { APP_COLOR_MODES, APP_THEMES, usePreferences } from "@/lib/preferences-context";
 import { TREE_DISPLAY_MODES } from "@/lib/tree-preferences";
@@ -37,17 +38,21 @@ function VolumeSetting({
     <label className="block">
       <span className="flex items-center justify-between text-sm font-medium text-ink">
         {label}
-        <output className="text-xs tabular-nums text-ink/50">{value}%</output>
+        <output className="text-xs tabular-nums text-ink/50">{value}</output>
       </span>
       <input
         type="range"
         min="0"
-        max="100"
+        max="5"
+        step="1"
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
         className="settings-volume mt-3 w-full"
         aria-label={`${label}の音量`}
       />
+      <div className="mt-0.5 grid grid-cols-6 text-center text-[10px] tabular-nums text-ink/40" aria-hidden="true">
+        {AUDIO_VOLUME_LEVELS.map((level) => <span key={level}>{level}</span>)}
+      </div>
     </label>
   );
 }
@@ -155,7 +160,7 @@ export default function SettingDetailPage() {
       {section === "sound" && (
         <section className="settings-card mt-7" aria-labelledby="sound-heading">
           <h2 id="sound-heading" className="text-base font-semibold text-ink">音量</h2>
-          <p className="mt-1 text-xs leading-6 text-ink/50">音源追加後に、この値をそのまま接続できます。</p>
+          <p className="mt-1 text-xs leading-6 text-ink/50">0〜5の6段階で調節できます。</p>
           <div className="mt-6 space-y-6">
             <VolumeSetting label="BGM" value={bgmVolume} onChange={setBgmVolume} />
             <VolumeSetting label="効果音" value={soundEffectVolume} onChange={setSoundEffectVolume} />
