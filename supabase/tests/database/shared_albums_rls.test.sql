@@ -1,6 +1,6 @@
 begin;
 
-select plan(54);
+select plan(56);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -56,12 +56,47 @@ values (
   '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'
 );
 
+-- Capture INSERT ... RETURNING separately: results_eq opens a cursor, which
+-- cannot execute a data-modifying CTE. Only this temporary result table needs
+-- extra grants; shared album writes still use the normal authenticated RLS.
+create temporary table created_shared_album_result (
+  id uuid,
+  owner_id uuid,
+  name text,
+  created_at timestamptz,
+  updated_at timestamptz
+) on commit drop;
+
+grant insert, select on table pg_temp.created_shared_album_result to authenticated;
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
 
 select lives_ok(
-  $$insert into public.shared_albums (name) values ('家族の思い出')$$,
-  'an authenticated user can create a shared album'
+  $$with created as (
+    insert into public.shared_albums (name) values ('家族の思い出')
+    returning id, owner_id, name, created_at, updated_at
+  )
+  insert into pg_temp.created_shared_album_result (id, owner_id, name, created_at, updated_at)
+  select id, owner_id, name, created_at, updated_at
+  from created$$,
+  'an authenticated user can create a shared album and return it in the same statement'
+);
+
+select results_eq(
+  $$select id is not null, owner_id, name, created_at = now(), updated_at = now()
+    from pg_temp.created_shared_album_result$$,
+  $$values (true, '10000000-0000-0000-0000-000000000001'::uuid, '家族の思い出'::text, true, true)$$,
+  'album creation returns its generated ID, owner, name and timestamps like the app request'
+);
+
+select throws_ok(
+  $$insert into public.shared_albums (name, owner_id)
+    values ('偽装した所有者', '20000000-0000-0000-0000-000000000002')
+    returning id, owner_id, name, created_at, updated_at$$,
+  '42501',
+  null,
+  'clients cannot create an album owned by another user'
 );
 
 reset role;
