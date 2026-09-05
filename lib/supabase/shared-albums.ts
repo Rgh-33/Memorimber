@@ -4,7 +4,7 @@ import type { Memory } from "../types";
 import { MEMORY_IMAGE_BUCKET, MEMORY_IMAGE_URL_LIFETIME } from "./memories.ts";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MEMORY_COLUMNS = "id, user_id, image_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at";
+const MEMORY_COLUMNS = "id, user_id, image_path, thumbnail_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at";
 const SHARED_MEMORY_COLUMNS = `album_id, memory_id, added_by, added_by_display_name, created_at, memory:memories!inner(${MEMORY_COLUMNS})`;
 
 export type SharedAlbum = {
@@ -43,6 +43,7 @@ type MemoryRow = {
   id: string;
   user_id: string | null;
   image_path: string;
+  thumbnail_path?: string | null;
   caption: string;
   memory_date: string;
   people: string[];
@@ -98,11 +99,13 @@ function toAlbum(row: AlbumRow): SharedAlbum {
   return { id: row.id, ownerId: row.owner_id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
-function toMemory(row: MemoryRow, imageUrl: string): Memory {
+function toMemory(row: MemoryRow, imageUrl: string, thumbnailUrl?: string): Memory {
   return {
     id: row.id,
     imagePath: row.image_path,
     imageUrl,
+    thumbnailPath: row.thumbnail_path ?? undefined,
+    thumbnailUrl,
     caption: row.caption,
     date: row.memory_date,
     people: Array.isArray(row.people) ? row.people : [],
@@ -183,12 +186,14 @@ export async function listOwnMemoriesForSharing(
 async function signMemoryImages(client: SupabaseClient, rows: MemoryRow[]) {
   const urls = new Map<string, string>();
   let warning: string | null = null;
+  const paths = [...new Set(rows.flatMap((row) => [row.image_path, row.thumbnail_path]
+    .filter((path): path is string => Boolean(path))))];
   const pageSize = 100;
-  for (let offset = 0; offset < rows.length; offset += pageSize) {
-    const paths = rows.slice(offset, offset + pageSize).map((row) => row.image_path);
+  for (let offset = 0; offset < paths.length; offset += pageSize) {
+    const pagePaths = paths.slice(offset, offset + pageSize);
     try {
       const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
-        .createSignedUrls(paths, MEMORY_IMAGE_URL_LIFETIME);
+        .createSignedUrls(pagePaths, MEMORY_IMAGE_URL_LIFETIME);
       if (error) throw error;
       for (const item of data ?? []) {
         if (item.path && item.signedUrl && !item.error) urls.set(item.path, item.signedUrl);
@@ -197,7 +202,7 @@ async function signMemoryImages(client: SupabaseClient, rows: MemoryRow[]) {
       warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
     }
   }
-  if (urls.size !== rows.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
+  if (urls.size !== paths.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
   return { urls, warning };
 }
 
@@ -232,7 +237,11 @@ export async function loadSharedAlbumMemoryEntries(
       contributorName: row.added_by_display_name ?? null,
       addedAt: row.created_at,
       memoryOwnerId: memory.user_id,
-      memory: toMemory(memory, urls.get(memory.image_path) ?? ""),
+      memory: toMemory(
+        memory,
+        urls.get(memory.image_path) ?? "",
+        memory.thumbnail_path ? urls.get(memory.thumbnail_path) : undefined,
+      ),
     })),
     warning,
   };

@@ -10,7 +10,6 @@ import {
 
 const ALBUM_ID = "10000000-0000-4000-8000-000000000001";
 const OWNER_ID = "20000000-0000-4000-8000-000000000002";
-const MEMBER_ID = "30000000-0000-4000-8000-000000000003";
 
 function loaderClient() {
   const rows = [
@@ -23,6 +22,7 @@ function loaderClient() {
         id: "40000000-0000-4000-8000-000000000004",
         user_id: OWNER_ID,
         image_path: `${OWNER_ID}/one.jpg`,
+        thumbnail_path: `${OWNER_ID}/thumbnails/one.webp`,
         caption: "一枚目",
         memory_date: "2026-09-01",
         people: ["家族"],
@@ -34,12 +34,13 @@ function loaderClient() {
     {
       album_id: ALBUM_ID,
       memory_id: "50000000-0000-4000-8000-000000000005",
-      added_by: MEMBER_ID,
+      added_by: null,
+      added_by_display_name: "退会した人",
       created_at: "2026-09-05T02:00:00Z",
       memory: {
         id: "50000000-0000-4000-8000-000000000005",
-        user_id: MEMBER_ID,
-        image_path: `${MEMBER_ID}/two.jpg`,
+        user_id: null,
+        image_path: "retained/50000000-0000-4000-8000-000000000005/original.jpg",
         caption: "二枚目",
         memory_date: "2026-09-02",
         people: [],
@@ -67,7 +68,7 @@ function loaderClient() {
           async createSignedUrls(paths, expiresIn) {
             assert.equal(expiresIn, 3600);
             return {
-              data: paths.map((path, index) => index === 0
+              data: paths.map((path, index) => index < 2
                 ? { path, signedUrl: `https://signed.invalid/${path}`, error: null }
                 : { path, signedUrl: null, error: { message: "denied" } }),
               error: null,
@@ -83,9 +84,11 @@ test("shared-memory loader preserves metadata when one signed URL fails", async 
   const result = await loadSharedAlbumMemoryEntries(loaderClient(), ALBUM_ID);
   assert.equal(result.entries.length, 2);
   assert.match(result.entries[0].memory.imageUrl, /signed\.invalid/);
+  assert.match(result.entries[0].memory.thumbnailUrl, /signed\.invalid/);
   assert.equal(result.entries[1].memory.imageUrl, "");
   assert.equal(result.entries[1].memory.letter, "また行こう");
-  assert.equal(result.entries[1].memoryOwnerId, MEMBER_ID);
+  assert.equal(result.entries[1].memoryOwnerId, null);
+  assert.equal(result.entries[1].contributorName, "退会した人");
   assert.match(result.warning, /一部の写真/);
 });
 

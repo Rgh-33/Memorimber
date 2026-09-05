@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { MemoryPhoto } from "@/components/memory-photo";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { formatShortDate } from "@/lib/data";
+import { getMemoryDisplayUrl } from "@/lib/types";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   getSharedAlbum,
@@ -120,7 +121,7 @@ export default async function SharedGroupDetailPage({ params, searchParams }: Pa
                 <li key={entry.memory.id} className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
                   <Link href={`/shared-groups/${groupId}/memories/${entry.memory.id}`} className="group block">
                     <div className="aspect-square overflow-hidden bg-ivory">
-                      <MemoryPhoto src={entry.memory.imageUrl} alt={entry.memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                      <MemoryPhoto src={getMemoryDisplayUrl(entry.memory)} alt={entry.memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                     </div>
                     <div className="p-3">
                       <p className="line-clamp-2 text-xs font-semibold leading-5 text-ink">{entry.memory.caption}</p>
