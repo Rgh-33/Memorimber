@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { validateProfileUsername } from "@/lib/profile-username";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 type ProfileContextValue = {
@@ -46,18 +47,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setNickname = useCallback(async (nextNickname: string) => {
-    const limitedNickname = nextNickname.trim().slice(0, 20);
-    if (!limitedNickname) throw new Error("ユーザー名を入力してください。");
+    const validation = validateProfileUsername(nextNickname);
+    if (validation.error) {
+      throw new Error(validation.error === "missing_username"
+        ? "ユーザー名を入力してください。"
+        : "ユーザー名は20文字以内で入力してください。");
+    }
+    const username = validation.username;
     if (!isSupabaseConfigured()) {
-      setNicknameState(limitedNickname);
-      window.localStorage.setItem(NICKNAME_STORAGE_KEY, limitedNickname);
+      setNicknameState(username);
+      window.localStorage.setItem(NICKNAME_STORAGE_KEY, username);
       return;
     }
     const response = await fetch("/api/profile", {
       method: "PATCH",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_name: limitedNickname }),
+      body: JSON.stringify({ display_name: username }),
     });
     const data = await response.json() as ProfileResponse;
     if (!response.ok || !data.profile?.display_name) throw new Error(data.error || "ユーザー名を保存できませんでした。");

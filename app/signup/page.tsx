@@ -29,7 +29,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
   return (
     <AuthPageShell
       title="新規登録"
-      description="メールアドレスとパスワードで、Memorimberのアカウントを作成します。"
+      description="メールアドレスとパスワードで登録したあと、最初のログイン時にユーザー名を設定します。"
       notice={notice}
       footer={<>すでに登録済みの方は <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-semibold text-coral hover:underline">ログイン</Link></>}
     >
