@@ -4,6 +4,7 @@ import test from "node:test";
 import { createQuizQuestions } from "../lib/quiz.ts";
 import {
   loadSharedAlbumMemories,
+  loadSharedAlbumMemoryDetail,
   loadSharedAlbumMemoryEntries,
   normalizeSharedAlbumName,
 } from "../lib/supabase/shared-albums.ts";
@@ -11,7 +12,7 @@ import {
 const ALBUM_ID = "10000000-0000-4000-8000-000000000001";
 const OWNER_ID = "20000000-0000-4000-8000-000000000002";
 
-function loaderClient() {
+function loaderHarness({ denySecondPath = true } = {}) {
   const rows = [
     {
       album_id: ALBUM_ID,
@@ -50,16 +51,23 @@ function loaderClient() {
       },
     },
   ];
-  const query = {
-    select() { return this; },
-    eq() { return this; },
-    order() { return this; },
-    async range() { return { data: rows, error: null }; },
-  };
-  return {
+  const signedPathCalls = [];
+  const client = {
     from(table) {
       assert.equal(table, "shared_album_memories");
-      return query;
+      const filters = new Map();
+      return {
+        select() { return this; },
+        eq(column, value) { filters.set(column, value); return this; },
+        order() { return this; },
+        async range() {
+          return { data: rows.filter((row) => [...filters].every(([column, value]) => row[column] === value)), error: null };
+        },
+        async maybeSingle() {
+          const matches = rows.filter((row) => [...filters].every(([column, value]) => row[column] === value));
+          return { data: matches[0] ?? null, error: null };
+        },
+      };
     },
     storage: {
       from(bucket) {
@@ -67,8 +75,9 @@ function loaderClient() {
         return {
           async createSignedUrls(paths, expiresIn) {
             assert.equal(expiresIn, 3600);
+            signedPathCalls.push([...paths]);
             return {
-              data: paths.map((path, index) => index < 2
+              data: paths.map((path, index) => !denySecondPath || index === 0
                 ? { path, signedUrl: `https://signed.invalid/${path}`, error: null }
                 : { path, signedUrl: null, error: { message: "denied" } }),
               error: null,
@@ -78,27 +87,40 @@ function loaderClient() {
       },
     },
   };
+  return { client, rows, signedPathCalls };
 }
 
 test("shared-memory loader preserves metadata when one signed URL fails", async () => {
-  const result = await loadSharedAlbumMemoryEntries(loaderClient(), ALBUM_ID);
+  const { client, rows, signedPathCalls } = loaderHarness();
+  const result = await loadSharedAlbumMemoryEntries(client, ALBUM_ID);
   assert.equal(result.entries.length, 2);
-  assert.match(result.entries[0].memory.imageUrl, /signed\.invalid/);
+  assert.equal(result.entries[0].memory.imageUrl, "");
   assert.match(result.entries[0].memory.thumbnailUrl, /signed\.invalid/);
   assert.equal(result.entries[1].memory.imageUrl, "");
   assert.equal(result.entries[1].memory.letter, "また行こう");
   assert.equal(result.entries[1].memoryOwnerId, null);
   assert.equal(result.entries[1].contributorName, "退会した人");
   assert.match(result.warning, /一部の写真/);
+  assert.deepEqual(signedPathCalls, [[rows[0].memory.thumbnail_path, rows[1].memory.image_path]]);
+  assert.ok(!signedPathCalls.flat().includes(rows[0].memory.image_path));
 });
 
 test("shared-memory loader result can be passed directly to the existing quiz generator", async () => {
-  const memories = await loadSharedAlbumMemories(loaderClient(), ALBUM_ID);
+  const memories = await loadSharedAlbumMemories(loaderHarness().client, ALBUM_ID);
   const questions = createQuizQuestions(memories, 2, ["month"], () => 0.25);
   assert.equal(memories.length, 2);
   assert.equal(questions.length, 2);
-  const availableMemoryId = memories.find((memory) => memory.imageUrl)?.id;
+  const availableMemoryId = memories.find((memory) => memory.thumbnailUrl ?? memory.imageUrl)?.id;
   assert.ok(questions.every((question) => question.memoryId === availableMemoryId));
+});
+
+test("shared-memory detail signs only the selected original image", async () => {
+  const { client, rows, signedPathCalls } = loaderHarness({ denySecondPath: false });
+  const result = await loadSharedAlbumMemoryDetail(client, ALBUM_ID, rows[0].memory_id);
+  assert.equal(result.entry.memory.id, rows[0].memory_id);
+  assert.match(result.entry.memory.imageUrl, /signed\.invalid/);
+  assert.equal(result.entry.memory.thumbnailUrl, undefined);
+  assert.deepEqual(signedPathCalls, [[rows[0].memory.image_path]]);
 });
 
 test("shared group names are trimmed and constrained", () => {

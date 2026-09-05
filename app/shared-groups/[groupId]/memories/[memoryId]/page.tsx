@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { MemoryPhoto } from "@/components/memory-photo";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getSharedAlbum, isUuid, listSharedAlbumMembers, loadSharedAlbumMemoryEntries } from "@/lib/supabase/shared-albums";
+import { getSharedAlbum, isUuid, listSharedAlbumMembers, loadSharedAlbumMemoryDetail } from "@/lib/supabase/shared-albums";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +29,10 @@ export default async function SharedMemoryDetailPage({ params }: PageProps) {
 
   const [album, memoryResult, members] = await Promise.all([
     getSharedAlbum(client, groupId),
-    loadSharedAlbumMemoryEntries(client, groupId),
+    loadSharedAlbumMemoryDetail(client, groupId, memoryId),
     listSharedAlbumMembers(client, groupId),
   ]);
-  const entry = memoryResult.entries.find((candidate) => candidate.memory.id === memoryId);
+  const entry = memoryResult?.entry;
   if (!album || !entry) notFound();
   const contributor = entry.contributorName
     ?? members.find((member) => member.userId === entry.addedBy)?.displayName
@@ -44,7 +44,7 @@ export default async function SharedMemoryDetailPage({ params }: PageProps) {
       <AppHeader />
       <Link href={`/shared-groups/${groupId}`} className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-ink/55 hover:text-coral"><ArrowLeft size={15} />{album.name}へ</Link>
 
-      {memoryResult.warning ? <p role="status" className="auth-notice auth-notice--info mt-5">{memoryResult.warning}</p> : null}
+      {memoryResult?.warning ? <p role="status" className="auth-notice auth-notice--info mt-5">{memoryResult.warning}</p> : null}
 
       <article className="mt-5 overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
         <div className="aspect-[4/3] overflow-hidden bg-ivory">

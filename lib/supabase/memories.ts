@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAlbumAppearance, type AlbumAppearance } from "../album-appearance.ts";
-import { createMemoryThumbnail, type GeneratedMemoryThumbnail } from "../memory-thumbnail.ts";
+import { createMemoryThumbnail, MEMORY_THUMBNAIL_FILE_SUFFIX, type GeneratedMemoryThumbnail } from "../memory-thumbnail.ts";
 import type { Memory, MemoryInput, MemoryUpdateInput } from "../types";
 
 export const MEMORY_IMAGE_BUCKET = "memory-images";
@@ -73,7 +73,7 @@ export function readPendingMemoryUpload(storage: Pick<Storage, "getItem">): Pend
       && new RegExp(`^${pending.userId}/${pending.id}\\.(jpg|png|webp|heic|heif)$`).test(pending.imagePath)
       && (pending.thumbnailPath === undefined || pending.thumbnailPath === null
         || (typeof pending.thumbnailPath === "string"
-          && new RegExp(`^${pending.userId}/thumbnails/${pending.id}\\.(webp|jpg)$`).test(pending.thumbnailPath)))) {
+          && new RegExp(`^${pending.userId}/thumbnails/${pending.id}(?:${MEMORY_THUMBNAIL_FILE_SUFFIX})?\\.(webp|jpg)$`).test(pending.thumbnailPath)))) {
       return {
         id: pending.id,
         userId: pending.userId,
@@ -152,7 +152,7 @@ export async function recoverMemorySave(client: SupabaseClient, pending: Pending
     throw new MemorySaveError(errorDetail(error), pending);
   }
   const validThumbnailPath = pending.thumbnailPath === null
-    || new RegExp(`^${user.id}/thumbnails/${pending.id}\\.(webp|jpg)$`).test(pending.thumbnailPath);
+    || new RegExp(`^${user.id}/thumbnails/${pending.id}(?:${MEMORY_THUMBNAIL_FILE_SUFFIX})?\\.(webp|jpg)$`).test(pending.thumbnailPath);
   if (user.id !== pending.userId || !pending.imagePath.startsWith(`${user.id}/${pending.id}.`)
     || pending.imagePath.split("/").length !== 2 || !validThumbnailPath) {
     throw new MemorySaveError("投稿したアカウントでログインし直してから、保存状態を確認してください。", pending);
@@ -204,7 +204,7 @@ export async function saveMemory(
     id,
     userId: user.id,
     imagePath: `${user.id}/${id}.${extension}`,
-    thumbnailPath: thumbnail ? `${user.id}/thumbnails/${id}.${thumbnail.extension}` : null,
+    thumbnailPath: thumbnail ? `${user.id}/thumbnails/${id}${MEMORY_THUMBNAIL_FILE_SUFFIX}.${thumbnail.extension}` : null,
   };
   let savedThumbnailPath = pending.thumbnailPath;
   const savedMemory = async (): Promise<Memory> => {

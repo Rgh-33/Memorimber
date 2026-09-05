@@ -331,6 +331,17 @@ npm run build
 
 保存処理の自動テストは `npm test` で実行します。Supabaseクライアントの通信先をテスト内の模擬応答に置き換えるため、実プロジェクトへの書き込みや認証情報は必要ありません。
 
+### 110×110サムネイルのバックフィル
+
+`20260905080000_allow_shared_memory_thumbnails.sql` を適用し、`.env.local` に `NEXT_PUBLIC_SUPABASE_URL` と `SUPABASE_SECRET_KEY` を設定してから実行します。秘密鍵をコマンドラインやGitへ記録しないでください。
+
+```bash
+npm run backfill:memory-thumbnails -- --dry-run
+npm run backfill:memory-thumbnails -- --apply
+```
+
+dry-runは対象件数だけを確認します。applyは元画像を変更せず、110×110 WebPのアップロード、`thumbnail_path`更新、旧サムネイル削除の順で処理します。失敗した行はIDと理由を表示し、再実行できます。
+
 ビルド成功後、本番用サーバーを起動できます。
 
 ```bash

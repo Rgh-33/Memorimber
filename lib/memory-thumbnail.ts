@@ -1,5 +1,9 @@
-export const MEMORY_THUMBNAIL_MAX_EDGE = 720;
-export const MEMORY_THUMBNAIL_TARGET_BYTES = 300 * 1024;
+export const MEMORY_THUMBNAIL_SIZE = 110;
+export const MEMORY_THUMBNAIL_MAX_EDGE = MEMORY_THUMBNAIL_SIZE;
+export const MEMORY_THUMBNAIL_TARGET_BYTES = 10 * 1024;
+export const MEMORY_THUMBNAIL_FILE_SUFFIX = "-110x110";
+
+const MEMORY_THUMBNAIL_QUALITIES = [0.65, 0.5, 0.4, 0.3] as const;
 
 export type GeneratedMemoryThumbnail = {
   blob: Blob;
@@ -56,7 +60,7 @@ function encodeCanvas(canvas: HTMLCanvasElement, type: string, quality: number) 
 
 async function encodeAtTargetSize(canvas: HTMLCanvasElement, type: "image/webp" | "image/jpeg") {
   let smallest: Blob | null = null;
-  for (const quality of [0.82, 0.72, 0.62]) {
+  for (const quality of MEMORY_THUMBNAIL_QUALITIES) {
     const blob = await encodeCanvas(canvas, type, quality);
     // Browsers without WebP support can silently return a PNG instead.
     if (!blob || blob.type !== type) return null;
@@ -79,15 +83,27 @@ export async function createMemoryThumbnail(file: File): Promise<GeneratedMemory
     decoded = await decodeImage(file);
     if (decoded.width <= 0 || decoded.height <= 0) return null;
 
-    const scale = Math.min(1, MEMORY_THUMBNAIL_MAX_EDGE / Math.max(decoded.width, decoded.height));
+    const cropSize = Math.min(decoded.width, decoded.height);
+    const sourceX = (decoded.width - cropSize) / 2;
+    const sourceY = (decoded.height - cropSize) / 2;
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(decoded.width * scale));
-    canvas.height = Math.max(1, Math.round(decoded.height * scale));
+    canvas.width = MEMORY_THUMBNAIL_SIZE;
+    canvas.height = MEMORY_THUMBNAIL_SIZE;
     const context = canvas.getContext("2d");
     if (!context || typeof canvas.toBlob !== "function") return null;
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
-    context.drawImage(decoded.source, 0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      decoded.source,
+      sourceX,
+      sourceY,
+      cropSize,
+      cropSize,
+      0,
+      0,
+      MEMORY_THUMBNAIL_SIZE,
+      MEMORY_THUMBNAIL_SIZE,
+    );
 
     const webp = await encodeAtTargetSize(canvas, "image/webp");
     if (webp) return { blob: webp, contentType: "image/webp", extension: "webp" };
