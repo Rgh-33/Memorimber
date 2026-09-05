@@ -4,7 +4,7 @@ import test from "node:test";
 import { validateAccountDeletionConfirmation } from "../lib/supabase/account-deletion.ts";
 
 const migration = readFileSync(
-  new URL("../supabase/migrations/20260905050000_account_deletion_retention.sql", import.meta.url),
+  new URL("../supabase/migrations/20260905060000_account_deletion_retention.sql", import.meta.url),
   "utf8",
 );
 

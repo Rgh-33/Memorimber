@@ -24,7 +24,7 @@ test("post-onboarding redirects remain same-origin and cannot return to account-
 });
 
 test("profile migration enforces username format without adding uniqueness", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/20260905000000_require_profile_display_name.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../supabase/migrations/20260905070000_require_profile_display_name.sql", import.meta.url), "utf8");
   assert.match(sql, /display_name is null[\s\S]*display_name = btrim\(display_name\)[\s\S]*char_length\(display_name\) between 1 and 20/);
   assert.match(sql, /old\.display_name is not null and new\.display_name is null/);
   assert.doesNotMatch(sql, /unique\s*\([^)]*display_name/i);
