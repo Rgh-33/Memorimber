@@ -41,7 +41,13 @@ test("September BGM is bundled and uses a sample-accurate Web Audio loop", () =>
   assert.equal(header.subarray(0, 4).toString("ascii"), "RIFF");
   assert.equal(header.subarray(8, 12).toString("ascii"), "WAVE");
   assert.match(component, /SEPTEMBER_BACKGROUND_MUSIC_URL = "\/audio\/evoke-september\.wav"/);
-  assert.match(component, /if \(!AudioContextConstructor\) return/);
+  assert.match(component, /webkitAudioContext/);
+  assert.match(component, /new Audio\(silentMediaUrl\)/);
+  assert.match(component, /silentMedia\.play\(\)/);
+  assert.match(component, /createBuffer\(1, 1, context\.sampleRate\)/);
+  assert.match(component, /window\.addEventListener\("touchend", unlockPlayback\)/);
+  assert.match(component, /document\.addEventListener\("visibilitychange", recoverPlayback\)/);
+  assert.match(component, /context\.suspend\(\)\.then\(\(\) => context\.resume\(\)\)/);
   assert.match(component, /createBufferSource\(\)/);
   assert.match(component, /source\.loop = true/);
   assert.match(component, /source\.loopStart = 0/);
