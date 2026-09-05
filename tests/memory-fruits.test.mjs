@@ -5,6 +5,7 @@ import { completeMemoryHarvest, loadMemoryFruits } from "../lib/supabase/memory-
 const row = (index, changes = {}) => ({
   memory_id: `memory-${String(index).padStart(3, "0")}`,
   ripened_at: null,
+  is_golden: false,
   harvested_at: null,
   harvest_word: null,
   word_assigned_at: null,
@@ -44,6 +45,7 @@ test("memory fruits are paginated and mapped by memory id", async () => {
   const fruits = await loadMemoryFruits(h.client);
   assert.equal(Object.keys(fruits).length, 101);
   assert.equal(fruits["memory-000"].ripenedAt, "2026-08-08T03:00:00Z");
+  assert.equal(fruits["memory-000"].isGolden, false);
   assert.equal(fruits["memory-100"].harvestedAt, null);
   assert.deepEqual(h.calls.filter((call) => call.method === "range").map(({ from, to }) => [from, to]), [[0, 99], [100, 199]]);
 });
@@ -54,7 +56,7 @@ test("memory fruit read errors remain visible to the tree", async () => {
 });
 
 test("harvest uses the RPC with a trimmed word and maps its saved result", async () => {
-  const saved = row(1, { ripened_at: "2026-08-08T03:00:00Z", harvested_at: "2026-08-20T03:00:00Z",
+  const saved = row(1, { ripened_at: "2026-08-08T03:00:00Z", is_golden: true, harvested_at: "2026-08-20T03:00:00Z",
     harvest_word: "帰り道", word_assigned_at: "2026-08-20T03:00:00Z", home_visible_until: "2026-08-31T15:00:00Z" });
   const h = harness({ rpcData: saved });
   const fruit = await completeMemoryHarvest(h.client, saved.memory_id, "  帰り道  ");
@@ -62,6 +64,7 @@ test("harvest uses the RPC with a trimmed word and maps its saved result", async
     method: "rpc", name: "complete_memory_harvest", args: { p_memory_id: saved.memory_id, p_word: "帰り道" },
   });
   assert.equal(fruit.harvestWord, "帰り道");
+  assert.equal(fruit.isGolden, true);
   assert.equal(fruit.homeVisibleUntil, "2026-08-31T15:00:00Z");
 });
 

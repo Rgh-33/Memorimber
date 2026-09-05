@@ -5,6 +5,8 @@ import test from "node:test";
 const controls = readFileSync(new URL("../components/tree-preview-controls.tsx", import.meta.url), "utf8");
 const css = readFileSync(new URL("../app/konoha.css", import.meta.url), "utf8");
 const home = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const treeContext = readFileSync(new URL("../lib/tree-context.tsx", import.meta.url), "utf8");
 const bottomNav = readFileSync(new URL("../components/bottom-nav.tsx", import.meta.url), "utf8");
 
 test("preview controls stay on the tree screen and become fixed only while previewing", () => {
@@ -13,6 +15,7 @@ test("preview controls stay on the tree screen and become fixed only while previ
   assert.match(controls, /tree\.preview \? " konoha-preview--fixed" : ""/);
   assert.match(controls, /tree\.preview \? \([\s\S]*?<fieldset[\s\S]*?\) : toggle/);
   assert.match(controls, /konoha-preview-slot print-hide/);
+  assert.match(controls, /onClick=\{tree\.uploadGolden\}[^>]*>1枚追加\(金\)<\/button>/);
 });
 
 test("the active preview toolbar sits compactly above the existing footer", () => {
@@ -21,4 +24,13 @@ test("the active preview toolbar sits compactly above the existing footer", () =
   assert.match(css, /\.konoha-preview--fixed\s*\{[^}]*width:\s*min\(calc\(100% - 24px\), 406px\);/s);
   assert.match(css, /grid-template-columns:\s*auto 36px minmax\(82px, 1fr\) 36px 36px;/);
   assert.match(css, /\.konoha-preview--fixed \.konoha-preview-actions button\s*\{[^}]*min-height:\s*36px;/s);
+});
+
+test("route changes declare the app's smooth scrolling behavior", () => {
+  assert.match(layout, /<html[^>]*data-scroll-behavior="smooth"/);
+});
+
+test("tree preview starts from the same state during SSR and browser hydration", () => {
+  assert.match(treeContext, /useState<TreeState>\(\(\) => emptyState\(false\)\)/);
+  assert.match(treeContext, /setState\(readState\(raw, isDemo\)\)/);
 });

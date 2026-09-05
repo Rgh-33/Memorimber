@@ -35,6 +35,20 @@ test("only the latest photo and the fruit formed or ripened by it are marked for
   }
 });
 
+test("preview gold is assigned only to the selected fruit and never changes later", () => {
+  const source = photos(9);
+  const goldenIds = new Set([source[0].id]);
+  let items = buildTreeItems(source, "2026-08-01", {}, goldenIds);
+  assert.equal(items[0].stage, "quiz-ready");
+  assert.equal(items[0].golden, true);
+  assert.equal(items[1].stage, "quiz-ready");
+  assert.equal(items[1].golden, false);
+
+  items = buildTreeItems([...source, memory(9)], "2026-08-01", {}, goldenIds);
+  assert.equal(items[0].golden, true);
+  assert.equal(items[1].golden, false);
+});
+
 test("upload presentation runs only for an explicitly pending upload", () => {
   const source = buildTreeItems(photos(8), "2026-08-01", {});
   const stable = applyUploadPresentation(source, null);
@@ -119,10 +133,11 @@ test("persisted fruit timestamps, not frontend upload counts, decide ripe and ha
   const source = photos(9);
   const fruits = {
     [source[0].id]: { memoryId: source[0].id, ripenedAt: "2026-08-01T12:00:07Z", harvestedAt: null,
-      harvestWord: null, wordAssignedAt: null, homeVisibleUntil: null },
+      isGolden: true, harvestWord: null, wordAssignedAt: null, homeVisibleUntil: null },
   };
   const items = buildPersistedTreeItems(source, "2026-08-31", fruits);
   assert.equal(items[0].stage, "quiz-ready");
+  assert.equal(items[0].golden, true);
   // Nine uploads would make the second fruit ripe in the prototype algorithm,
   // but the real UI must wait for the backend timestamp.
   assert.equal(items[1].stage, "growing");
@@ -136,7 +151,7 @@ test("persisted fruit timestamps, not frontend upload counts, decide ripe and ha
 test("persisted petals disappear at the backend deadline while harvest history remains", () => {
   const source = photos(1);
   const fruits = { [source[0].id]: { memoryId: source[0].id, ripenedAt: "2026-08-01T12:00:07Z",
-    harvestedAt: "2026-08-20T03:00:00Z", harvestWord: "夏の日", wordAssignedAt: "2026-08-20T03:00:00Z",
+    isGolden: false, harvestedAt: "2026-08-20T03:00:00Z", harvestWord: "夏の日", wordAssignedAt: "2026-08-20T03:00:00Z",
     homeVisibleUntil: "2026-08-31T15:00:00Z" } };
   assert.equal(buildPersistedPetals(source, "2026-08-31", fruits, Date.parse("2026-08-31T14:59:59Z"))[0].word, "夏の日");
   assert.equal(buildPersistedPetals(source, "2026-09-01", fruits, Date.parse("2026-08-31T15:00:00Z")).length, 0);
