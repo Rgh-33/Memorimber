@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const thumbnailMigration = readFileSync(
-  new URL("../supabase/migrations/20260905000000_add_memory_thumbnail_path.sql", import.meta.url),
+  new URL("../supabase/migrations/20260905050000_add_memory_thumbnail_path.sql", import.meta.url),
   "utf8",
 );
 const storageMigration = readFileSync(

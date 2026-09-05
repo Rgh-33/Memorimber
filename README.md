@@ -123,7 +123,7 @@
 | `/quiz` | 思い出クイズ | サンプルデータを使ったクイズ |
 | `/memory/[id]` | 思い出詳細 | 個別の思い出と関連する記憶 |
 | `/profile` | プロフィール | アイコン、ニックネーム、写真レベル、活動記録 |
-| `/account` | アカウント | ログイン中のメールアドレスとパスワード変更導線 |
+| `/account` | アカウント | ログイン情報、パスワード再認証付きのアカウント削除 |
 | `/login` | ログイン | Supabase Authのメール・パスワード認証 |
 | `/signup` | 新規登録 | Supabase Authへのメール・パスワード登録 |
 | `/settings` | 設定 | 設定項目の一覧 |
@@ -184,6 +184,8 @@ Supabaseには、ユーザーごとの思い出を保存する `memories` テー
 
 共有グループへの招待は、オーナーが入力した登録済みメールアドレスをDB内でアカウントIDへ解決します。メールアドレスは招待・通知テーブルや通常レスポンスへ保存せず、外部メールも送信しません。招待は7日間有効で、受信者本人だけがアプリ内の通知を閲覧して承認または辞退できます。
 
+アカウント削除では、現在のパスワードで再認証した後、本人のグループ・思い出・Storage画像・アバターを削除します。本人が明示的に選んだ場合だけ、他のユーザーが所有する共有グループで共有中の思い出を閲覧専用で保持します。保持画像は `memory-images/retained/<memory-id>/` へ移動し、最後の共有関係が外れた時点でキューへ登録して削除します。処理は再開可能で、失敗分は画面からの再試行と日次Cronで回収します。
+
 ## 認証について
 
 ログイン・新規登録・ログアウト、Cookieセッションの更新、未ログイン時のページ保護、本人の `profiles` 読み取りまでを実装しています。`profiles` のINSERT・DELETEはフロントから行わず、登録時の行作成はDB側Triggerへ任せます。
@@ -197,14 +199,20 @@ Supabaseの接続情報が未設定の場合、ローカル開発では既存UI�
 1. **Authentication > URL Configuration** の Site URL に本番URL（例: `https://your-app.vercel.app`）を設定します。
 2. 同画面の Redirect URLs に本番の `https://your-app.vercel.app/auth/callback` と、ローカル確認用の `http://localhost:3000/auth/callback` を追加します。Preview Deploymentでもメール確認を行う場合は、そのURLも許可します。
 3. **Authentication > Providers > Email** でEmailプロバイダーを有効にし、Confirm emailの利用有無を確認します。
-4. **Project Settings > API / Connect** からProject URLとPublishable Keyを取得します。`service_role`、secret key、Database PasswordはこのアプリやVercelへ登録しません。
+4. **Project Settings > API / Connect** からProject URLとPublishable Keyを取得します。アカウント削除を利用する環境では、サーバー専用のSupabase Secret Keyも取得します。Database PasswordはアプリやVercelへ登録しません。
 
 Vercelとローカルの `.env.local` には、どちらも次の公開情報を登録します。旧形式のプロジェクトでPublishable Keyが発行されていない場合だけ、`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` の代わりに `NEXT_PUBLIC_SUPABASE_ANON_KEY` を利用できます。
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
+CRON_SECRET=
 ```
+
+`SUPABASE_SECRET_KEY` と `CRON_SECRET` はServer Action／Route Handlerだけで参照します。名前に `NEXT_PUBLIC_` を付けず、実値をリポジトリへコミットしないでください。Vercel Cronは毎日03:00（日本時間）に `/api/cron/account-deletion-cleanup` を呼び出し、Vercelが付与する `Authorization: Bearer <CRON_SECRET>` をRoute Handlerで検証します。
+
+共有グループとアカウント削除のmigration適用後は、VercelのProduction環境へ上記4変数を設定して再デプロイします。手動確認では、保持しない退会、共有中だけ保持する退会、保持画像のメンバー閲覧、非メンバー拒否、最後の共有解除後の削除、Cronの401／成功応答をそれぞれ確認してください。
 
 接続後は、新規登録、確認メールのcallback、ログイン、保護ページへの遷移、`/api/profile` の本人プロフィール応答、ログアウト、ログアウト後の保護ページからのリダイレクトを順に確認してください。ブラウザの開発者ツールではSupabaseの認証Cookieが作成・更新されることと、クライアントへ配信されたコードやVercelの環境変数に秘密鍵が含まれないことも確認します。
 
@@ -268,11 +276,13 @@ npm install
 
 `node_modules` フォルダが作成され、Next.js、React、Tailwind CSSなど、実行に必要なパッケージがインストールされます。初回は数分かかる場合があります。
 
-Supabaseへ接続する場合は `.env.example` を参考に `.env.local` を作成し、プロジェクトの公開URLと公開キーを設定します。`service_role` やsecret keyは設定しないでください。
+Supabaseへ接続する場合は `.env.example` を参考に `.env.local` を作成し、プロジェクトの公開URLと公開キーを設定します。アカウント削除をローカル確認する場合だけ、サーバー専用のSecret Keyと十分に長いCron Secretも設定してください。
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
+SUPABASE_SECRET_KEY=sb_secret_xxx
+CRON_SECRET=replace-with-a-long-random-value
 ```
 
 ### 4. 開発サーバーを起動する
