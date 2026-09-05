@@ -116,7 +116,7 @@ test("unread counts and all-read updates stay scoped to the authenticated recipi
 });
 
 test("invitation migration keeps email private and enforces lifecycle and RLS", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/20260905020000_create_shared_album_invitations.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../supabase/migrations/20260905030000_create_shared_album_invitations.sql", import.meta.url), "utf8");
   assert.match(sql, /create table public\.shared_album_invitations[\s\S]*status in \('pending', 'accepted', 'declined', 'expired'\)/);
   assert.match(sql, /expires_at = created_at \+ interval '7 days'/);
   assert.match(sql, /shared_album_invitations_one_pending_idx[\s\S]*where status = 'pending'/);
