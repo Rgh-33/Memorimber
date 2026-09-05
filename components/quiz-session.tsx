@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/app-header";
 import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
 import { getFruitQuiz } from "@/lib/tree-growth";
+import { getMemoryDisplayUrl } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 type FruitQuiz = NonNullable<ReturnType<typeof getFruitQuiz>>;
@@ -79,7 +80,7 @@ export function QuizSession({ quiz, variant = "page", onClose, onHarvest }: {
 
     <div className={`relative overflow-hidden rounded-xl border border-dashed border-coral/45 bg-ivory p-2 ${dialog ? "mt-3" : "mt-5"}`}>
       <div className={`${dialog ? "konoha-quiz-photo" : "aspect-[4/3]"} overflow-hidden rounded-lg bg-paper transition duration-500 ${answered ? "" : "blur-[10px]"}`}>
-        <img src={memory.imageUrl} alt="クイズの写真" className="h-full w-full object-cover" />
+        <img src={getMemoryDisplayUrl(memory)} alt="クイズの写真" className="h-full w-full object-cover" />
       </div>
       {!answered && <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center text-coral/45"><Grid3X3 size={dialog ? 42 : 52} strokeWidth={1.2} /></span>}
     </div>

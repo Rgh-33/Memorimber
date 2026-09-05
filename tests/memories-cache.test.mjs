@@ -17,6 +17,7 @@ const memory = (id, changes = {}) => ({
 test("tab-local cache applies committed additions, updates, and removals without duplicates", () => {
   const first = memory("first");
   const second = memory("second");
+  second.thumbnailUrl = "https://images.invalid/second-thumbnail";
   const added = addMemoryToCache([first], second);
   assert.deepEqual(added.map(({ id }) => id), ["second", "first"]);
   assert.equal(addMemoryToCache(added, { ...second, caption: "saved" }).filter(({ id }) => id === "second").length, 1);
@@ -24,6 +25,7 @@ test("tab-local cache applies committed additions, updates, and removals without
   const updated = updateMemoryInCache(added, { ...second, imageUrl: "", caption: "updated" });
   assert.equal(updated[0].caption, "updated");
   assert.equal(updated[0].imageUrl, second.imageUrl);
+  assert.equal(updated[0].thumbnailUrl, second.thumbnailUrl);
   assert.deepEqual(removeMemoryFromCache(updated, "second"), [first]);
 });
 
@@ -45,7 +47,9 @@ test("routing does not drive full memory reloads and mutation screens use cache 
   assert.match(provider, /refreshAge >= MEMORY_IMAGE_URL_LIFETIME/);
   assert.doesNotMatch(form, /refreshMemories/);
   assert.match(form, /addMemory\(memory\)/);
-  assert.match(detail, /const cachedMemory = memories\.find/);
+  assert.match(detail, /const localMemory = previewMemory \?\? sampleMemory/);
+  assert.doesNotMatch(detail, /localMemory = [^;]*cachedMemory/);
+  assert.match(detail, /loadMemory\(createClient\(\), params\.id\)/);
   assert.match(detail, /updateCachedMemory\(updated\)/);
   assert.match(detail, /removeMemory\(memory\.id\)/);
   assert.doesNotMatch(detail, /void refreshMemories/);

@@ -7,7 +7,7 @@ import { TreeArtDefs, TreeCanopy, TreeGround, TreeSeedling, TreeWood } from "@/c
 import { TreeFruit } from "@/components/tree-fruit";
 import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tree-fruit-layout";
 import type { TreeDisplayMode } from "@/lib/tree-preferences";
-import type { Memory } from "@/lib/types";
+import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 
 function Blossom({ x, y, scale, setting = false }: { x: number; y: number; scale: number; setting?: boolean }) {
   if (setting) return <g transform={`translate(${x} ${y}) scale(${scale})`} className="konoha-flower konoha-flower--setting">
@@ -209,7 +209,7 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
   const monthIndex = Number(month.slice(5, 7));
   const mirrored = monthIndex % 2 === 0;
   const leafColor = ["#55724d", "#527366", "#79734a", "#586e54"][monthIndex % 4];
-  const imageById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory.imageUrl])), [memories]);
+  const imageById = useMemo(() => new Map(memories.map((memory) => [memory.id, getMemoryDisplayUrl(memory)])), [memories]);
   const latestItem = visible.find((item) => item.newlyAdded);
   const hasGoldenRipening = visible.some((item) => item.newlyRipened && item.golden);
   const latestImageUrl = latestItem ? imageById.get(latestItem.memoryId ?? latestItem.id) : undefined;

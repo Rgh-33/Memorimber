@@ -58,7 +58,11 @@ export function MemoryDetailActions({
         tags: parseList(tags),
         letter,
       });
-      onUpdated({ ...updated, imageUrl: memory.imageUrl });
+      onUpdated({
+        ...updated,
+        imageUrl: memory.imageUrl,
+        thumbnailUrl: memory.thumbnailUrl,
+      });
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "思い出を更新できませんでした。");

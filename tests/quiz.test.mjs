@@ -40,13 +40,21 @@ test("small collections are exhausted before reuse and repeated memories change 
 
 test("caption and photo questions use real memories and keep the right answer", () => {
   const source = memories(4);
+  source[0].thumbnailUrl = "thumbnail-0.webp";
   const captionQuestion = createMemoryQuizQuestion(source[0], source, "photo-to-caption", seededRandom());
   assert.equal(captionQuestion.correctChoiceId, source[0].id);
   assert.equal(captionQuestion.choices.find((choice) => choice.id === source[0].id).label, source[0].caption);
 
   const photoQuestion = createMemoryQuizQuestion(source[0], source, "caption-to-photo", seededRandom());
   assert.equal(photoQuestion.correctChoiceId, source[0].id);
-  assert.equal(photoQuestion.choices.find((choice) => choice.id === source[0].id).imageUrl, source[0].imageUrl);
+  assert.equal(photoQuestion.choices.find((choice) => choice.id === source[0].id).imageUrl, source[0].thumbnailUrl);
+});
+
+test("thumbnail-only list memories remain eligible for quizzes", () => {
+  const source = memories(3).map((memory) => ({ ...memory, imageUrl: "", thumbnailUrl: `${memory.id}.webp` }));
+  const questions = createQuizQuestions(source, 3, undefined, seededRandom());
+  assert.equal(questions.length, 3);
+  assert.ok(questions.every((question) => question.memory.thumbnailUrl));
 });
 
 test("fruit quizzes only use the two recall formats, never the month question", () => {

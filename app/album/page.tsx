@@ -7,6 +7,8 @@ import { MemoryCard } from "@/components/memory-card";
 import { getAlbumGridSlotCount } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { createClient } from "@/lib/supabase/client";
+import { loadMemoryOriginalUrls } from "@/lib/supabase/memories";
 
 const ALBUM_RETURN_POSITION_KEY = "memorimber-album-return-position-v1";
 
@@ -38,6 +40,10 @@ export default function AlbumPage() {
   });
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [scrollRestoreReady, setScrollRestoreReady] = useState(false);
+  const [printImageUrls, setPrintImageUrls] = useState<Map<string, string> | null>(null);
+  const [printPreparing, setPrintPreparing] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const memoryGridRef = useRef<HTMLElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const didInitialScroll = useRef(false);
   const didPrepareScrollRestore = useRef(false);
@@ -100,6 +106,53 @@ export default function AlbumPage() {
     };
   }, [isLoading, scrollRestoreReady, selectedMonth]);
 
+  useEffect(() => {
+    setPrintImageUrls(null);
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    const clearPrintImages = () => setPrintImageUrls(null);
+    window.addEventListener("afterprint", clearPrintImages);
+    return () => window.removeEventListener("afterprint", clearPrintImages);
+  }, []);
+
+  const handlePrint = async () => {
+    if (printPreparing) return;
+    setPrintPreparing(true);
+    setPrintError(null);
+    try {
+      const originals = isDemo
+        ? new Map(memories.map((memory) => [memory.id, memory.imageUrl]))
+        : await loadMemoryOriginalUrls(createClient(), memories);
+      setPrintImageUrls(originals);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          promise,
+          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
+        ]);
+        if (timeout) clearTimeout(timeout);
+      };
+      const images = Array.from(memoryGridRef.current?.querySelectorAll("img") ?? []);
+      await Promise.all(images.map(async (image) => {
+        if (!image.complete) {
+          await waitAtMost(new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          }));
+        }
+        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
+      }));
+      window.print();
+    } catch (cause) {
+      setPrintImageUrls(null);
+      setPrintError(cause instanceof Error ? cause.message : "印刷用の元画像を読み込めませんでした。");
+    } finally {
+      setPrintPreparing(false);
+    }
+  };
+
   const rememberAlbumPosition = () => {
     try {
       sessionStorage.setItem(ALBUM_RETURN_POSITION_KEY, JSON.stringify({ month: selectedMonth, scrollY: window.scrollY }));
@@ -122,14 +175,14 @@ export default function AlbumPage() {
         <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">月間アルバム</h1>
       </section>
 
-      <section className="album-page-memory-slot mt-5">
+      <section ref={memoryGridRef} className="album-page-memory-slot mt-5">
         {isDemo && <p className="mb-3 text-center text-xs text-ink/55">サンプルの思い出を表示しています</p>}
         {warning && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">{warning}<button type="button" onClick={() => void refreshMemories()} className="ml-2 text-coral underline">再読み込み</button></p>}
         {isLoading ? <p role="status" className="py-12 text-center text-sm text-ink/65">思い出を読み込んでいます…</p> : error ? <div role="alert" className="rounded-xl border border-line p-4 text-sm leading-6 text-ink">{error}<button type="button" onClick={() => void refreshMemories()} className="mt-2 block text-coral underline">再読み込み</button></div> : memories.length > 0 ? (
           <div className="grid grid-cols-3 gap-2.5">
             {placeholders}
             {memories.map((memory) => <div key={memory.id} onClickCapture={rememberAlbumPosition}>
-              <MemoryCard memory={memory} dateOnly />
+              <MemoryCard memory={memory} dateOnly imageUrl={printImageUrls?.get(memory.id)} />
             </div>)}
           </div>
         ) : (
@@ -140,7 +193,8 @@ export default function AlbumPage() {
         )}
       </section>
 
-      <button type="button" onClick={() => window.print()} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper print-hide"><Printer size={18} /> {Number(selectedMonth.slice(5))}月をプリントする</button>
+      <button type="button" onClick={() => void handlePrint()} disabled={printPreparing || memories.length === 0} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper disabled:cursor-wait disabled:opacity-55 print-hide"><Printer size={18} /> {printPreparing ? "元画像を準備中…" : `${Number(selectedMonth.slice(5))}月をプリントする`}</button>
+      {printError && <p role="alert" className="mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700 print-hide">{printError}</p>}
 
       <div ref={bottomRef} className="album-month-switcher print-hide">
         <div className="mx-auto flex max-w-[270px] items-center justify-between">

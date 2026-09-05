@@ -14,6 +14,7 @@ export function updateMemoryInCache(memories: Memory[], memory: Memory) {
     ...memory,
     // Metadata updates do not issue a new signed URL.
     imageUrl: memory.imageUrl || existing.imageUrl,
+    thumbnailUrl: memory.thumbnailUrl || existing.thumbnailUrl,
   };
   return memories.map((candidate) => candidate.id === memory.id ? updated : candidate);
 }

@@ -8,12 +8,13 @@ import type { AlbumAppearance } from "@/lib/album-appearance";
 import { useMemories } from "@/lib/memories-context";
 import { usePreferences } from "@/lib/preferences-context";
 import { createClient } from "@/lib/supabase/client";
-import { updateMemoryAlbumAppearance } from "@/lib/supabase/memories";
+import { loadMemory, updateMemoryAlbumAppearance } from "@/lib/supabase/memories";
 import { useTree } from "@/lib/tree-context";
+import type { Memory } from "@/lib/types";
 
 export default function MemoryAlbumSettingsPage() {
   const params = useParams<{ id: string }>();
-  const { getMemory, isLoading, error, updateMemory: updateCachedMemory } = useMemories();
+  const { getMemory, isLoading, error, isDemo, updateMemory: updateCachedMemory } = useMemories();
   const {
     albumAppearance: defaultAppearance,
     albumAppearanceReady,
@@ -22,11 +23,34 @@ export default function MemoryAlbumSettingsPage() {
     reloadAlbumAppearance,
   } = usePreferences();
   const tree = useTree();
-  const memory = getMemory(params.id);
+  const cachedMemory = getMemory(params.id);
+  const [loadedMemory, setLoadedMemory] = useState<Memory | null>(null);
+  const [memoryLoading, setMemoryLoading] = useState(!isDemo);
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+  const memory = isDemo ? cachedMemory : loadedMemory ?? undefined;
   const [individualAppearance, setIndividualAppearance] = useState<AlbumAppearance | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inheritedAppearanceUnavailable = !memory?.albumAppearance && !albumAppearanceReady;
+
+  useEffect(() => {
+    if (isDemo) return;
+    let active = true;
+    setMemoryLoading(true);
+    setMemoryError(null);
+    setLoadedMemory(null);
+    void loadMemory(createClient(), params.id).then((result) => {
+      if (!active) return;
+      setLoadedMemory(result?.memory ?? null);
+      if (!result) setMemoryError("思い出が見つかりません。");
+    }).catch((cause) => {
+      if (!active) return;
+      setMemoryError(cause instanceof Error ? cause.message : "思い出を読み込めませんでした。");
+    }).finally(() => {
+      if (active) setMemoryLoading(false);
+    });
+    return () => { active = false; };
+  }, [isDemo, params.id]);
 
   useEffect(() => {
     setIndividualAppearance(memory?.albumAppearance ?? null);
@@ -41,6 +65,7 @@ export default function MemoryAlbumSettingsPage() {
     try {
       const saved = await updateMemoryAlbumAppearance(createClient(), memory.id, next);
       setIndividualAppearance(saved);
+      setLoadedMemory((current) => current ? { ...current, albumAppearance: saved } : current);
       updateCachedMemory({ ...memory, albumAppearance: saved });
     } catch (cause) {
       setIndividualAppearance(previous);
@@ -60,10 +85,10 @@ export default function MemoryAlbumSettingsPage() {
         <p className="mt-2 text-xs leading-6 text-ink/50">今見ている思い出で、印刷の仕上がりを試せます。</p>
       </section>
 
-      {isLoading && !memory ? (
+      {(isDemo ? isLoading : memoryLoading) && !memory ? (
         <p role="status" className="mt-12 text-center text-sm text-ink/55">思い出を読み込んでいます…</p>
-      ) : error && !memory ? (
-        <p role="alert" className="mt-12 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{error}</p>
+      ) : (isDemo ? error : memoryError) && !memory ? (
+        <p role="alert" className="mt-12 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{isDemo ? error : memoryError}</p>
       ) : memory ? (
         <AlbumSettingsPanel
           memory={memory}

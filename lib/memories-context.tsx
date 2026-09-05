@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SAMPLE_MEMORIES, getMonthKey } from "./data";
 import { orderAlbumMemories } from "./album-grid";
-import { Memory } from "./types";
+import { getMemoryDisplayUrl, type Memory } from "./types";
 import { addMemoryToCache, removeMemoryFromCache, updateMemoryInCache } from "./memories-cache";
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
@@ -69,7 +69,7 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   const addMemory = useCallback((memory: Memory) => {
     prepareLocalChange();
     setMemories((current) => addMemoryToCache(current, memory));
-    if (!memory.imageUrl) setWarning("一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。");
+    if (!getMemoryDisplayUrl(memory)) setWarning("一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。");
   }, [prepareLocalChange]);
 
   const updateMemory = useCallback((memory: Memory) => {

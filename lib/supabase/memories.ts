@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAlbumAppearance, type AlbumAppearance } from "../album-appearance.ts";
+import { createMemoryThumbnail, type GeneratedMemoryThumbnail } from "../memory-thumbnail.ts";
 import type { Memory, MemoryInput, MemoryUpdateInput } from "../types";
 
 export const MEMORY_IMAGE_BUCKET = "memory-images";
@@ -59,8 +60,8 @@ export function validateMemoryInput(input: MemoryInput) {
   };
 }
 
-export type PendingMemoryUpload = { id: string; userId: string; imagePath: string };
-export type MemorySaveStage = "auth" | "upload" | "insert" | "cleanup";
+export type PendingMemoryUpload = { id: string; userId: string; imagePath: string; thumbnailPath: string | null };
+export type MemorySaveStage = "thumbnail" | "auth" | "upload" | "insert" | "cleanup";
 export const PENDING_MEMORY_STORAGE_KEY = "memorimber-pending-memory-upload";
 
 export function readPendingMemoryUpload(storage: Pick<Storage, "getItem">): PendingMemoryUpload | null {
@@ -69,8 +70,16 @@ export function readPendingMemoryUpload(storage: Pick<Storage, "getItem">): Pend
     if (pending && typeof pending.userId === "string" && typeof pending.id === "string"
       && /^[0-9a-f-]{36}$/i.test(pending.id) && /^[0-9a-f-]{36}$/i.test(pending.userId)
       && typeof pending.imagePath === "string"
-      && new RegExp(`^${pending.userId}/${pending.id}\\.(jpg|png|webp|heic|heif)$`).test(pending.imagePath)) {
-      return { id: pending.id, userId: pending.userId, imagePath: pending.imagePath };
+      && new RegExp(`^${pending.userId}/${pending.id}\\.(jpg|png|webp|heic|heif)$`).test(pending.imagePath)
+      && (pending.thumbnailPath === undefined || pending.thumbnailPath === null
+        || (typeof pending.thumbnailPath === "string"
+          && new RegExp(`^${pending.userId}/thumbnails/${pending.id}\\.(webp|jpg)$`).test(pending.thumbnailPath)))) {
+      return {
+        id: pending.id,
+        userId: pending.userId,
+        imagePath: pending.imagePath,
+        thumbnailPath: pending.thumbnailPath ?? null,
+      };
     }
   } catch { /* Unavailable or invalid tab-local recovery metadata is not a saved memory. */ }
   return null;
@@ -119,9 +128,13 @@ async function requireUser(client: SupabaseClient) {
   return data.user;
 }
 
-async function removeUploadedImage(client: SupabaseClient, pending: PendingMemoryUpload, reason: string) {
+function pendingImagePaths(pending: PendingMemoryUpload) {
+  return pending.thumbnailPath ? [pending.imagePath, pending.thumbnailPath] : [pending.imagePath];
+}
+
+async function removeUploadedImages(client: SupabaseClient, pending: PendingMemoryUpload, reason: string) {
   try {
-    const { error } = await client.storage.from(MEMORY_IMAGE_BUCKET).remove([pending.imagePath]);
+    const { error } = await client.storage.from(MEMORY_IMAGE_BUCKET).remove(pendingImagePaths(pending));
     if (error) throw error;
   } catch (error) {
     throw new MemorySaveError(`${reason} アップロード済み画像の削除も完了していません。「保存状態を確認・後片付け」を押してください。削除エラー: ${errorDetail(error)}`, pending);
@@ -138,16 +151,27 @@ export async function recoverMemorySave(client: SupabaseClient, pending: Pending
   } catch (error) {
     throw new MemorySaveError(errorDetail(error), pending);
   }
+  const validThumbnailPath = pending.thumbnailPath === null
+    || new RegExp(`^${user.id}/thumbnails/${pending.id}\\.(webp|jpg)$`).test(pending.thumbnailPath);
   if (user.id !== pending.userId || !pending.imagePath.startsWith(`${user.id}/${pending.id}.`)
-    || pending.imagePath.split("/").length !== 2) {
+    || pending.imagePath.split("/").length !== 2 || !validThumbnailPath) {
     throw new MemorySaveError("投稿したアカウントでログインし直してから、保存状態を確認してください。", pending);
   }
   try {
-    const { data, error } = await client.from("memories").select("id, image_path")
+    let { data, error } = await client.from("memories").select("id, image_path, thumbnail_path")
       .eq("user_id", user.id).eq("id", pending.id).maybeSingle();
+    if (error && isMissingOptionalMemoryColumnError(error)) {
+      ({ data, error } = await client.from("memories").select("id, image_path")
+        .eq("user_id", user.id).eq("id", pending.id).maybeSingle());
+    }
     if (error) throw error;
     if (data) {
-      if (data.image_path !== pending.imagePath) throw new Error("画像の保存先が一致しません。");
+      const row = data as { image_path: string; thumbnail_path?: string | null };
+      if (row.image_path !== pending.imagePath
+        || (row.thumbnail_path && row.thumbnail_path !== pending.thumbnailPath)
+        || (pending.thumbnailPath === null && row.thumbnail_path)) {
+        throw new Error("画像の保存先が一致しません。");
+      }
       return { saved: true as const, id: pending.id };
     }
   } catch (error) {
@@ -158,27 +182,39 @@ export async function recoverMemorySave(client: SupabaseClient, pending: Pending
     // Absence right now is not evidence of rejection; let the user recheck.
     throw new MemorySaveError("保存結果を確定できません。少し時間をおいて「保存状態を確認・後片付け」を押してください。再投稿はまだ行わないでください。", pending);
   }
-  await removeUploadedImage(client, pending, "思い出は保存されていません。");
+  await removeUploadedImages(client, pending, "思い出は保存されていません。");
   return { saved: false as const, id: pending.id };
 }
 
+type MemorySaveInput = MemoryInput & { thumbnail?: GeneratedMemoryThumbnail | null };
+
 export async function saveMemory(
   client: SupabaseClient,
-  input: MemoryInput,
+  input: MemorySaveInput,
   onStage?: (stage: MemorySaveStage) => void,
   onPending?: (pending: PendingMemoryUpload) => void,
 ) {
   const { fields, contentType, extension } = validateMemoryInput(input);
+  onStage?.("thumbnail");
+  const thumbnail = input.thumbnail === undefined ? await createMemoryThumbnail(input.image) : input.thumbnail;
   onStage?.("auth");
   const user = await requireUser(client);
   const id = createMemoryId();
-  const pending = { id, userId: user.id, imagePath: `${user.id}/${id}.${extension}` };
+  const pending: PendingMemoryUpload = {
+    id,
+    userId: user.id,
+    imagePath: `${user.id}/${id}.${extension}`,
+    thumbnailPath: thumbnail ? `${user.id}/thumbnails/${id}.${thumbnail.extension}` : null,
+  };
+  let savedThumbnailPath = pending.thumbnailPath;
   const savedMemory = async (): Promise<Memory> => {
-    const signedImage = await signMemoryImage(client, pending.imagePath);
+    const signedImage = await signMemoryImage(client, savedThumbnailPath ?? pending.imagePath);
     return {
       id,
       imagePath: pending.imagePath,
-      imageUrl: signedImage.imageUrl,
+      imageUrl: savedThumbnailPath ? "" : signedImage.imageUrl,
+      thumbnailPath: savedThumbnailPath ?? undefined,
+      thumbnailUrl: savedThumbnailPath ? signedImage.imageUrl : undefined,
       caption: fields.caption,
       date: fields.memory_date,
       people: fields.people,
@@ -214,13 +250,34 @@ export async function saveMemory(
     throw new MemorySaveError(reason);
   }
 
+  if (thumbnail && pending.thumbnailPath) {
+    try {
+      const thumbnailFile = new File([thumbnail.blob], `${id}.${thumbnail.extension}`, { type: thumbnail.contentType });
+      const { error } = await client.storage.from(MEMORY_IMAGE_BUCKET).upload(pending.thumbnailPath, thumbnailFile, {
+        contentType: thumbnail.contentType,
+        upsert: false,
+      });
+      if (error) throw error;
+    } catch {
+      // The derivative is optional. If upload outcome is uncertain, try to
+      // discard the exact path, but never fail the original-memory post.
+      try { await client.storage.from(MEMORY_IMAGE_BUCKET).remove([pending.thumbnailPath]); } catch { /* Best effort. */ }
+      savedThumbnailPath = null;
+    }
+  }
+
   onStage?.("insert");
   let failure: unknown;
   let definitelyRejected = false;
   try {
     // The database default auth.uid() supplies user_id. No ownership field,
     // public URL, data URL or signed URL is sent by the client.
-    const { error, status } = await client.from("memories").insert({ id, image_path: pending.imagePath, ...fields });
+    const { error, status } = await client.from("memories").insert({
+      id,
+      image_path: pending.imagePath,
+      thumbnail_path: savedThumbnailPath,
+      ...fields,
+    });
     if (!error) return savedMemory();
     failure = error;
     definitelyRejected = status >= 400 && status < 500 && Boolean(error.code);
@@ -235,19 +292,24 @@ export async function saveMemory(
     const result = await recoverMemorySave(client, pending, false);
     if (result.saved) return savedMemory();
   } else {
-    await removeUploadedImage(client, pending, `思い出を保存できませんでした。${errorDetail(failure)}`);
+    await removeUploadedImages(client, pending, `思い出を保存できませんでした。${errorDetail(failure)}`);
   }
   throw new MemorySaveError(`思い出を保存できませんでした。画像は取り消しました。${errorDetail(failure)}`);
 }
 
 type MemoryRow = {
   id: string; image_path: string; caption: string; memory_date: string; people: string[]; tags: string[];
+  thumbnail_path?: string | null;
   letter?: string;
   album_appearance?: unknown;
   created_at?: string; updated_at?: string;
 };
 
 const MEMORY_ROW_COLUMN_SETS = [
+  "id, image_path, thumbnail_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at",
+  "id, image_path, thumbnail_path, caption, memory_date, people, tags, letter, created_at, updated_at",
+  "id, image_path, thumbnail_path, caption, memory_date, people, tags, album_appearance, created_at, updated_at",
+  "id, image_path, thumbnail_path, caption, memory_date, people, tags, created_at, updated_at",
   "id, image_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at",
   "id, image_path, caption, memory_date, people, tags, letter, created_at, updated_at",
   "id, image_path, caption, memory_date, people, tags, album_appearance, created_at, updated_at",
@@ -259,7 +321,7 @@ function isMissingOptionalMemoryColumnError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const record = error as { code?: unknown; message?: unknown; details?: unknown };
   const description = `${String(record.message ?? "")} ${String(record.details ?? "")}`.toLowerCase();
-  return (description.includes("letter") || description.includes("album_appearance")) && (
+  return (description.includes("thumbnail_path") || description.includes("letter") || description.includes("album_appearance")) && (
     record.code === "42703"
     || record.code === "PGRST204"
     || description.includes("does not exist")
@@ -267,9 +329,13 @@ function isMissingOptionalMemoryColumnError(error: unknown) {
   );
 }
 
-function toMemory(row: MemoryRow, imageUrl = ""): Memory {
+function toMemory(row: MemoryRow, urls: { imageUrl?: string; thumbnailUrl?: string } = {}): Memory {
   return {
-    id: row.id, imagePath: row.image_path, imageUrl,
+    id: row.id,
+    imagePath: row.image_path,
+    imageUrl: urls.imageUrl ?? "",
+    thumbnailPath: row.thumbnail_path ?? undefined,
+    thumbnailUrl: urls.thumbnailUrl,
     caption: row.caption, date: row.memory_date, people: row.people, tags: row.tags, letter: row.letter ?? "",
     albumAppearance: isAlbumAppearance(row.album_appearance) ? row.album_appearance : null,
     createdAt: row.created_at,
@@ -327,6 +393,22 @@ export type MemoryDetail = {
 
 export type LoadedMemory = Pick<MemoryDetail, "memory" | "warning">;
 
+/** Load one memory for a list/cache without signing its original when a thumbnail exists. */
+export async function loadMemoryPreview(client: SupabaseClient, id: string): Promise<LoadedMemory | null> {
+  if (!UUID_PATTERN.test(id)) return null;
+  const user = await requireUser(client);
+  const row = await loadOwnedMemoryRow(client, user.id, id);
+  if (!row) return null;
+  const displayPath = row.thumbnail_path ?? row.image_path;
+  const signedImage = await signMemoryImage(client, displayPath);
+  return {
+    memory: row.thumbnail_path
+      ? toMemory(row, { thumbnailUrl: signedImage.imageUrl || undefined })
+      : toMemory(row, { imageUrl: signedImage.imageUrl }),
+    warning: signedImage.warning,
+  };
+}
+
 /** Load one memory without also reading the complete ordering. */
 export async function loadMemory(client: SupabaseClient, id: string): Promise<LoadedMemory | null> {
   if (!UUID_PATTERN.test(id)) return null;
@@ -334,7 +416,7 @@ export async function loadMemory(client: SupabaseClient, id: string): Promise<Lo
   const row = await loadOwnedMemoryRow(client, user.id, id);
   if (!row) return null;
   const signedImage = await signMemoryImage(client, row.image_path);
-  return { memory: toMemory(row, signedImage.imageUrl), warning: signedImage.warning };
+  return { memory: toMemory(row, { imageUrl: signedImage.imageUrl }), warning: signedImage.warning };
 }
 
 /** Load one owned row by URL id. RLS is authoritative; user_id is extra scoping. */
@@ -352,7 +434,7 @@ export async function loadMemoryDetail(client: SupabaseClient, id: string): Prom
   if (currentIndex < 0) throw new Error("前後の思い出を確認できませんでした。再読み込みしてください。");
 
   return {
-    memory: toMemory(row, signedImage.imageUrl),
+    memory: toMemory(row, { imageUrl: signedImage.imageUrl }),
     previousId: currentIndex > 0 ? order[currentIndex - 1].id : null,
     nextId: currentIndex < order.length - 1 ? order[currentIndex + 1].id : null,
     warning: signedImage.warning,
@@ -424,6 +506,7 @@ async function restoreDeletedMemory(client: SupabaseClient, row: MemoryRow) {
   const { error } = await client.from("memories").insert({
     id: row.id,
     image_path: row.image_path,
+    ...(row.thumbnail_path !== undefined ? { thumbnail_path: row.thumbnail_path } : {}),
     caption: row.caption,
     memory_date: row.memory_date,
     people: row.people,
@@ -460,6 +543,10 @@ export async function deleteMemory(client: SupabaseClient, id: string) {
   if (!isOwnedImagePath(row.image_path, user.id)) {
     throw new Error("写真の保存先を安全に確認できないため、削除を中止しました。");
   }
+  if (row.thumbnail_path && (!isOwnedImagePath(row.thumbnail_path, user.id)
+    || row.thumbnail_path.split("/")[1] !== "thumbnails")) {
+    throw new Error("サムネイルの保存先を安全に確認できないため、削除を中止しました。");
+  }
 
   let deletionConfirmed = false;
   let deletionFailure: unknown = null;
@@ -490,8 +577,9 @@ export async function deleteMemory(client: SupabaseClient, id: string) {
   }
 
   let storageError: unknown = null;
+  const imagePaths = row.thumbnail_path ? [row.image_path, row.thumbnail_path] : [row.image_path];
   try {
-    const result = await client.storage.from(MEMORY_IMAGE_BUCKET).remove([row.image_path]);
+    const result = await client.storage.from(MEMORY_IMAGE_BUCKET).remove(imagePaths);
     storageError = result.error;
   } catch (error) {
     storageError = error;
@@ -499,7 +587,8 @@ export async function deleteMemory(client: SupabaseClient, id: string) {
   if (!storageError) return { id };
 
   try {
-    if (!await storageObjectExists(client, row.image_path)) {
+    const remainingObjects = await Promise.all(imagePaths.map((path) => storageObjectExists(client, path)));
+    if (remainingObjects.every((exists) => !exists)) {
       // The Storage response was lost after the object was removed.
       return { id };
     }
@@ -539,13 +628,15 @@ export async function loadMemories(client: SupabaseClient): Promise<{ memories: 
     offset += pageSize;
   }
 
+  const displayPaths = rows.map((row) => row.thumbnail_path ?? row.image_path);
   const urls = new Map<string, string>();
   let warning: string | null = null;
-  // Private originals are displayed via short-lived signed URLs, never getPublicUrl.
+  // Sign only the lightweight derivative when present. Older rows without a
+  // thumbnail keep using their original as a backward-compatible fallback.
   for (let offset = 0; offset < rows.length; offset += pageSize) {
     try {
       const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
-        .createSignedUrls(rows.slice(offset, offset + pageSize).map((row) => row.image_path), MEMORY_IMAGE_URL_LIFETIME);
+        .createSignedUrls(displayPaths.slice(offset, offset + pageSize), MEMORY_IMAGE_URL_LIFETIME);
       if (error) throw error;
       for (const item of data ?? []) {
         if (item.path && item.signedUrl && !item.error) urls.set(item.path, item.signedUrl);
@@ -555,10 +646,39 @@ export async function loadMemories(client: SupabaseClient): Promise<{ memories: 
       warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
     }
   }
-  if (urls.size !== rows.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
+  if (displayPaths.some((path) => !urls.has(path))) {
+    warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
+  }
   return {
-    memories: rows.map((row) => toMemory(row, urls.get(row.image_path) ?? "")),
+    memories: rows.map((row) => row.thumbnail_path
+      ? toMemory(row, { thumbnailUrl: urls.get(row.thumbnail_path) })
+      : toMemory(row, { imageUrl: urls.get(row.image_path) ?? "" })),
     warning,
     userId: user.id,
   };
+}
+
+/** Sign original images only for an explicit high-quality action such as print. */
+export async function loadMemoryOriginalUrls(client: SupabaseClient, memories: Memory[]) {
+  const user = await requireUser(client);
+  const owned = memories.filter((memory): memory is Memory & { imagePath: string } => (
+    Boolean(memory.imagePath) && isOwnedImagePath(memory.imagePath!, user.id)
+  ));
+  if (owned.length !== memories.length) throw new Error("印刷する写真の保存先を安全に確認できませんでした。");
+
+  const urls = new Map<string, string>();
+  const pageSize = 100;
+  for (let offset = 0; offset < owned.length; offset += pageSize) {
+    const page = owned.slice(offset, offset + pageSize);
+    const memoryByPath = new Map(page.map((memory) => [memory.imagePath, memory]));
+    const { data, error } = await client.storage.from(MEMORY_IMAGE_BUCKET)
+      .createSignedUrls(page.map((memory) => memory.imagePath), MEMORY_IMAGE_URL_LIFETIME);
+    if (error) throw new Error(`印刷用の元画像を読み込めませんでした。${errorDetail(error)}`);
+    for (const item of data ?? []) {
+      const memory = item.path ? memoryByPath.get(item.path) : undefined;
+      if (memory && item.signedUrl && !item.error) urls.set(memory.id, item.signedUrl);
+    }
+  }
+  if (urls.size !== memories.length) throw new Error("印刷用の元画像をすべて読み込めませんでした。");
+  return urls;
 }

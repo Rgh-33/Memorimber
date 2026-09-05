@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createClient } from "@supabase/supabase-js";
 import {
-  deleteMemory, getMemoryImageType, loadMemories, loadMemory, loadMemoryDetail, MAX_MEMORY_IMAGE_BYTES, MAX_MEMORY_LETTER_LENGTH,
+  deleteMemory, getMemoryImageType, loadMemories, loadMemory, loadMemoryDetail, loadMemoryOriginalUrls, loadMemoryPreview,
+  MAX_MEMORY_IMAGE_BYTES, MAX_MEMORY_LETTER_LENGTH,
   MEMORY_IMAGE_BUCKET, MemoryNotFoundError, MemorySaveError, readPendingMemoryUpload,
   recoverMemorySave, saveMemory, updateMemory, updateMemoryAlbumAppearance, validateMemoryFields, validateMemoryInput,
 } from "../lib/supabase/memories.ts";
@@ -43,9 +44,13 @@ function harness(options = {}) {
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body;
         calls.push({ url: parsed, method, body, headers: new Headers(init?.headers) });
         if (parsed.pathname.startsWith(`/storage/v1/object/${MEMORY_IMAGE_BUCKET}/`) && method === "POST") {
+          const path = decodeURIComponent(parsed.pathname.split(`/object/${MEMORY_IMAGE_BUCKET}/`)[1]);
           if (state.uploadThrows) throw new TypeError("Network failed during upload");
           if (state.uploadError) return json({ message: state.uploadError, statusCode: "413", error: "Payload too large" }, 413);
-          const path = decodeURIComponent(parsed.pathname.split(`/object/${MEMORY_IMAGE_BUCKET}/`)[1]);
+          if (path.includes("/thumbnails/") && state.thumbnailUploadThrows) throw new TypeError("Thumbnail response lost");
+          if (path.includes("/thumbnails/") && state.thumbnailUploadError) {
+            return json({ message: state.thumbnailUploadError, statusCode: "413", error: "Thumbnail rejected" }, 413);
+          }
           objects.set(path, body.get(""));
           return json({ Key: `${MEMORY_IMAGE_BUCKET}/${path}`, Id: "storage-id" });
         }
@@ -60,6 +65,9 @@ function harness(options = {}) {
           return new Response(null, { status: 201 });
         }
         if (parsed.pathname === "/rest/v1/memories" && method === "PATCH") {
+          if (state.missingThumbnailColumn && parsed.searchParams.get("select")?.includes("thumbnail_path")) {
+            return json({ message: "column memories.thumbnail_path does not exist", code: "42703", details: null, hint: null }, 400);
+          }
           if (state.missingLetterColumn && parsed.searchParams.get("select")?.includes("letter")) {
             return json({ message: "column memories.letter does not exist", code: "42703", details: null, hint: null }, 400);
           }
@@ -87,6 +95,9 @@ function harness(options = {}) {
           return json([{ id }]);
         }
         if (parsed.pathname === "/rest/v1/memories" && method === "GET") {
+          if (state.missingThumbnailColumn && parsed.searchParams.get("select")?.includes("thumbnail_path")) {
+            return json({ message: "column memories.thumbnail_path does not exist", code: "42703", details: null, hint: null }, 400);
+          }
           if (state.missingLetterColumn && parsed.searchParams.get("select")?.includes("letter")) {
             return json({ message: "column memories.letter does not exist", code: "42703", details: null, hint: null }, 400);
           }
@@ -147,16 +158,65 @@ for (const [extension, mime] of [["jpg", "image/jpeg"], ["png", "image/png"], ["
     assert.equal(result.caption, "帰り道の思い出");
     assert.deepEqual(result.people, ["友達", "家族"]);
     const insert = h.calls.find((call) => call.method === "POST" && call.url.pathname === "/rest/v1/memories");
-    assert.deepEqual(Object.keys(insert.body).sort(), ["id", "image_path", "caption", "memory_date", "people", "tags"].sort());
+    assert.deepEqual(Object.keys(insert.body).sort(), ["id", "image_path", "thumbnail_path", "caption", "memory_date", "people", "tags"].sort());
+    assert.equal(insert.body.thumbnail_path, null);
     assert.equal(insert.body.caption, "帰り道の思い出");
     assert.equal(insert.body.memory_date, "2026-08-31");
     assert.deepEqual(insert.body.people, ["友達", "家族"]);
     assert.deepEqual(insert.body.tags, ["帰り道"]);
     const upload = h.calls.find((call) => call.body instanceof FormData);
     assert.equal(upload.headers.get("x-upsert"), "false");
-    assert.deepEqual(stages, ["auth", "upload", "insert"]);
+    assert.deepEqual(stages, ["thumbnail", "auth", "upload", "insert"]);
   });
 }
+
+test("generated WebP thumbnail uploads beside the original and is the only signed list image", async () => {
+  const h = harness();
+  const thumbnail = {
+    blob: new Blob(["small thumbnail"], { type: "image/webp" }),
+    contentType: "image/webp",
+    extension: "webp",
+  };
+  const saved = await saveMemory(h.client, makeInput({ thumbnail }));
+  const originalPath = `${USER_ID}/${saved.id}.jpg`;
+  const thumbnailPath = `${USER_ID}/thumbnails/${saved.id}.webp`;
+  assert.deepEqual([...h.objects.keys()], [originalPath, thumbnailPath]);
+  assert.equal(h.rows.get(saved.id).image_path, originalPath);
+  assert.equal(h.rows.get(saved.id).thumbnail_path, thumbnailPath);
+  assert.equal(saved.imageUrl, "");
+  assert.equal(saved.thumbnailPath, thumbnailPath);
+  assert.match(saved.thumbnailUrl, /\/object\/sign\/memory-images\//);
+  const sign = h.calls.find((call) => call.url?.pathname.includes("/object/sign/"));
+  assert.deepEqual(sign.body.paths, [thumbnailPath]);
+});
+
+test("thumbnail upload failure keeps the original post and stores a null fallback", async () => {
+  const h = harness({ thumbnailUploadError: "Thumbnail too large" });
+  const thumbnail = {
+    blob: new Blob(["small thumbnail"], { type: "image/webp" }),
+    contentType: "image/webp",
+    extension: "webp",
+  };
+  const saved = await saveMemory(h.client, makeInput({ thumbnail }));
+  assert.deepEqual([...h.objects.keys()], [`${USER_ID}/${saved.id}.jpg`]);
+  assert.equal(h.rows.get(saved.id).thumbnail_path, null);
+  assert.equal(saved.thumbnailUrl, undefined);
+  assert.match(saved.imageUrl, /\/object\/sign\/memory-images\//);
+});
+
+test("DB rejection rolls back both the original and generated thumbnail", async () => {
+  const h = harness({ insertError: "caption check failed" });
+  const thumbnail = {
+    blob: new Blob(["small thumbnail"], { type: "image/webp" }),
+    contentType: "image/webp",
+    extension: "webp",
+  };
+  await assert.rejects(saveMemory(h.client, makeInput({ thumbnail })), /画像は取り消しました/);
+  assert.equal(h.objects.size, 0);
+  const removal = h.calls.find((call) => call.method === "DELETE" && call.url?.pathname.startsWith("/storage/"));
+  assert.equal(removal.body.prefixes.length, 2);
+  assert.match(removal.body.prefixes[1], new RegExp(`^${USER_ID}/thumbnails/.+\\.webp$`));
+});
 
 test("iPhone HEIC/HEIF with empty MIME uses extension and correct multipart MIME", async () => {
   for (const extension of ["HEIC", "HEIF"]) {
@@ -285,6 +345,66 @@ test("save then reload reads durable rows and private signed URLs; other owners 
   assert.equal(result.warning, null);
 });
 
+test("list loading signs thumbnails and only falls back to originals for legacy rows", async () => {
+  const thumbnailId = "10000000-0000-4000-8000-000000000010";
+  const legacyId = "10000000-0000-4000-8000-000000000011";
+  const thumbnailPath = `${USER_ID}/thumbnails/${thumbnailId}.webp`;
+  const thumbnailOriginalPath = `${USER_ID}/${thumbnailId}.jpg`;
+  const legacyOriginalPath = `${USER_ID}/${legacyId}.jpg`;
+  const listRow = (id, imagePath, thumbnailPath) => ({
+    id,
+    user_id: USER_ID,
+    image_path: imagePath,
+    thumbnail_path: thumbnailPath,
+    caption: "一覧の思い出",
+    memory_date: "2026-09-01",
+    people: [],
+    tags: [],
+    created_at: "2026-09-01T10:00:00.000Z",
+  });
+  const h = harness({ rows: [
+    listRow(thumbnailId, thumbnailOriginalPath, thumbnailPath),
+    listRow(legacyId, legacyOriginalPath, null),
+  ] });
+  const result = await loadMemories(h.client);
+  const thumbnailMemory = result.memories.find((memory) => memory.id === thumbnailId);
+  const legacyMemory = result.memories.find((memory) => memory.id === legacyId);
+  assert.equal(thumbnailMemory.imageUrl, "");
+  assert.match(thumbnailMemory.thumbnailUrl, /\/object\/sign\/memory-images\//);
+  assert.equal(legacyMemory.thumbnailUrl, undefined);
+  assert.match(legacyMemory.imageUrl, /\/object\/sign\/memory-images\//);
+  const signedPaths = h.calls
+    .filter((call) => call.url?.pathname.includes("/object/sign/"))
+    .flatMap((call) => call.body.paths);
+  assert.ok(signedPaths.includes(thumbnailPath));
+  assert.ok(signedPaths.includes(legacyOriginalPath));
+  assert.ok(!signedPaths.includes(thumbnailOriginalPath));
+});
+
+test("single preview loading signs a thumbnail while explicit print loading signs originals", async () => {
+  const id = "10000000-0000-4000-8000-000000000012";
+  const imagePath = `${USER_ID}/${id}.jpg`;
+  const thumbnailPath = `${USER_ID}/thumbnails/${id}.webp`;
+  const h = harness({ rows: [{
+    id,
+    user_id: USER_ID,
+    image_path: imagePath,
+    thumbnail_path: thumbnailPath,
+    caption: "一件の思い出",
+    memory_date: "2026-09-01",
+    people: [],
+    tags: [],
+  }] });
+  const preview = await loadMemoryPreview(h.client, id);
+  assert.equal(preview.memory.imageUrl, "");
+  assert.match(preview.memory.thumbnailUrl, /\/object\/sign\/memory-images\//);
+  const originalUrls = await loadMemoryOriginalUrls(h.client, [preview.memory]);
+  assert.match(originalUrls.get(id), /\/object\/sign\/memory-images\//);
+  const signRequests = h.calls.filter((call) => call.url?.pathname.includes("/object/sign/"));
+  assert.deepEqual(signRequests[0].body.paths, [thumbnailPath]);
+  assert.deepEqual(signRequests[1].body.paths, [imagePath]);
+});
+
 test("signed-URL failure still returns saved metadata with a warning", async () => {
   const h = harness({ signError: true });
   await saveMemory(h.client, makeInput());
@@ -328,7 +448,7 @@ const detailRow = (id, changes = {}) => ({
 test("detail loads one owned URL id, signs its private image, and orders same-day neighbors stably", async () => {
   const rows = [
     detailRow(DETAIL_IDS.sameLater, { created_at: "2026-09-01T11:00:00.000Z" }),
-    detailRow(DETAIL_IDS.current),
+    detailRow(DETAIL_IDS.current, { thumbnail_path: `${USER_ID}/thumbnails/${DETAIL_IDS.current}.webp` }),
     detailRow(DETAIL_IDS.earlier, { memory_date: "2026-08-31", created_at: "2026-08-31T18:00:00.000Z" }),
     detailRow(DETAIL_IDS.sameEarlier, { created_at: "2026-09-01T09:00:00.000Z" }),
     detailRow(DETAIL_IDS.other, { user_id: OTHER_USER_ID, image_path: `${OTHER_USER_ID}/${DETAIL_IDS.other}.jpg` }),
@@ -345,6 +465,8 @@ test("detail loads one owned URL id, signs its private image, and orders same-da
   assert.ok(reads.every((call) => call.url.searchParams.get("user_id") === `eq.${USER_ID}`));
   const sign = h.calls.find((call) => call.url?.pathname.includes("/object/sign/"));
   assert.deepEqual(sign.body.paths, [`${USER_ID}/${DETAIL_IDS.current}.jpg`]);
+  assert.equal(result.memory.thumbnailPath, `${USER_ID}/thumbnails/${DETAIL_IDS.current}.webp`);
+  assert.equal(result.memory.thumbnailUrl, undefined);
 });
 
 test("single-memory loading does not query the complete navigation order", async () => {
@@ -442,24 +564,28 @@ test("an older database without the optional letter column still loads albums an
 });
 
 test("deleting an owned memory removes both its DB row and exact Storage object", async () => {
-  const row = detailRow(DETAIL_IDS.current);
+  const row = detailRow(DETAIL_IDS.current, { thumbnail_path: `${USER_ID}/thumbnails/${DETAIL_IDS.current}.webp` });
   const h = harness({ rows: [row] });
   h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  h.objects.set(row.thumbnail_path, new File(["thumbnail"], "thumbnail.webp", { type: "image/webp" }));
   assert.deepEqual(await deleteMemory(h.client, DETAIL_IDS.current), { id: DETAIL_IDS.current });
   assert.equal(h.rows.has(DETAIL_IDS.current), false);
   assert.equal(h.objects.has(row.image_path), false);
+  assert.equal(h.objects.has(row.thumbnail_path), false);
   const removal = h.calls.find((call) => call.method === "DELETE" && call.url?.pathname.startsWith("/storage/"));
-  assert.deepEqual(removal.body.prefixes, [row.image_path]);
+  assert.deepEqual(removal.body.prefixes, [row.image_path, row.thumbnail_path]);
 });
 
 test("Storage deletion failure restores the captured DB row instead of leaving an orphan image", async () => {
-  const row = detailRow(DETAIL_IDS.current);
+  const row = detailRow(DETAIL_IDS.current, { thumbnail_path: `${USER_ID}/thumbnails/${DETAIL_IDS.current}.webp` });
   const h = harness({ rows: [row], removeError: true });
   h.objects.set(row.image_path, new File(["photo"], "photo.jpg", { type: "image/jpeg" }));
+  h.objects.set(row.thumbnail_path, new File(["thumbnail"], "thumbnail.webp", { type: "image/webp" }));
   await assert.rejects(deleteMemory(h.client, DETAIL_IDS.current), /元に戻しました/);
   assert.equal(h.rows.get(DETAIL_IDS.current).image_path, row.image_path);
   assert.equal(h.rows.get(DETAIL_IDS.current).caption, row.caption);
   assert.equal(h.rows.get(DETAIL_IDS.current).letter, row.letter);
+  assert.equal(h.rows.get(DETAIL_IDS.current).thumbnail_path, row.thumbnail_path);
   assert.equal(h.objects.has(row.image_path), true);
   assert.equal(h.calls.filter((call) => call.method === "POST" && call.url?.pathname === "/rest/v1/memories").length, 1);
 });
@@ -503,7 +629,8 @@ test("recovery metadata is journaled before uploading and survives a tab reload"
     stored = JSON.stringify(pending);
   });
   const pending = readPendingMemoryUpload({ getItem: () => stored });
-  assert.deepEqual(Object.keys(pending).sort(), ["id", "imagePath", "userId"]);
+  assert.deepEqual(Object.keys(pending).sort(), ["id", "imagePath", "thumbnailPath", "userId"]);
+  assert.equal(pending.thumbnailPath, null);
   assert.deepEqual(await recoverMemorySave(h.client, pending), { saved: true, id: result.id });
   assert.equal(h.calls.filter((call) => call.method === "DELETE").length, 0);
   assert.equal(readPendingMemoryUpload({ getItem: () => "broken JSON" }), null);
