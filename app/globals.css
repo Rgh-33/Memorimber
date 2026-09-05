@@ -238,6 +238,44 @@ a {
   padding: 0 20px 34px;
 }
 
+.shared-groups-page {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+}
+
+.shared-group-invitation-responses button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.shared-group-create-fab {
+  position: fixed;
+  inset: auto 0 calc(110px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  width: min(100%, 430px);
+  margin-inline: auto;
+  padding-inline: 16px;
+  pointer-events: none;
+}
+
+.shared-group-create-fab > button {
+  pointer-events: auto;
+}
+
+.shared-group-create-dialog {
+  width: min(390px, calc(100% - 40px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+}
+
+.shared-group-create-dialog::backdrop {
+  background: rgb(var(--ink-rgb) / 0.35);
+}
+
 .album-page {
   display: flex;
   min-height: calc(100dvh - 128px);
