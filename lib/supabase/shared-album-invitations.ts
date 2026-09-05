@@ -79,7 +79,7 @@ export async function respondToSharedAlbumInvitation(
     target_invitation_id: requireUuid(invitationId, "招待"),
     response,
   });
-  if (error) throw new Error(invitationError(error, "招待へ回答できませんでした。"));
+  if (error) throw new Error(invitationError(error, "招待へ回答できませんでした。"), { cause: error });
 
   const row = firstRow(data as { album_id?: unknown; status?: unknown }[] | null);
   if (!row || typeof row.album_id !== "string" || !isInvitationStatus(row.status)) {
