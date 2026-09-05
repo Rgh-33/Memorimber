@@ -49,7 +49,6 @@ export default function MemoryDetailPage() {
   const router = useRouter();
   const {
     memories,
-    isLoading: memoriesLoading,
     getRelatedMemories,
     updateMemory: updateCachedMemory,
     removeMemory,
@@ -66,8 +65,7 @@ export default function MemoryDetailPage() {
   const requestVersion = useRef(0);
   const previewMemory = tree.preview ? tree.memories.find((item) => item.id === params.id) : undefined;
   const sampleMemory = SAMPLE_MEMORIES.find((item) => item.id === params.id);
-  const cachedMemory = memories.find((item) => item.id === params.id);
-  const localMemory = previewMemory ?? sampleMemory ?? cachedMemory;
+  const localMemory = previewMemory ?? sampleMemory;
   const isPrototypeMemory = Boolean(previewMemory ?? sampleMemory);
   const [detail, setDetail] = useState<LoadedMemory | null>(null);
   const [loadState, setLoadState] = useState<LoadState>(localMemory ? "loaded" : "idle");
@@ -107,10 +105,6 @@ export default function MemoryDetailPage() {
       setLoadState("loaded");
       return;
     }
-    if (memoriesLoading) {
-      setLoadState("loading");
-      return;
-    }
     if (!configured) {
       requestVersion.current += 1;
       setDetail(null);
@@ -120,7 +114,7 @@ export default function MemoryDetailPage() {
     }
     void fetchDetail();
     return () => { requestVersion.current += 1; };
-  }, [configured, fetchDetail, localMemory, memoriesLoading]);
+  }, [configured, fetchDetail, localMemory]);
 
   useEffect(() => {
     setActionMode(null);

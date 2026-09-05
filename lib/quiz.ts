@@ -1,4 +1,4 @@
-import type { Memory } from "./types";
+import { getMemoryDisplayUrl, type Memory } from "./types.ts";
 
 export type QuizKind = "month" | "photo-to-caption" | "caption-to-photo";
 export type QuizMode = "quick" | "mixed" | "photo-to-caption" | "caption-to-photo" | "endless";
@@ -63,7 +63,7 @@ export const QUIZ_MODE_LABELS: Record<QuizMode, string> = {
 
 function uniqueMemories(memories: Memory[]) {
   return [...new Map(memories.map((memory) => [memory.id, memory])).values()]
-    .filter((memory) => Boolean(memory.imageUrl && memory.caption.trim()));
+    .filter((memory) => Boolean(getMemoryDisplayUrl(memory) && memory.caption.trim()));
 }
 
 function shuffle<T>(values: readonly T[], random: () => number) {
@@ -144,7 +144,7 @@ export function createMemoryQuizQuestion(
 
   const choices = shuffle([memory, ...shuffle(otherMemories, random).slice(0, 2)], random).map((candidate) => ({
     id: candidate.id,
-    imageUrl: candidate.imageUrl,
+    imageUrl: getMemoryDisplayUrl(candidate),
   }));
   return {
     id,

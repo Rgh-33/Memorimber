@@ -6,17 +6,18 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Check, ChevronRight, ImagePlus, Sprout, Tag, Users } from "lucide-react";
 import { useMemories } from "@/lib/memories-context";
+import { createMemoryThumbnail, type GeneratedMemoryThumbnail } from "@/lib/memory-thumbnail";
 import { useProcessing } from "@/lib/processing-context";
 import { useTree } from "@/lib/tree-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getMemoryImageType, loadMemory, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
+import { getMemoryImageType, loadMemoryPreview, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
 import type { Memory } from "@/lib/types";
 
 const PEOPLE = ["友達", "家族", "クラスのみんな", "部活の仲間"];
 const TAGS = ["放課後", "帰り道", "教室", "行事", "昼休み", "8月"];
 const STAGE_LABELS: Record<MemorySaveStage, string> = {
-  auth: "ログインを確認しています…", upload: "写真をアップロードしています…",
+  thumbnail: "サムネイルを準備しています…", auth: "ログインを確認しています…", upload: "写真をアップロードしています…",
   insert: "思い出を保存しています…", cleanup: "保存状態を確認・後片付けしています…",
 };
 const today = () => {
@@ -32,6 +33,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const configured = isSupabaseConfigured();
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
+  const thumbnailPromiseRef = useRef<Promise<GeneratedMemoryThumbnail | null>>(Promise.resolve(null));
   const [image, setImage] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
   const [previewFailed, setPreviewFailed] = useState(false);
@@ -67,12 +69,14 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     if (file) {
       try {
         getMemoryImageType(file);
+        thumbnailPromiseRef.current = createMemoryThumbnail(file);
         setImage(file);
         setImageUrl(URL.createObjectURL(file));
         setPreviewFailed(false);
         setErrors((current) => ({ ...current, image: undefined }));
       } catch (cause) {
         setImage(null);
+        thumbnailPromiseRef.current = Promise.resolve(null);
         setImageUrl("");
         event.target.value = "";
         setErrors((current) => ({ ...current, image: cause instanceof Error ? cause.message : "写真を読み込めませんでした。" }));
@@ -88,6 +92,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setSaveError(null);
     clearPending();
     setImage(null);
+    thumbnailPromiseRef.current = Promise.resolve(null);
     setImageUrl("");
     setCaption("");
     setDate(today());
@@ -132,10 +137,11 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
 
     submittingRef.current = true;
     setSaveError(null);
-    setStage("auth");
+    setStage("thumbnail");
     startProcessing();
     try {
-      const saved = await saveMemory(createClient(), { image, caption, date, people, tags }, setStage, rememberPending);
+      const thumbnail = await thumbnailPromiseRef.current;
+      const saved = await saveMemory(createClient(), { image, thumbnail, caption, date, people, tags }, setStage, rememberPending);
       onSaved(saved);
     } catch (cause) {
       showSaveError(cause);
@@ -155,7 +161,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
       const client = createClient();
       const result = await recoverMemorySave(client, pending);
       if (result.saved) {
-        const loaded = await loadMemory(client, result.id);
+        const loaded = await loadMemoryPreview(client, result.id);
         if (!loaded) throw new MemorySaveError("保存済みの思い出を読み込めませんでした。もう一度、保存状態を確認してください。", pending);
         onSaved(loaded.memory);
       }
