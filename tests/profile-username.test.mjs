@@ -27,6 +27,10 @@ test("profile migration enforces username format without adding uniqueness", () 
   const sql = readFileSync(new URL("../supabase/migrations/20260905070000_require_profile_display_name.sql", import.meta.url), "utf8");
   assert.match(sql, /display_name is null[\s\S]*display_name = btrim\(display_name\)[\s\S]*char_length\(display_name\) between 1 and 20/);
   assert.match(sql, /old\.display_name is not null and new\.display_name is null/);
+  assert.match(sql, /pg_catalog\.pg_constraint[\s\S]*conname = 'profiles_display_name_format'[\s\S]*conrelid = 'public\.profiles'::regclass/);
+  assert.match(sql, /create or replace function public\.prevent_profile_display_name_clear\(\)/);
+  assert.match(sql, /pg_catalog\.pg_trigger[\s\S]*tgname = 'on_profile_updated_prevent_display_name_clear'[\s\S]*tgrelid = 'public\.profiles'::regclass/);
+  assert.doesNotMatch(sql, /drop constraint|drop trigger/i);
   assert.doesNotMatch(sql, /unique\s*\([^)]*display_name/i);
 });
 
