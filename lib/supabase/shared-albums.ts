@@ -36,6 +36,11 @@ export type SharedAlbumMemoryResult = {
   warning: string | null;
 };
 
+export type SharedAlbumMemoryDetailResult = {
+  entry: SharedAlbumMemoryEntry;
+  warning: string | null;
+};
+
 export type SharedMemoryChoice = Pick<Memory, "id" | "date" | "caption">;
 
 type AlbumRow = { id: string; owner_id: string; name: string; created_at: string; updated_at: string };
@@ -183,11 +188,10 @@ export async function listOwnMemoriesForSharing(
   });
 }
 
-async function signMemoryImages(client: SupabaseClient, rows: MemoryRow[]) {
+async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[]) {
   const urls = new Map<string, string>();
   let warning: string | null = null;
-  const paths = [...new Set(rows.flatMap((row) => [row.image_path, row.thumbnail_path]
-    .filter((path): path is string => Boolean(path))))];
+  const paths = [...new Set(requestedPaths)];
   const pageSize = 100;
   for (let offset = 0; offset < paths.length; offset += pageSize) {
     const pagePaths = paths.slice(offset, offset + pageSize);
@@ -204,6 +208,22 @@ async function signMemoryImages(client: SupabaseClient, rows: MemoryRow[]) {
   }
   if (urls.size !== paths.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
   return { urls, warning };
+}
+
+function toSharedMemoryEntry(
+  row: SharedMemoryRow,
+  memory: MemoryRow,
+  imageUrl: string,
+  thumbnailUrl?: string,
+): SharedAlbumMemoryEntry {
+  return {
+    albumId: row.album_id,
+    addedBy: row.added_by,
+    contributorName: row.added_by_display_name ?? null,
+    addedAt: row.created_at,
+    memoryOwnerId: memory.user_id,
+    memory: toMemory(memory, imageUrl, thumbnailUrl),
+  };
 }
 
 export async function loadSharedAlbumMemoryEntries(
@@ -229,20 +249,35 @@ export async function loadSharedAlbumMemoryEntries(
     const memory = singleMemory(row.memory);
     return memory ? [{ row, memory }] : [];
   });
-  const { urls, warning } = await signMemoryImages(client, normalized.map(({ memory }) => memory));
+  const displayPaths = normalized.map(({ memory }) => memory.thumbnail_path ?? memory.image_path);
+  const { urls, warning } = await signMemoryPaths(client, displayPaths);
   return {
-    entries: normalized.map(({ row, memory }) => ({
-      albumId: row.album_id,
-      addedBy: row.added_by,
-      contributorName: row.added_by_display_name ?? null,
-      addedAt: row.created_at,
-      memoryOwnerId: memory.user_id,
-      memory: toMemory(
-        memory,
-        urls.get(memory.image_path) ?? "",
-        memory.thumbnail_path ? urls.get(memory.thumbnail_path) : undefined,
-      ),
-    })),
+    entries: normalized.map(({ row, memory }) => memory.thumbnail_path
+      ? toSharedMemoryEntry(row, memory, "", urls.get(memory.thumbnail_path))
+      : toSharedMemoryEntry(row, memory, urls.get(memory.image_path) ?? "")),
+    warning,
+  };
+}
+
+/** Load and sign exactly one shared memory's original for the detail screen. */
+export async function loadSharedAlbumMemoryDetail(
+  client: SupabaseClient,
+  albumId: string,
+  memoryId: string,
+): Promise<SharedAlbumMemoryDetailResult | null> {
+  const { data, error } = await client.from("shared_album_memories")
+    .select(SHARED_MEMORY_COLUMNS)
+    .eq("album_id", requireUuid(albumId, "グループ"))
+    .eq("memory_id", requireUuid(memoryId, "思い出"))
+    .maybeSingle();
+  if (error) throw new Error(albumError(error, "共有された思い出を読み込めませんでした。"));
+  if (!data) return null;
+  const row = data as unknown as SharedMemoryRow;
+  const memory = singleMemory(row.memory);
+  if (!memory) return null;
+  const { urls, warning } = await signMemoryPaths(client, [memory.image_path]);
+  return {
+    entry: toSharedMemoryEntry(row, memory, urls.get(memory.image_path) ?? ""),
     warning,
   };
 }

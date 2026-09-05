@@ -1,6 +1,6 @@
 begin;
 
-select plan(50);
+select plan(54);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -45,6 +45,16 @@ values
   ('memory-images', '10000000-0000-0000-0000-000000000001/private.jpg'),
   ('memory-images', '20000000-0000-0000-0000-000000000002/member.jpg'),
   ('memory-images', '30000000-0000-0000-0000-000000000003/outsider.jpg');
+
+update public.memories
+set thumbnail_path = '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'
+where id = 'a0000000-0000-0000-0000-000000000001';
+
+insert into storage.objects (bucket_id, name)
+values (
+  'memory-images',
+  '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
@@ -359,6 +369,14 @@ select results_eq(
   'a member can select another users shared image'
 );
 
+select results_eq(
+  $$select name from storage.objects
+    where bucket_id = 'memory-images'
+      and name = '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'$$,
+  $$values ('10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'::text)$$,
+  'a member can select another users shared thumbnail'
+);
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', true);
 
@@ -367,6 +385,13 @@ select is_empty(
     where bucket_id = 'memory-images'
       and name = '10000000-0000-0000-0000-000000000001/owner.jpg'$$,
   'a non-member cannot select a shared image'
+);
+
+select is_empty(
+  $$select name from storage.objects
+    where bucket_id = 'memory-images'
+      and name = '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'$$,
+  'a non-member cannot select a shared thumbnail'
 );
 
 set local role authenticated;
@@ -381,11 +406,27 @@ select is_empty(
 );
 
 select is_empty(
+  $$update storage.objects set name = name
+    where bucket_id = 'memory-images'
+      and name = '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'
+    returning name$$,
+  'a member cannot update another users shared thumbnail'
+);
+
+select is_empty(
   $$delete from storage.objects
     where bucket_id = 'memory-images'
       and name = '10000000-0000-0000-0000-000000000001/owner.jpg'
     returning name$$,
   'a member cannot delete another users shared image'
+);
+
+select is_empty(
+  $$delete from storage.objects
+    where bucket_id = 'memory-images'
+      and name = '10000000-0000-0000-0000-000000000001/thumbnails/a0000000-0000-0000-0000-000000000001-110x110.webp'
+    returning name$$,
+  'a member cannot delete another users shared thumbnail'
 );
 
 select is_empty(

@@ -179,7 +179,7 @@ test("generated WebP thumbnail uploads beside the original and is the only signe
   };
   const saved = await saveMemory(h.client, makeInput({ thumbnail }));
   const originalPath = `${USER_ID}/${saved.id}.jpg`;
-  const thumbnailPath = `${USER_ID}/thumbnails/${saved.id}.webp`;
+  const thumbnailPath = `${USER_ID}/thumbnails/${saved.id}-110x110.webp`;
   assert.deepEqual([...h.objects.keys()], [originalPath, thumbnailPath]);
   assert.equal(h.rows.get(saved.id).image_path, originalPath);
   assert.equal(h.rows.get(saved.id).thumbnail_path, thumbnailPath);
@@ -635,6 +635,14 @@ test("recovery metadata is journaled before uploading and survives a tab reload"
   assert.equal(h.calls.filter((call) => call.method === "DELETE").length, 0);
   assert.equal(readPendingMemoryUpload({ getItem: () => "broken JSON" }), null);
   assert.equal(readPendingMemoryUpload({ getItem: () => JSON.stringify({ ...pending, imagePath: "someone/else.jpg" }) }), null);
+  const newThumbnailPath = `${pending.userId}/thumbnails/${pending.id}-110x110.webp`;
+  const oldThumbnailPath = `${pending.userId}/thumbnails/${pending.id}.webp`;
+  assert.equal(readPendingMemoryUpload({
+    getItem: () => JSON.stringify({ ...pending, thumbnailPath: newThumbnailPath }),
+  }).thumbnailPath, newThumbnailPath);
+  assert.equal(readPendingMemoryUpload({
+    getItem: () => JSON.stringify({ ...pending, thumbnailPath: oldThumbnailPath }),
+  }).thumbnailPath, oldThumbnailPath);
 });
 
 test("failure to journal recovery information prevents upload", async () => {
