@@ -5,6 +5,8 @@ export type Memory = {
   date: string;
   imageUrl: string;
   imagePath?: string;
+  thumbnailUrl?: string;
+  thumbnailPath?: string;
   createdAt?: string;
   caption: string;
   people: string[];
@@ -28,8 +30,12 @@ export type AlbumMonth = {
   message: string;
 };
 
-export type MemoryInput = Omit<Memory, "id" | "imageUrl" | "imagePath"> & {
+export type MemoryInput = Omit<Memory, "id" | "imageUrl" | "imagePath" | "thumbnailUrl" | "thumbnailPath"> & {
   image: File;
 };
 
 export type MemoryUpdateInput = Pick<Memory, "caption" | "date" | "people" | "tags" | "letter">;
+
+export function getMemoryDisplayUrl(memory: Pick<Memory, "imageUrl" | "thumbnailUrl">) {
+  return memory.thumbnailUrl ?? memory.imageUrl;
+}

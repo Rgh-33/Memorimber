@@ -9,7 +9,7 @@ import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
 import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
-import type { Memory } from "@/lib/types";
+import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export function FruitQuizDialog({ memory, memories, onClose }: { memory: Memory; memories: Memory[]; onClose: () => void }) {
@@ -70,7 +70,7 @@ export function FruitQuizDialog({ memory, memories, onClose }: { memory: Memory;
 
             <article className="fruit-quiz-memory-focus">
               <p>この木の実から見つかった思い出</p>
-              <img src={memory.imageUrl} alt={memory.caption} />
+              <img src={getMemoryDisplayUrl(memory)} alt={memory.caption} />
               <div><small>{formatJapaneseDate(memory.date)}</small><strong>{memory.caption}</strong></div>
             </article>
 

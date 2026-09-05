@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { formatShortDate } from "@/lib/data";
-import { Memory } from "@/lib/types";
+import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { MemoryPhoto } from "@/components/memory-photo";
 
-export function MemoryCard({ memory, compact = false, dateOnly = false }: { memory: Memory; compact?: boolean; dateOnly?: boolean }) {
+export function MemoryCard({ memory, compact = false, dateOnly = false, imageUrl: imageUrlOverride }: {
+  memory: Memory;
+  compact?: boolean;
+  dateOnly?: boolean;
+  imageUrl?: string;
+}) {
+  const imageUrl = imageUrlOverride ?? getMemoryDisplayUrl(memory);
   if (dateOnly) {
     return (
       <Link href={`/memory/${memory.id}`} className="group block rounded-lg border border-dashed border-coral/35 bg-ivory p-1.5 transition hover:-translate-y-0.5 hover:border-coral hover:shadow-card">
         <div className="aspect-square overflow-hidden rounded-md bg-paper">
-          <MemoryPhoto src={memory.imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          <MemoryPhoto src={imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         </div>
         <p className="pb-0.5 pt-1.5 text-center text-[10px] font-medium text-ink/60">{formatShortDate(memory.date)}</p>
       </Link>
@@ -20,7 +26,7 @@ export function MemoryCard({ memory, compact = false, dateOnly = false }: { memo
     return (
       <Link href={`/memory/${memory.id}`} className="group block rounded-lg border border-dashed border-coral/35 bg-ivory p-1.5 transition hover:border-coral">
         <div className="aspect-square overflow-hidden rounded-md bg-paper">
-          <MemoryPhoto src={memory.imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          <MemoryPhoto src={imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         </div>
       </Link>
     );
@@ -29,7 +35,7 @@ export function MemoryCard({ memory, compact = false, dateOnly = false }: { memo
   return (
     <Link href={`/memory/${memory.id}`} className="group block rounded-2xl border border-line bg-ivory p-2 shadow-sm">
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-paper">
-        <MemoryPhoto src={memory.imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+        <MemoryPhoto src={imageUrl} alt={memory.caption} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
       </div>
       <div className="px-1 pb-1 pt-3">
         <p className="line-clamp-2 text-sm font-semibold leading-5 text-ink">{memory.caption}</p>

@@ -4,6 +4,7 @@
 
 import { Check, Grid3X3, X } from "lucide-react";
 import type { MemoryQuizQuestion } from "@/lib/quiz";
+import { getMemoryDisplayUrl } from "@/lib/types";
 
 function MosaicPhoto({ src, alt, revealed = false, compact = false }: {
   src: string;
@@ -34,7 +35,7 @@ export function QuizQuestionCard({ question, selectedChoiceId, answered, onSelec
 
       {question.kind !== "caption-to-photo" && (
         <MosaicPhoto
-          src={question.memory.imageUrl}
+          src={getMemoryDisplayUrl(question.memory)}
           alt={answered ? question.memory.caption : "モザイクのかかったクイズ写真"}
           revealed={answered}
         />
