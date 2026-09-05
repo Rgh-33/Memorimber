@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Info, LogOut, Menu, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
+import { Bell, Info, LogOut, Menu, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/auth/actions";
 import { BrandHomeLink } from "@/components/brand-home-link";
@@ -10,6 +10,7 @@ import { useMemories } from "@/lib/memories-context";
 import { useProcessing } from "@/lib/processing-context";
 import { useProfile } from "@/lib/profile-context";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useNotifications } from "@/lib/notifications-context";
 
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -17,6 +18,7 @@ export function AppHeader() {
   const { resetDemo } = useMemories();
   const { startProcessing } = useProcessing();
   const { avatarDataUrl, nickname } = useProfile();
+  const { unreadCount } = useNotifications();
   useBodyScrollLock(menuOpen);
 
   useEffect(() => {
@@ -52,12 +54,15 @@ export function AppHeader() {
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            className="rounded-lg p-2 text-ink transition hover:bg-paper hover:text-coral"
-            aria-label="メニューを開く"
+            className="relative rounded-lg p-2 text-ink transition hover:bg-paper hover:text-coral"
+            aria-label={unreadCount > 0 ? `メニューを開く、未読通知${unreadCount}件` : "メニューを開く"}
             aria-expanded={menuOpen}
             aria-controls="app-side-menu"
           >
             <Menu size={23} strokeWidth={1.7} />
+            {unreadCount > 0 ? (
+              <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-ivory bg-coral" aria-hidden="true" />
+            ) : null}
           </button>
         </div>
       </header>
@@ -82,6 +87,15 @@ export function AppHeader() {
               <Link href="/profile" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
                 <UserRound size={17} />
                 <span>プロフィール</span>
+              </Link>
+              <Link href="/notifications" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
+                <Bell size={17} />
+                <span>通知</span>
+                {unreadCount > 0 ? (
+                  <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-coral px-1.5 py-0.5 text-[9px] leading-4 text-white" aria-label={`未読${unreadCount}件`}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
               </Link>
               <div className="app-side-menu-divider" aria-hidden="true" />
               <Link href="/post" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
