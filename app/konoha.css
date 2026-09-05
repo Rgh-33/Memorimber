@@ -99,8 +99,59 @@
 .konoha-calm-mote--two { animation-delay: calc(var(--growth-delay) + 110ms); }
 .konoha-calm-mote--three { animation-delay: calc(var(--growth-delay) + 190ms); }
 .konoha-calm-glint { fill: none; stroke: var(--konoha-calm-magic); stroke-width: .8; stroke-linecap: round; filter: drop-shadow(0 0 1.4px color-mix(in srgb, var(--konoha-calm-magic) 55%, transparent)); transform-box: fill-box; transform-origin: center; animation: konoha-calm-glint .72s ease-out calc(var(--growth-delay) + 220ms) both; }
-.konoha-fruit--ripe { filter: drop-shadow(0 2px 1.5px #182d2b66) drop-shadow(0 0 6px rgb(var(--accent-rgb) / .58)); }
-.konoha-fruit--golden:not(.konoha-fruit--turning-golden) { filter: drop-shadow(0 2px 1.5px #5f431e66) drop-shadow(0 0 8px #e5b93fcc); }
+.konoha-glass-shell {
+  paint-order: fill stroke;
+  fill-opacity: .82;
+  filter: drop-shadow(1.1px 1.55px .65px rgb(38 29 52 / .38));
+}
+.konoha-crystal-side { opacity: .68; filter: brightness(.58) saturate(1.26); }
+.konoha-crystal-front { opacity: .52; filter: brightness(1.12) saturate(1.08); }
+.konoha-crystal-top { opacity: .58; filter: brightness(1.42) saturate(.88); }
+.konoha-glass-heart, .konoha-crystal-planes {
+  opacity: .68;
+}
+.konoha-crystal-facets, .konoha-geode-cracks {
+  opacity: .92;
+}
+.konoha-glass-highlight {
+  fill: none;
+  stroke: #fffce2;
+  stroke-width: .95;
+  stroke-linecap: round;
+  opacity: .86;
+}
+.konoha-gilt-stem {
+  fill: none;
+  stroke: #b98327;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  filter: drop-shadow(.3px .4px .25px rgb(74 47 13 / .5));
+}
+.konoha-gilt-branch { stroke-width: 1.45; }
+.konoha-gilt-calyx { filter: drop-shadow(0 .35px .25px rgb(74 47 13 / .45)); }
+.konoha-gem-leaf { filter: drop-shadow(0 .4px .25px rgb(27 54 43 / .34)); }
+.konoha-leaf-vein {
+  fill: none;
+  stroke: #d4d59c;
+  stroke-width: .55;
+  stroke-linecap: round;
+  opacity: .58;
+}
+.konoha-geode-core { opacity: .86; filter: drop-shadow(0 0 .7px #ffe3a0); }
+.konoha-gem-dust {
+  fill: #fffbd7;
+  filter: drop-shadow(0 0 .6px #ffd96d);
+  animation: konoha-ripe-sparkles 3.2s ease-in-out infinite reverse;
+}
+.konoha-fruit--young .konoha-crystal-facets,
+.konoha-fruit--young .konoha-geode-cracks,
+.konoha-fruit--young .konoha-gem-dust { opacity: .34; }
+.konoha-fruit--ripe { filter: drop-shadow(0 1.5px .8px #3328425c) drop-shadow(0 0 3px rgb(var(--accent-rgb) / .42)); }
+.konoha-fruit--golden:not(.konoha-fruit--turning-golden) { filter: drop-shadow(0 1.5px .8px #70451266) drop-shadow(0 0 4px #efa91fb8) drop-shadow(0 0 1px #fff1a3); }
+.konoha-fruit--golden .konoha-glass-heart,
+.konoha-fruit--golden .konoha-crystal-planes { filter: drop-shadow(0 0 1px #fff0a2); }
+.konoha-fruit--golden .konoha-crystal-facets,
+.konoha-fruit--golden .konoha-geode-cracks { opacity: .94; }
 .konoha-fruit--golden .konoha-fruit-color--base { opacity: 0; }
 .konoha-fruit-color--golden { opacity: 1; }
 .konoha-fruit--turning-golden .konoha-fruit-color--base {
@@ -113,8 +164,8 @@
   transform-origin: center;
   animation: konoha-fruit-turn-golden 1.45s cubic-bezier(.16,.82,.22,1) 1.52s both;
 }
-.konoha-ripe-aura { fill: rgb(var(--accent-rgb) / .3); stroke: none; filter: blur(2.8px) drop-shadow(0 0 4px rgb(var(--accent-rgb) / .62)); transform-box: fill-box; transform-origin: center; animation: konoha-ripe-aura 2.2s ease-in-out infinite; }
-.konoha-ripe-sparkles { fill: none; stroke: #fff4a8; stroke-width: 1.35; stroke-linecap: round; filter: drop-shadow(0 0 2.5px rgb(var(--accent-rgb) / .8)); animation: konoha-ripe-sparkles 2.2s ease-in-out infinite; }
+.konoha-ripe-aura { fill: rgb(var(--accent-rgb) / .12); stroke: none; filter: blur(1.4px); transform-box: fill-box; transform-origin: center; animation: konoha-ripe-aura 2.8s ease-in-out infinite; }
+.konoha-ripe-sparkles { fill: none; stroke: #fff8c9; stroke-width: .9; stroke-linecap: round; filter: drop-shadow(0 0 .8px rgb(var(--accent-rgb) / .62)); animation: konoha-ripe-sparkles 2.8s ease-in-out infinite; }
 .konoha-new-fruit-emphasis, .konoha-just-ripe-celebration { pointer-events: none; }
 .konoha-new-fruit-halo { fill: color-mix(in srgb, var(--konoha-magic) 46%, transparent); stroke: color-mix(in srgb, var(--konoha-magic) 78%, white); stroke-width: .85; filter: blur(1.2px) drop-shadow(0 0 3px var(--konoha-magic)); transform-box: fill-box; transform-origin: center; animation: konoha-new-fruit-halo 2.6s ease-out calc(var(--growth-delay) + 1280ms) both; }
 .konoha-new-fruit-glint { fill: none; stroke: #fff6b5; stroke-width: 1.35; stroke-linecap: round; filter: drop-shadow(0 0 2px var(--konoha-magic)); transform-box: fill-box; transform-origin: center; animation: konoha-new-fruit-glint 1.7s ease-out calc(var(--growth-delay) + 1340ms) both; }

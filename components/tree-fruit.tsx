@@ -6,60 +6,131 @@ function FruitArtwork({ uid, variety, mature, fill }: {
   mature: boolean;
   fill: string;
 }) {
+  const metal = `url(#${uid}-gilt)`;
+  const facets = `url(#${uid}-facet-light)`;
+
   return <>
-    <path d="M0 -15 Q-1 -11 1 -8" fill="none" stroke="#5b4a2d" strokeWidth="2" strokeLinecap="round" />
+    {variety === "le-lectier" && <g>
+      <path d="M0 -13 L-7 -8 L-13 2 L-12 11 L-6 17 L0 22 L6 17 L12 11 L13 2 L7 -8Z"
+        fill={`url(#${fill})`} stroke={metal} strokeWidth="1.15" strokeLinejoin="round" className="konoha-glass-shell" />
+      <path d="M0 -13 L-7 -8 L-13 2 L-12 11 L0 22 L0 5 L-6 1Z" fill={`url(#${fill})`} className="konoha-crystal-side" />
+      <path d="M0 5 L0 22 L12 11 L13 2 L6 1Z" fill={`url(#${fill})`} className="konoha-crystal-front" />
+      <path d="M0 -13 L-7 -8 L-6 1 L0 5 L6 1 L7 -8Z" fill={`url(#${fill})`} className="konoha-crystal-top" />
+      <path d="M0 -12 L-7 -8 L-6 1 L0 5 L6 1 L7 -8Z M-6 1 L-5 12 L0 21 L0 5Z"
+        fill={`url(#${uid}-glass-heart)`} className="konoha-crystal-planes" />
+      <path d="M0 -12 L-6 1 L-5 12 L0 21 L5 12 L6 1Z M-6 1 L0 5 L6 1 M-5 12 L0 5 L5 12"
+        fill="none" stroke={facets} strokeWidth=".72" strokeLinejoin="round" className="konoha-crystal-facets" />
+      <path d="M-7 2 Q-9 8 -5 13" className="konoha-glass-highlight" />
+      <path d="M0 -12 C-5 -13 -8 -17 -8 -20 C-3 -20 0 -17 1 -13 C3 -18 7 -20 10 -19 C9 -15 6 -12 0 -12Z"
+        fill={metal} stroke="#7f5817" strokeWidth=".45" strokeLinejoin="round" className="konoha-gilt-calyx" />
+      <path d="M0 -16 C-2 -22 1 -25 3 -27" className="konoha-gilt-stem" />
+      <path d="M3 -24 C8 -29 15 -29 19 -27 C16 -21 10 -19 4 -21Z" fill={`url(#${uid}-gem-leaf)`}
+        stroke="#38563d" strokeWidth=".65" className="konoha-gem-leaf" />
+      <path d="M5 -22 Q11 -25 17 -27" className="konoha-leaf-vein" />
+    </g>}
 
-    {variety === "le-lectier" && <>
-      <path d="M0 -11 C-5 -10 -5 -5 -7 -2 C-12 3 -12 10 -7 13 C-3 16 5 16 9 12 C13 8 11 2 7 -2 C4 -5 5 -10 0 -11Z" fill={`url(#${fill})`} stroke="#75532d" strokeWidth=".8" />
-      <path d="M-4 -6 C-7 0 -8 8 -4 11" fill="none" stroke="#fff1b0" strokeWidth="2.2" strokeLinecap="round" opacity=".5" />
-      {mature && <g fill="#76532f" opacity=".63"><circle cx="4" cy="-3" r=".65" /><circle cx="7" cy="4" r=".55" /><circle cx="3" cy="10" r=".7" /><circle cx="-1" cy="6" r=".5" /><circle cx="8" cy="8" r=".4" /></g>}
-    </>}
+    {variety === "apple" && <g>
+      <path d="M0 -8 L-6 -12 L-13 -10 L-17 -3 L-15 6 L-9 13 L0 19 L9 13 L15 6 L17 -3 L13 -10 L6 -12Z"
+        fill={`url(#${fill})`} stroke={metal} strokeWidth="1.2" strokeLinejoin="round" className="konoha-glass-shell" />
+      <path d="M0 -8 L-6 -12 L-13 -10 L-17 -3 L-15 6 L0 19 L0 2 L-8 -3Z" fill={`url(#${fill})`} className="konoha-crystal-side" />
+      <path d="M0 2 L0 19 L15 6 L17 -3 L8 -3Z" fill={`url(#${fill})`} className="konoha-crystal-front" />
+      <path d="M0 -8 L-6 -12 L-13 -10 L-8 -3 L0 2 L8 -3 L13 -10 L6 -12Z" fill={`url(#${fill})`} className="konoha-crystal-top" />
+      <path d="M0 -8 L-8 -3 L0 2 L8 -3 L6 -11Z M-8 -3 L-10 8 L0 18 L0 2Z"
+        fill={`url(#${uid}-glass-heart)`} className="konoha-crystal-planes" />
+      <path d="M0 -8 L-8 -3 L-10 8 L0 18 L10 8 L8 -3Z M-8 -3 L0 2 L8 -3 M-10 8 L0 2 L10 8"
+        fill="none" stroke={facets} strokeWidth=".72" strokeLinejoin="round" className="konoha-crystal-facets" />
+      <path d="M-10 -3 Q-13 3 -9 8" className="konoha-glass-highlight" />
+      <path d="M0 -9 C-5 -10 -8 -14 -8 -17 C-3 -17 0 -14 1 -10 C3 -14 7 -17 10 -16 C9 -12 6 -9 0 -9Z"
+        fill={metal} stroke="#805a1b" strokeWidth=".45" className="konoha-gilt-calyx" />
+      <path d="M0 -12 C-1 -18 1 -22 4 -24" className="konoha-gilt-stem" />
+      <path d="M3 -20 C8 -25 14 -24 18 -21 C14 -16 9 -15 4 -17Z" fill={`url(#${uid}-gem-leaf)`}
+        stroke="#38563d" strokeWidth=".65" className="konoha-gem-leaf" />
+      <path d="M5 -18 Q11 -21 16 -21" className="konoha-leaf-vein" />
+    </g>}
 
-    {variety === "apple" && <>
-      <path d="M0 -8 C-4 -12 -12 -9 -13 -1 C-15 8 -8 14 0 12 C8 15 15 8 13 -1 C12 -9 5 -12 0 -8Z" fill={`url(#${fill})`} stroke="#78302b" strokeWidth=".8" />
-      <path d="M1 -9 Q7 -15 13 -10 Q7 -6 2 -7Z" fill="#708747" stroke="#435f3b" strokeWidth=".6" />
-      <path d="M-8 -4 Q-11 3 -7 8" fill="none" stroke="#ffe0a0" strokeWidth="2.4" strokeLinecap="round" opacity=".53" />
-    </>}
+    {variety === "breadfruit" && <g>
+      <path d="M0 -13 L8 -11 L13 -6 L16 2 L14 10 L8 16 L0 19 L-8 16 L-14 10 L-16 2 L-13 -6 L-7 -11Z"
+        fill={`url(#${fill})`} stroke={metal} strokeWidth="1.15" strokeLinejoin="round" className="konoha-glass-shell" />
+      <path d="M0 -13 L-7 -11 L-13 -6 L-16 2 L-14 10 L0 19 L0 3 L-5 -1Z" fill={`url(#${fill})`} className="konoha-crystal-side" />
+      <path d="M0 3 L0 19 L8 16 L14 10 L16 2 L6 -1Z" fill={`url(#${fill})`} className="konoha-crystal-front" />
+      <path d="M0 -13 L-7 -11 L-5 -1 L0 3 L6 -1 L8 -11Z" fill={`url(#${fill})`} className="konoha-crystal-top" />
+      <path d="M-10 -5 L-5 -8 L0 -4 L5 -8 L10 -4 L8 2 L13 6 L8 11 L3 10 L0 16 L-5 11 L-11 12 L-12 5 L-7 1Z"
+        fill={`url(#${uid}-geode-core)`} className="konoha-geode-core" />
+      <path d="M-11 -5 L-5 -1 L-7 4 L-2 7 L-5 12 M-5 -1 L0 -4 L4 0 L9 -3 M-2 7 L3 5 L8 11 M4 0 L3 5 L9 7 L13 5"
+        fill="none" stroke={facets} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="konoha-geode-cracks" />
+      <path d="M-10 -7 Q-14 -2 -12 4" className="konoha-glass-highlight" />
+      <path d="M0 -12 C-5 -12 -9 -16 -10 -19 C-5 -19 -2 -17 0 -14 C2 -18 6 -20 10 -18 C8 -14 5 -12 0 -12Z"
+        fill={metal} stroke="#805a1b" strokeWidth=".45" className="konoha-gilt-calyx" />
+      <path d="M0 -14 C-2 -20 0 -24 3 -26" className="konoha-gilt-stem" />
+      <path d="M3 -23 C8 -28 15 -26 18 -23 C14 -18 9 -18 4 -20Z" fill={`url(#${uid}-gem-leaf)`}
+        stroke="#38563d" strokeWidth=".65" className="konoha-gem-leaf" />
+      <path d="M5 -21 Q11 -24 16 -24" className="konoha-leaf-vein" />
+    </g>}
 
-    {variety === "breadfruit" && <>
-      <path d="M0 -12 C-9 -12 -14 -4 -13 4 C-12 13 -5 16 2 15 C11 14 15 7 13 -2 C12 -10 6 -13 0 -12Z" fill={`url(#${fill})`} stroke="#47623b" strokeWidth=".8" />
-      {mature && <g fill="none" stroke="#d9d787" strokeWidth=".65" opacity=".72">
-        <path d="M-8 -6 l4 -2 4 2 -1 4 -4 1 -3 -2Z M2 -8 l4 -1 3 3 -2 4 -4 1 -3 -3Z M-10 2 l4 -2 3 3 -1 4 -4 1 -3 -3Z M0 1 l4 -2 4 3 -1 4 -4 2 -4 -3Z M-5 9 l4 -2 4 2 -1 4 -4 1Z M7 7 l3 -2 2 3 -2 3 -3 1Z" />
-      </g>}
-      <path d="M-7 -7 Q-10 -1 -9 4" fill="none" stroke="#f1ecac" strokeWidth="2" strokeLinecap="round" opacity=".42" />
-    </>}
+    {variety === "dragon-fruit" && <g>
+      <path d="M0 -12 L-7 -9 L-13 -1 L-11 12 L-5 20 L0 24 L6 19 L12 10 L13 -2 L7 -9Z"
+        fill={`url(#${fill})`} stroke={metal} strokeWidth="1.15" strokeLinejoin="round" className="konoha-glass-shell" />
+      <path d="M0 -12 L-7 -9 L-13 -1 L-11 12 L0 24 L0 5 L-6 0Z" fill={`url(#${fill})`} className="konoha-crystal-side" />
+      <path d="M0 5 L0 24 L6 19 L12 10 L13 -2 L6 0Z" fill={`url(#${fill})`} className="konoha-crystal-front" />
+      <path d="M0 -12 L-7 -9 L-6 0 L0 5 L6 0 L7 -9Z" fill={`url(#${fill})`} className="konoha-crystal-top" />
+      <path d="M0 -11 L-6 0 L0 5 L6 0Z M-6 0 L-5 13 L0 23 L0 5 M6 0 L5 12 L0 23"
+        fill="none" stroke={facets} strokeWidth=".72" strokeLinejoin="round" className="konoha-crystal-facets" />
+      <path d="M-8 0 Q-10 7 -7 12" className="konoha-glass-highlight" />
+      <path d="M0 -12 L-7 -13 L-10 -17 L-3 -16 L0 -21 L3 -16 L10 -17 L7 -13Z"
+        fill={metal} stroke="#805a1b" strokeWidth=".45" strokeLinejoin="round" className="konoha-gilt-calyx" />
+      <path d="M0 -19 C-2 -24 0 -28 2 -30" className="konoha-gilt-stem" />
+      <path d="M2 -27 C7 -31 14 -30 18 -27 C14 -22 9 -21 3 -24Z" fill={`url(#${uid}-gem-leaf)`}
+        stroke="#38563d" strokeWidth=".65" className="konoha-gem-leaf" />
+      <path d="M4 -25 Q10 -28 16 -28" className="konoha-leaf-vein" />
+    </g>}
 
-    {variety === "dragon-fruit" && <>
-      <path d="M0 -13 C-8 -14 -13 -7 -12 1 C-13 9 -8 15 -1 16 C7 17 12 12 12 3 C13 -5 8 -12 0 -13Z" fill={`url(#${fill})`} stroke="#8f2354" strokeWidth=".85" />
-      <g fill={`url(#${uid}-dragon-bract)`} stroke="#477842" strokeWidth=".48" strokeLinejoin="round">
-        <path d="M-3 -11 C-7 -15 -7 -19 -5 -21 C-1 -17 1 -14 2 -11Z" />
-        <path d="M-8 -8 C-13 -10 -15 -13 -14 -16 C-10 -13 -6 -12 -4 -9Z" />
-        <path d="M6 -9 C11 -12 14 -13 15 -11 C12 -7 9 -5 7 -4Z" />
-        <path d="M-11 -2 C-16 -3 -18 -6 -18 -9 C-14 -7 -10 -6 -7 -3Z" />
-        <path d="M10 -1 C15 -4 18 -4 19 -1 C15 2 12 3 9 3Z" />
-        <path d="M-10 6 C-15 7 -17 5 -18 3 C-14 2 -10 1 -7 2Z" />
-        <path d="M9 7 C14 5 17 7 18 9 C14 11 10 11 7 10Z" />
-        <path d="M-5 12 C-8 16 -7 20 -5 21 C-2 18 -1 15 0 13Z" />
-        <path d="M3 13 C5 18 8 19 10 17 C8 13 6 11 4 10Z" />
+    {variety === "jatropha-curcas" && <g>
+      <path d="M-1 -17 C-3 -22 -1 -25 1 -28 M-1 -17 Q-8 -13 -10 -6 M-1 -17 Q7 -15 9 -8 M-1 -15 Q0 -7 1 -2"
+        className="konoha-gilt-stem konoha-gilt-branch" />
+      <path d="M0 -24 C-7 -29 -14 -28 -18 -24 C-13 -18 -7 -18 -1 -21Z" fill={`url(#${uid}-gem-leaf)`}
+        stroke="#38563d" strokeWidth=".65" className="konoha-gem-leaf" />
+      <path d="M-2 -22 Q-8 -24 -16 -25" className="konoha-leaf-vein" />
+      <g fill={`url(#${fill})`} stroke={metal} strokeWidth="1" strokeLinejoin="round" className="konoha-crystal-berries">
+        <path d="M-9 -7 L-3 -3 L-3 5 L-9 11 L-16 6 L-16 -2Z" />
+        <path d="M9 -10 L16 -5 L16 4 L9 10 L2 5 L2 -5Z" />
+        <path d="M1 3 L8 8 L8 18 L1 23 L-7 18 L-7 8Z" />
       </g>
-      <path d="M-7 -7 Q-10 0 -7 8" fill="none" stroke="#ffd7e2" strokeWidth="2.2" strokeLinecap="round" opacity=".58" />
-      <path d="M1 -10 Q5 -7 7 -3" fill="none" stroke="#ffb1c8" strokeWidth=".8" opacity=".55" />
-    </>}
-
-    {variety === "jatropha-curcas" && <>
-      <g fill={`url(#${fill})`} stroke="#52673a" strokeWidth=".7">
-        <path d="M0 -9 C-7 -11 -10 -5 -8 1 C-7 6 -3 8 0 5 C3 8 7 6 8 1 C10 -5 6 -11 0 -9Z" />
-        <path d="M0 1 C-6 -1 -10 4 -8 9 C-6 14 -2 15 0 11 C3 15 8 13 9 8 C10 3 6 -1 0 1Z" />
+      <g fill={`url(#${fill})`}>
+        <path d="M-9 -7 L-16 -2 L-16 6 L-9 11 L-9 2Z" className="konoha-crystal-side" />
+        <path d="M9 -10 L2 -5 L2 5 L9 10 L9 0Z" className="konoha-crystal-side" />
+        <path d="M1 3 L-7 8 L-7 18 L1 23 L1 13Z" className="konoha-crystal-side" />
+        <path d="M-9 -7 L-3 -3 L-9 2 L-16 -2Z M9 -10 L16 -5 L9 0 L2 -5Z M1 3 L8 8 L1 13 L-7 8Z" className="konoha-crystal-top" />
       </g>
-      <path d="M0 -7 L0 11 M-6 0 Q0 3 6 0" fill="none" stroke="#e5de88" strokeWidth=".75" opacity=".65" />
-      <path d="M-5 -6 Q-8 -2 -6 2" fill="none" stroke="#f1efb3" strokeWidth="1.7" strokeLinecap="round" opacity=".45" />
-    </>}
+      <path d="M-15 -4 L-9 -7 L-9 2 L-3 -5 M3 -7 L9 -10 L9 0 L16 -7 M-6 6 L1 3 L1 13 L8 6"
+        fill="none" stroke={facets} strokeWidth=".55" className="konoha-crystal-planes" />
+      <path d="M-15 -2 L-9 2 L-4 -3 M3 -4 L9 0 L14 -4 M-6 10 L1 13 L7 8"
+        fill="none" stroke={facets} strokeWidth=".65" className="konoha-crystal-facets" />
+      <path d="M-14 -3 Q-17 1 -14 5 M4 -5 Q1 -1 3 3 M-5 8 Q-7 13 -3 16" className="konoha-glass-highlight" />
+    </g>}
 
-    {variety === "nikkori-pear" && <>
-      <path d="M0 -10 C-8 -12 -14 -5 -14 4 C-14 13 -7 17 1 16 C10 16 15 10 14 2 C13 -6 7 -11 0 -10Z" fill={`url(#${fill})`} stroke="#76512b" strokeWidth=".8" />
-      <path d="M-8 -6 Q-12 1 -9 8" fill="none" stroke="#ffedaa" strokeWidth="2.5" strokeLinecap="round" opacity=".48" />
-      {mature && <g fill="#74512f" opacity=".55"><circle cx="4" cy="-4" r=".55" /><circle cx="8" cy="1" r=".6" /><circle cx="5" cy="9" r=".45" /><circle cx="-1" cy="12" r=".6" /><circle cx="-4" cy="4" r=".45" /><circle cx="10" cy="7" r=".45" /></g>}
-    </>}
+    {variety === "nikkori-pear" && <g>
+      <path d="M0 -8 L-7 -10 L-13 -5 L-14 4 L-11 13 L0 22 L11 13 L14 4 L13 -5 L7 -10Z"
+        fill={`url(#${fill})`} stroke={metal} strokeWidth="1.2" strokeLinejoin="round" className="konoha-glass-shell" />
+      <path d="M0 -8 L-7 -10 L-13 -5 L-14 4 L-11 13 L0 22 L0 5 L-7 1Z" fill={`url(#${fill})`} className="konoha-crystal-side" />
+      <path d="M0 5 L0 22 L11 13 L14 4 L7 1Z" fill={`url(#${fill})`} className="konoha-crystal-front" />
+      <path d="M0 -8 L-7 -10 L-7 1 L0 5 L7 1 L7 -10Z" fill={`url(#${fill})`} className="konoha-crystal-top" />
+      <path d="M0 -7 L-7 1 L0 5 L7 1 L7 -9Z M-7 1 L-7 12 L0 21 L0 5Z"
+        fill={`url(#${uid}-glass-heart)`} className="konoha-crystal-planes" />
+      <path d="M0 -7 L-7 1 L-7 12 L0 21 L7 12 L7 1Z M-7 1 L0 5 L7 1 M-7 12 L0 5 L7 12"
+        fill="none" stroke={facets} strokeWidth=".72" strokeLinejoin="round" className="konoha-crystal-facets" />
+      <path d="M-9 1 Q-11 7 -7 12" className="konoha-glass-highlight" />
+      <g fill={metal} stroke="#7d5719" strokeWidth=".42" strokeLinejoin="round" className="konoha-gilt-calyx">
+        <path d="M-13 -2 L-7 -11 L-2 -6 L0 -13 L4 -6 L10 -11 L13 -2 L7 2 L0 -3 L-7 2Z" />
+      </g>
+      <path d="M0 -12 C-2 -19 0 -23 3 -26" className="konoha-gilt-stem" />
+      <path d="M3 -23 C9 -28 16 -26 19 -23 C15 -18 10 -17 4 -20Z" fill={`url(#${uid}-gem-leaf)`}
+        stroke="#38563d" strokeWidth=".65" className="konoha-gem-leaf" />
+      <path d="M5 -21 Q12 -24 17 -24" className="konoha-leaf-vein" />
+    </g>}
+
+    {mature && <g className="konoha-gem-dust" aria-hidden="true">
+      <circle cx="-5" cy="3" r=".75" /><circle cx="5" cy="9" r=".55" /><circle cx="2" cy="-3" r=".45" />
+    </g>}
   </>;
 }
 
@@ -75,29 +146,50 @@ export function TreeFruit({ uid, appearance, mature, golden = false, newlyFormed
   return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}${newlyFormed ? " konoha-fruit--new" : ""}${justRipened ? " konoha-fruit--just-ripe" : ""}${visiblyGolden ? " konoha-fruit--golden" : ""}${visiblyGolden && justRipened ? " konoha-fruit--turning-golden" : ""}`} data-fruit-variety={variety} data-golden={visiblyGolden || undefined}
     transform={`translate(${x} ${y + hangY}) rotate(${tilt}) scale(${scale})`}>
     <defs>
-      <radialGradient id={`${uid}-le-lectier`} cx=".3" cy=".22" r=".82">
-        <stop stopColor="#f6dc84" /><stop offset=".45" stopColor="#d9ae4f" /><stop offset=".78" stopColor="#a87935" /><stop offset="1" stopColor="#6f4f27" />
-      </radialGradient>
-      <radialGradient id={`${uid}-apple`} cx=".3" cy=".2" r=".82">
-        <stop stopColor="#ffd37b" /><stop offset=".3" stopColor="#d96642" /><stop offset=".72" stopColor="#a92f2f" /><stop offset="1" stopColor="#692a27" />
-      </radialGradient>
-      <radialGradient id={`${uid}-breadfruit`} cx=".3" cy=".2" r=".85">
-        <stop stopColor="#d6d87d" /><stop offset=".45" stopColor="#8ba653" /><stop offset="1" stopColor="#405f39" />
-      </radialGradient>
-      <radialGradient id={`${uid}-dragon-fruit`} cx=".32" cy=".18" r=".84">
-        <stop stopColor="#ffabc0" /><stop offset=".34" stopColor="#f14f87" /><stop offset=".72" stopColor="#cf286d" /><stop offset="1" stopColor="#861f50" />
-      </radialGradient>
-      <linearGradient id={`${uid}-dragon-bract`} x1="0" y1="0" x2="1" y2="1">
-        <stop stopColor="#e63e79" /><stop offset=".48" stopColor="#d53270" /><stop offset=".58" stopColor="#a8c85e" /><stop offset="1" stopColor="#4f8248" />
+      <linearGradient id={`${uid}-le-lectier`} x1=".08" y1="0" x2=".9" y2="1">
+        <stop stopColor="#fffdf0" stopOpacity=".98" /><stop offset=".24" stopColor="#ffd6a3" stopOpacity=".86" /><stop offset=".58" stopColor="#dfaee4" stopOpacity=".76" /><stop offset=".83" stopColor="#9eace1" stopOpacity=".7" /><stop offset="1" stopColor="#656596" stopOpacity=".82" />
       </linearGradient>
-      <radialGradient id={`${uid}-jatropha-curcas`} cx=".35" cy=".22" r=".84">
-        <stop stopColor="#e1db79" /><stop offset=".48" stopColor="#91a957" /><stop offset="1" stopColor="#4f6538" />
+      <linearGradient id={`${uid}-apple`} x1=".08" y1="0" x2=".9" y2="1">
+        <stop stopColor="#fffce7" stopOpacity=".98" /><stop offset=".28" stopColor="#ffc49d" stopOpacity=".86" /><stop offset=".62" stopColor="#ed91aa" stopOpacity=".74" /><stop offset="1" stopColor="#994c69" stopOpacity=".82" />
+      </linearGradient>
+      <linearGradient id={`${uid}-breadfruit`} x1=".08" y1="0" x2=".9" y2="1">
+        <stop stopColor="#fff9df" stopOpacity=".97" /><stop offset=".25" stopColor="#ddbae6" stopOpacity=".82" /><stop offset=".64" stopColor="#999ad2" stopOpacity=".7" /><stop offset="1" stopColor="#595680" stopOpacity=".84" />
+      </linearGradient>
+      <linearGradient id={`${uid}-dragon-fruit`} x1=".08" y1="0" x2=".9" y2="1">
+        <stop stopColor="#fffde8" stopOpacity=".98" /><stop offset=".26" stopColor="#ffd1ad" stopOpacity=".86" /><stop offset=".62" stopColor="#ee9db5" stopOpacity=".74" /><stop offset="1" stopColor="#a75270" stopOpacity=".82" />
+      </linearGradient>
+      <linearGradient id={`${uid}-jatropha-curcas`} x1=".08" y1="0" x2=".9" y2="1">
+        <stop stopColor="#fffde5" stopOpacity=".98" /><stop offset=".26" stopColor="#bdebd8" stopOpacity=".84" /><stop offset=".62" stopColor="#76c8c7" stopOpacity=".72" /><stop offset="1" stopColor="#40828c" stopOpacity=".84" />
+      </linearGradient>
+      <linearGradient id={`${uid}-nikkori-pear`} x1=".08" y1="0" x2=".9" y2="1">
+        <stop stopColor="#fffde9" stopOpacity=".98" /><stop offset=".3" stopColor="#ead0e4" stopOpacity=".82" /><stop offset=".66" stopColor="#adb5e3" stopOpacity=".7" /><stop offset="1" stopColor="#686991" stopOpacity=".84" />
+      </linearGradient>
+      <radialGradient id={`${uid}-glass-heart`} cx=".5" cy=".5" r=".54">
+        <stop stopColor="#fffde5" stopOpacity=".92" /><stop offset=".27" stopColor="#fff0a8" stopOpacity=".68" />
+        <stop offset=".72" stopColor="#ffd86e" stopOpacity=".18" /><stop offset="1" stopColor="#fff" stopOpacity="0" />
       </radialGradient>
-      <radialGradient id={`${uid}-nikkori-pear`} cx=".32" cy=".2" r=".85">
-        <stop stopColor="#f4d67d" /><stop offset=".48" stopColor="#c79a42" /><stop offset="1" stopColor="#79532b" />
+      <radialGradient id={`${uid}-geode-core`} cx=".46" cy=".48" r=".68">
+        <stop stopColor="#fffbe0" /><stop offset=".3" stopColor="#ffd884" stopOpacity=".9" />
+        <stop offset=".64" stopColor="#d597d2" stopOpacity=".55" /><stop offset="1" stopColor="#7c72aa" stopOpacity=".08" />
       </radialGradient>
+      <linearGradient id={`${uid}-gilt`} x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#fff0a7" /><stop offset=".18" stopColor="#d9a331" /><stop offset=".46" stopColor="#8f5b13" />
+        <stop offset=".7" stopColor="#f3c755" /><stop offset="1" stopColor="#6d4411" />
+      </linearGradient>
+      <linearGradient id={`${uid}-facet-light`} x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#fffde6" stopOpacity=".94" /><stop offset=".45" stopColor="#ffe69c" stopOpacity=".72" />
+        <stop offset="1" stopColor="#c8ddff" stopOpacity=".52" />
+      </linearGradient>
+      <linearGradient id={`${uid}-gem-leaf`} x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#9bae69" /><stop offset=".42" stopColor="#59764d" /><stop offset="1" stopColor="#29483c" />
+      </linearGradient>
       <filter id={`${uid}-golden-fruit`} colorInterpolationFilters="sRGB">
-        <feColorMatrix type="matrix" values=".27 .53 .10 0 .25  .225 .4425 .0825 0 .16  .075 .1475 .0275 0 .02  0 0 0 1 0" />
+        <feColorMatrix type="matrix" values=".32 .5 .1 0 .24  .2 .34 .06 0 .1  .035 .07 .015 0 .01  0 0 0 1 0" />
+        <feComponentTransfer>
+          <feFuncR type="gamma" amplitude="1.08" exponent=".82" offset=".02" />
+          <feFuncG type="gamma" amplitude="1" exponent=".9" offset=".01" />
+          <feFuncB type="gamma" amplitude=".72" exponent="1.08" offset="0" />
+        </feComponentTransfer>
       </filter>
     </defs>
 
