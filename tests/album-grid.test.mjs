@@ -48,10 +48,17 @@ test("month navigation stays after print in normal flow and the app allows verti
   assert.match(memoryPage, /href="\/album\?restore=1"[\s\S]*?scroll=\{false\}/);
 });
 
-test("album header stays visible while the album scrolls", () => {
-  const albumPage = readFileSync(new URL("../app/album/page.tsx", import.meta.url), "utf8");
+test("the shared app header stays visible while every app page scrolls", () => {
+  const appShell = readFileSync(new URL("../components/app-shell.tsx", import.meta.url), "utf8");
+  const header = readFileSync(new URL("../components/app-header.tsx", import.meta.url), "utf8");
   const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  const harvestCss = readFileSync(new URL("../app/harvest.css", import.meta.url), "utf8");
 
-  assert.match(albumPage, /className="album-sticky-header"[\s\S]*?<AppHeader \/>/);
-  assert.match(css, /\.album-sticky-header\s*\{[^}]*position:\s*sticky[^}]*top:\s*0[^}]*z-index:\s*40[^}]*background:\s*var\(--ivory\)/s);
+  assert.match(appShell, /!isAuthPage && <AppHeader \/>/);
+  assert.match(appShell, /pb-\[92px\] pt-\[62px\]/);
+  assert.match(header, /className="app-header[^\"]*print:hidden/);
+  assert.match(css, /\.app-header\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0 auto auto 50%[^}]*z-index:\s*40[^}]*background:/s);
+  assert.match(css, /@media print[\s\S]*?\.app-shell main\s*\{[^}]*padding-top:\s*0 !important/s);
+  assert.match(harvestCss, /\.konoha-harvest-flight\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0 auto 0 50%[^}]*z-index:\s*200/s);
+  assert.doesNotMatch(css, /\.album-sticky-header/);
 });

@@ -1,6 +1,5 @@
 import { AlertTriangle, ChevronRight, KeyRound, Mail, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { deleteAccountAction, retryAccountDeletionAction } from "./actions";
-import { AppHeader } from "@/components/app-header";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { getMyAccountDeletionJob, type AccountDeletionJob, type AccountDeletionJobStatus } from "@/lib/supabase/account-deletion";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -44,8 +43,6 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
   return (
     <div className="page-pad">
-      <AppHeader />
-
       <section className="pt-8 text-center">
         <p className="text-[10px] font-semibold tracking-[0.2em] text-coral">YOUR ACCOUNT</p>
         <h1 className="mt-2 text-[25px] font-semibold tracking-[0.1em] text-ink">アカウント</h1>
