@@ -184,6 +184,16 @@ Supabaseには、ユーザーごとの思い出を保存する `memories` テー
 
 共有グループへの招待は、オーナーが入力した登録済みメールアドレスをDB内でアカウントIDへ解決します。メールアドレスは招待・通知テーブルや通常レスポンスへ保存せず、外部メールも送信しません。招待は7日間有効で、受信者本人だけがアプリ内の通知を閲覧して承認または辞退できます。
 
+招待承認時に「招待へ回答できませんでした。」となる #101 の修正には、`20260905110000_fix_shared_album_invitation_acceptance.sql` の適用が必要です。アプリの更新だけではDB関数は更新されません。接続先と未適用migrationを確認してから反映します。
+
+```bash
+npx supabase migration list --linked
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+```
+
+ローカルDBを使わないDB動作確認には `npx supabase db query --linked --file scripts/verify-shared-album-invitations.sql` を使います。このスクリプトは専用のランダムIDのテストデータで承認・再承認・辞退・期限切れ・他人の招待への回答拒否を検証し、成功時も失敗時もデータをロールバックします。画面では、期限内の招待を承認してグループ詳細へ移動できること、再読み込み後も参加状態が保持されることを確認してください。回答に失敗した場合は、開発サーバーの `[shared-groups] Invitation response failed` ログにRPC名・DBエラーコード・メッセージが出力されます。
+
 アカウント削除では、現在のパスワードで再認証した後、本人のグループ・思い出・Storage画像・アバターを削除します。本人が明示的に選んだ場合だけ、他のユーザーが所有する共有グループで共有中の思い出を閲覧専用で保持します。保持画像は `memory-images/retained/<memory-id>/` へ移動し、最後の共有関係が外れた時点でキューへ登録して削除します。処理は再開可能で、失敗分は画面からの再試行と日次Cronで回収します。
 
 ## 認証について

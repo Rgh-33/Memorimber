@@ -78,6 +78,29 @@ test("accepting, declining, and expired responses are mapped without email data"
   }
 });
 
+test("invitation response errors preserve database diagnostics behind the user-facing message", async () => {
+  for (const [rpcError, userMessage] of [
+    [{
+      code: "42702",
+      message: 'column reference "album_id" is ambiguous',
+      details: "It could refer to either a PL/pgSQL variable or a table column.",
+      hint: null,
+    }, "招待へ回答できませんでした。"],
+    [{ code: "P0002", message: "invitation not found" }, "招待が見つからないか、回答する権限がありません。"],
+    [{ code: "22023", message: "invitation has already been resolved" }, "この招待にはすでに回答済みです。"],
+  ]) {
+    const h = harness({ rpc: {
+      respond_to_shared_album_invitation: { data: null, error: rpcError },
+    } });
+    await assert.rejects(respondToSharedAlbumInvitation(h.client, INVITATION_ID, "accepted"), (error) => {
+      assert.equal(error.message, userMessage);
+      assert.equal(error.cause, rpcError);
+      assert.equal(String(error).includes(rpcError.message), false);
+      return true;
+    });
+  }
+});
+
 test("notification listing accepts only the safe RPC response shape", async () => {
   const h = harness({ rpc: {
     list_my_invitation_notifications: {

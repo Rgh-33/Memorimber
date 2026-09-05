@@ -78,6 +78,14 @@ export async function respondInvitationAction(formData: FormData) {
     result = await respondToSharedAlbumInvitation(await authenticatedClient(), invitationId, response);
   } catch (error) {
     failure = errorText(error, "招待へ回答できませんでした。");
+    const cause = error instanceof Error && error.cause && typeof error.cause === "object"
+      ? error.cause as Record<string, unknown>
+      : null;
+    console.error("[shared-groups] Invitation response failed", {
+      rpc: "respond_to_shared_album_invitation",
+      code: typeof cause?.code === "string" ? cause.code : null,
+      message: typeof cause?.message === "string" ? cause.message : failure,
+    });
   }
   if (failure || !result) redirect(noticePath("/shared-groups", "error", failure ?? "招待へ回答できませんでした。"));
   revalidateGroup(result.albumId);
