@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validateProfileUsername } from "@/lib/profile-username";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCurrentUserProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
@@ -34,10 +35,14 @@ export async function PATCH(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => null) as { display_name?: unknown } | null;
-  const displayName = typeof body?.display_name === "string" ? body.display_name.trim() : "";
-  if (!displayName || displayName.length > 20) {
-    return NextResponse.json({ error: "Display name must be between 1 and 20 characters." }, { status: 400 });
+  const validation = validateProfileUsername(body?.display_name);
+  if (validation.error === "missing_username") {
+    return NextResponse.json({ error: "ユーザー名を入力してください。" }, { status: 400 });
   }
+  if (validation.error === "username_too_long") {
+    return NextResponse.json({ error: "ユーザー名は20文字以内で入力してください。" }, { status: 400 });
+  }
+  const displayName = validation.username;
   const { data, error } = await supabase.from("profiles").update({ display_name: displayName }).eq("id", user.id)
     .select("id, display_name, avatar_url, created_at, updated_at").single();
   if (error) return NextResponse.json({ error: "Profile could not be updated." }, { status: 500 });

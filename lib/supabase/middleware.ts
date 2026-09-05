@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSafePostUsernameRedirect, USERNAME_ONBOARDING_PATH } from "@/lib/profile-username";
 import { getSupabaseConfig, isSupabaseConfigured } from "@/lib/supabase/config";
 
 const PUBLIC_PATHS = new Set(["/login", "/signup"]);
@@ -17,6 +18,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthCallback = pathname.startsWith("/auth/");
   const isApiRoute = pathname.startsWith("/api/");
+  const isUsernameOnboarding = pathname === USERNAME_ONBOARDING_PATH;
   const isPublicPage = PUBLIC_PATHS.has(pathname) || isAuthCallback;
 
   if (!isSupabaseConfigured()) {
@@ -54,6 +56,37 @@ export async function updateSession(request: NextRequest) {
     loginUrl.search = "";
     loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return copySessionHeaders(response, NextResponse.redirect(loginUrl));
+  }
+
+  if (user && !isApiRoute && !isAuthCallback) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profileError) {
+      const hasUsername = typeof profile?.display_name === "string" && profile.display_name.trim().length > 0;
+      if (!hasUsername && !isUsernameOnboarding) {
+        const onboardingUrl = request.nextUrl.clone();
+        onboardingUrl.pathname = USERNAME_ONBOARDING_PATH;
+        onboardingUrl.search = "";
+        const requestedNext = PUBLIC_PATHS.has(pathname)
+          ? request.nextUrl.searchParams.get("next")
+          : `${pathname}${request.nextUrl.search}`;
+        onboardingUrl.searchParams.set("next", getSafePostUsernameRedirect(requestedNext));
+        return copySessionHeaders(response, NextResponse.redirect(onboardingUrl));
+      }
+
+      if (hasUsername && isUsernameOnboarding) {
+        const destinationUrl = request.nextUrl.clone();
+        const next = getSafePostUsernameRedirect(request.nextUrl.searchParams.get("next"));
+        const nextUrl = new URL(next, request.url);
+        destinationUrl.pathname = nextUrl.pathname;
+        destinationUrl.search = nextUrl.search;
+        return copySessionHeaders(response, NextResponse.redirect(destinationUrl));
+      }
+    }
   }
 
   if (user && PUBLIC_PATHS.has(pathname)) {

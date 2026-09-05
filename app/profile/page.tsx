@@ -200,26 +200,26 @@ export default function ProfilePage() {
                 onKeyDown={(event) => {
                   if (event.key === "Escape") setNicknameEditing(false);
                 }}
-                aria-label="ニックネームを編集"
+                aria-label="ユーザー名を編集"
                 className="min-w-0 w-full bg-transparent py-2.5 text-center text-[28px] font-semibold leading-[1.3] tracking-[0.04em] text-coral outline-none"
               />
               <button
                 type="submit"
                 disabled={!nicknameDraft.trim() || profileSaving}
                 className="absolute right-0 grid h-9 w-9 place-items-center rounded-full bg-coral text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
-                aria-label="ニックネームを確定"
+                aria-label="ユーザー名を確定"
               >
                 <Check size={16} strokeWidth={2} />
               </button>
             </form>
           ) : (
             <div className="relative flex min-h-[58px] items-center justify-center px-11">
-              <p className="min-w-0 max-w-full truncate py-1.5 text-[28px] font-semibold leading-[1.3] tracking-[0.04em] text-coral">{nickname || "ニックネーム未設定"}</p>
+              <p className="min-w-0 max-w-full truncate py-1.5 text-[28px] font-semibold leading-[1.3] tracking-[0.04em] text-coral">{nickname || "ユーザー名未設定"}</p>
               <button
                 type="button"
                 onClick={startNicknameEditing}
                 className="absolute right-0 grid h-9 w-9 place-items-center rounded-full text-coral transition hover:bg-coral/10"
-                aria-label="ニックネームを編集"
+                aria-label="ユーザー名を編集"
               >
                 <Pencil size={16} strokeWidth={1.8} />
               </button>

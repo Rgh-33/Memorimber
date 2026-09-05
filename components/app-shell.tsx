@@ -8,7 +8,10 @@ import { BottomNav } from "./bottom-nav";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { startProcessing, stopProcessing } = useProcessing();
-  const isAuthPage = pathname === "/login" || pathname === "/signup" || pathname.startsWith("/auth/");
+  const isAuthPage = pathname === "/login"
+    || pathname === "/signup"
+    || pathname.startsWith("/auth/")
+    || pathname.startsWith("/onboarding/");
   const isAlbumPage = pathname === "/album";
 
   useEffect(() => {
