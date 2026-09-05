@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, Info, LogOut, Menu, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
+import { Bell, Info, LogOut, Menu, MoreHorizontal, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/auth/actions";
 import { BrandHomeLink } from "@/components/brand-home-link";
@@ -105,6 +105,10 @@ export function AppHeader() {
               <Link href="/more#about" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
                 <Info size={17} />
                 <span>このプロトタイプについて</span>
+              </Link>
+              <Link href="/more" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
+                <MoreHorizontal size={17} />
+                <span>その他</span>
               </Link>
               <button
                 type="button"
