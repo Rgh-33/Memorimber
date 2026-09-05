@@ -80,8 +80,8 @@ export function TreeArtDefs({ uid }: { uid: string }) {
       <stop offset="1" stopColor="#454036" />
     </linearGradient>
     <radialGradient id={`${uid}-seed`} cx=".28" cy=".2" r=".9">
-      <stop stopColor="#d8b77d" /><stop offset=".38" stopColor="#a97c45" />
-      <stop offset=".78" stopColor="#725033" /><stop offset="1" stopColor="#46372c" />
+      <stop stopColor="#a18c70" /><stop offset=".38" stopColor="#75614c" />
+      <stop offset=".78" stopColor="#4f4033" /><stop offset="1" stopColor="#29251f" />
     </radialGradient>
     {Array.from({ length: 8 }, (_, i) => <linearGradient key={i} id={`${uid}-leaf-${i}`} x1="0" y1="0" x2=".6" y2="1">
       <stop stopColor={`var(--konoha-leaf-${i})`} /><stop offset="1" stopColor={`var(--konoha-leaf-${Math.max(0, i - 1)})`} />
@@ -164,14 +164,42 @@ export function TreeGround({ uid, stage, front }: { uid: string; stage: number; 
 }
 
 function TreeSeedShell({ uid }: { uid: string }) {
-  return <g className="konoha-seed" transform="rotate(-8)" data-seed-visible="true">
-    <path d="M-1 1 C-9 3 -13 -2 -12 -9 C-7 -11 -2 -8 1 -3Z" fill={`url(#${uid}-seed)`} stroke="#4f3d2d" strokeWidth=".5" />
-    <path d="M1 0 C8 3 13 -1 12 -8 C8 -10 3 -8 0 -4Z" fill={`url(#${uid}-seed)`} stroke="#4f3d2d" strokeWidth=".5" />
-    <path d="M-9 -7 Q-5 -4 -1 -3 M9 -7 Q5 -4 1 -3" fill="none" stroke="#e5c892" strokeWidth=".8" strokeLinecap="round" opacity=".65" />
+  return <g className="konoha-seed" transform="translate(1 -1) rotate(7) scale(.68)" data-seed-visible="true">
+    <path d="M-6 -16 C-3 -27 7 -32 17 -28 C27 -24 30 -12 25 -2 C22 5 15 9 7 8 C2 2 -1 -7 -6 -16Z"
+      fill={`url(#${uid}-seed)`} stroke="#463528" strokeWidth="1" strokeLinejoin="round" />
+    <path d="M-3 -17 C1 -25 9 -28 17 -24 C21 -22 24 -18 25 -13 C18 -17 8 -18 -3 -17Z"
+      fill="#dfc08a" opacity=".28" />
+    <path d="M23 -3 C18 3 12 6 6 5 C4 2 3 -1 2 -4 C9 -1 17 -2 23 -7Z" fill="#3f3027" opacity=".48" />
+    <path d="M-1 -20 Q5 -24 11 -23 M20 -18 Q24 -13 23 -8 M4 4 Q9 6 14 4"
+      fill="none" stroke="#ead4aa" strokeWidth=".75" strokeLinecap="round" opacity=".42" />
+    <g fill="#30271f" opacity=".7">
+      <circle cx="2" cy="-19" r="1" /><circle cx="15" cy="-23" r=".8" />
+      <circle cx="22" cy="-12" r="1.15" /><circle cx="18" cy="0" r=".75" />
+      <circle cx="7" cy="-8" r=".65" />
+    </g>
   </g>;
 }
 
 export function TreeSeedling({ uid, stage }: { uid: string; stage: number }) {
+  if (stage === 1) return <g className="konoha-seedling konoha-seedling--covered" transform="translate(190 385)">
+    <g className="konoha-seedling-stem" style={{ transform: "scaleY(.6818)" }}>
+      <path d="M0 0 C4 -13 -4 -29 0 -44" fill="none" stroke="var(--leaf-color)" strokeWidth="2.7" strokeLinecap="round" />
+      <path d="M-.6 -1 C2 -13 -4 -29 -.6 -43" fill="none" stroke="#b2be86" strokeWidth=".7" strokeLinecap="round" />
+    </g>
+    <g className="konoha-cotyledon-joint" style={{ transform: "translateY(-30px)" }}>
+      <g className="konoha-cotyledon" data-cotyledon="left" transform="scale(.72)">
+        <path d="M1 1 C-8 -4 -12 -15 -9 -24 C-7 -31 -2 -35 4 -33 C10 -31 14 -24 15 -17
+          C9 -18 5 -15 4 -10 C4 -5 4 -1 1 1Z"
+          fill={`url(#${uid}-leaf-4)`} stroke="#3e5c39" strokeWidth=".9" strokeLinejoin="round" />
+        <path d="M-5 -25 C-3 -17 -1 -9 2 -2" fill="none" stroke="#dce4ad" strokeWidth=".85"
+          strokeLinecap="round" opacity=".58" />
+        <path d="M-6 -23 Q0 -24 7 -18" fill="none" stroke="#355238" strokeWidth=".7"
+          strokeLinecap="round" opacity=".55" />
+      </g>
+      <TreeSeedShell uid={uid} />
+    </g>
+  </g>;
+
   const opened = stage >= 2;
   const height = opened ? 44 : 30;
   const leaf = <>

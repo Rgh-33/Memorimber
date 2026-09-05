@@ -9,6 +9,8 @@ import { fruitAppearanceFor, fruitHangAt, type FruitAppearance } from "@/lib/tre
 import type { TreeDisplayMode } from "@/lib/tree-preferences";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 
+const TREE_ADVANCE_REVEAL_DELAY_MS = 260;
+
 function Blossom({ x, y, scale, setting = false }: { x: number; y: number; scale: number; setting?: boolean }) {
   if (setting) return <g transform={`translate(${x} ${y}) scale(${scale})`} className="konoha-flower konoha-flower--setting">
     <ellipse cy="3.5" rx="4.3" ry="5.6" className="konoha-fruit-ovary" />
@@ -79,12 +81,12 @@ function GrowingSeedling({ uid, stage, count, imageUrl, animate }: { uid: string
     const timer = window.setTimeout(() => {
       setVisibleStage(stage);
       setRevealedEvent(eventKey);
-    }, reducedMotion ? 0 : 1_470);
+    }, reducedMotion ? 0 : TREE_ADVANCE_REVEAL_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [animate, eventKey, stage, visibleStage]);
 
   return <g key={eventKey} className="konoha-seedling-growth" data-growth-stage={stage}
-    data-visible-growth-stage={visibleStage} style={{ "--growth-delay": "720ms" } as CSSProperties}>
+    data-visible-growth-stage={visibleStage} style={{ "--growth-delay": "0ms" } as CSSProperties}>
     {visibleStage > 0 && <g key={`${eventKey}-${visibleStage}`}
       className={`konoha-growth-result ${revealedEvent === eventKey ? "konoha-growth-result--reveal" : ""}`}>
       <TreeSeedling uid={uid} stage={visibleStage} />
@@ -113,7 +115,7 @@ export const GrowthNode = memo(function GrowthNode({ stage, treeStage, fruitAppe
   const flowerScale = [0.56, 0.56, 0.56, 0.58, 0.68, 0.79, 0.9, 1][Math.max(0, Math.min(7, visibleTreeStage))];
   const sequence = newlyRipened ? "ripened" : newlyAdded ? "added" : advancesThisUpload ? "advanced" : "stable";
   const magicDelay = newlyRipened ? 1_430 : newlyAdded ? 720 : delay;
-  const revealDelay = newlyRipened ? 1_900 : newlyAdded ? 1_470 : 260 + delay;
+  const revealDelay = newlyRipened ? 1_900 : newlyAdded ? 1_470 : TREE_ADVANCE_REVEAL_DELAY_MS + delay;
 
   useEffect(() => {
     if (visibleStage === stage) return;

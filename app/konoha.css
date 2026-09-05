@@ -99,6 +99,7 @@
 .konoha-calm-mote--two { animation-delay: calc(var(--growth-delay) + 110ms); }
 .konoha-calm-mote--three { animation-delay: calc(var(--growth-delay) + 190ms); }
 .konoha-calm-glint { fill: none; stroke: var(--konoha-calm-magic); stroke-width: .8; stroke-linecap: round; filter: drop-shadow(0 0 1.4px color-mix(in srgb, var(--konoha-calm-magic) 55%, transparent)); transform-box: fill-box; transform-origin: center; animation: konoha-calm-glint .72s ease-out calc(var(--growth-delay) + 220ms) both; }
+.konoha-fruit-asset { pointer-events: none; }
 .konoha-fruit--ripe { filter: drop-shadow(0 2px 1.5px #182d2b66) drop-shadow(0 0 6px rgb(var(--accent-rgb) / .58)); }
 .konoha-fruit--golden:not(.konoha-fruit--turning-golden) { filter: drop-shadow(0 2px 1.5px #5f431e66) drop-shadow(0 0 8px #e5b93fcc); }
 .konoha-fruit--golden .konoha-fruit-color--base { opacity: 0; }
