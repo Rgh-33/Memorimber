@@ -10,9 +10,9 @@ import { advanceDate, applyUploadPresentation, buildPersistedPetals, buildPersis
 import { getTreeVisibleCount, placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
 
-type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; serial: number; slots: Record<string, (string | null)[]> };
+type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; previewGoldenIds: string[]; serial: number; slots: Record<string, (string | null)[]> };
 const TREE_ARRIVAL_STORAGE_KEY = "memorimber-pending-tree-arrival-v1";
-const emptyState = (preview: boolean): TreeState => ({ preview, date: `${localDate().slice(0, 7)}-01`, uploads: [], previewHarvests: {}, serial: 0, slots: {} });
+const emptyState = (preview: boolean): TreeState => ({ preview, date: `${localDate().slice(0, 7)}-01`, uploads: [], previewHarvests: {}, previewGoldenIds: [], serial: 0, slots: {} });
 
 function readState(raw: string | null, preview: boolean): TreeState {
   const fallback = emptyState(preview);
@@ -23,11 +23,15 @@ function readState(raw: string | null, preview: boolean): TreeState {
       || !Number.isSafeInteger(value.serial) || value.serial < 0) return fallback;
     const harvests = (input: unknown): Harvests => Object.fromEntries(Object.entries(input && typeof input === "object" ? input : {})
       .filter(([, item]) => item && typeof item.word === "string" && [...item.word].length <= 12 && typeof item.harvestedAt === "string"));
+    const goldenIds = (input: unknown): string[] => Array.isArray(input)
+      ? [...new Set<string>(input.filter((id): id is string => typeof id === "string" && id.startsWith("konoha-preview-")))]
+      : [];
     return { preview: value.preview, date: value.date, serial: value.serial,
       uploads: value.uploads.filter((item: Memory) => typeof item?.id === "string" && item.id.startsWith("konoha-preview-")
         && typeof item.createdAt === "string" && Number.isFinite(Date.parse(item.createdAt)) && typeof item.date === "string"
         && typeof item.caption === "string" && typeof item.imageUrl === "string" && Array.isArray(item.people) && Array.isArray(item.tags)),
       previewHarvests: harvests(value.previewHarvests),
+      previewGoldenIds: goldenIds(value.previewGoldenIds),
       // Older saved previews have no placements. Preserve their photos/words
       // and allocate positions on first use instead of resetting the preview.
       slots: Object.fromEntries(Object.entries(value.slots && typeof value.slots === "object" ? value.slots : {})
@@ -40,7 +44,9 @@ function useTreeState() {
   const { memories, isDemo, isLoading } = useMemories();
   const { treeMode, preferencesReady } = usePreferences();
   const [now, setNow] = useState(() => Date.now());
-  const [state, setState] = useState<TreeState>(() => emptyState(isDemo));
+  // SSR and the first browser render must not depend on environment-derived
+  // demo detection. Restore the appropriate preview state after hydration.
+  const [state, setState] = useState<TreeState>(() => emptyState(false));
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [fruits, setFruits] = useState<MemoryFruits>({});
   const [fruitsLoading, setFruitsLoading] = useState(!isDemo);
@@ -118,10 +124,10 @@ function useTreeState() {
   const items = useMemo(() => {
     if (!ready) return [];
     const rawItems = state.preview
-      ? buildTreeItems(source, date, state.previewHarvests)
+      ? buildTreeItems(source, date, state.previewHarvests, new Set(state.previewGoldenIds))
       : buildPersistedTreeItems(source, date, fruits);
     return applyUploadPresentation(rawItems, arrivingUploadId);
-  }, [ready, state.preview, state.previewHarvests, source, date, fruits, arrivingUploadId]);
+  }, [ready, state.preview, state.previewHarvests, state.previewGoldenIds, source, date, fruits, arrivingUploadId]);
   const petals = useMemo(() => {
     if (!ready) return [];
     return state.preview
@@ -164,7 +170,7 @@ function useTreeState() {
     } catch { /* Nothing else to clean up. */ }
   }, []);
 
-  const uploadPreview = () => {
+  const uploadPreview = (forceGolden = false) => {
     const serial = state.serial + 1;
     const sample = SAMPLE_MEMORIES[(serial - 1) % SAMPLE_MEMORIES.length];
     const lastUploadTime = Math.max(0, ...state.uploads.filter((entry) => entry.createdAt?.slice(0, 10) === state.date)
@@ -172,7 +178,15 @@ function useTreeState() {
     const time = Math.max(new Date(`${state.date}T12:00:00`).getTime(), lastUploadTime + 1);
     const createdAt = `${state.date}T${new Date(time).toTimeString().slice(0, 8)}.${String(time % 1000).padStart(3, "0")}`;
     const memory = { ...sample, id: `konoha-preview-${String(serial).padStart(8, "0")}`, date: state.date, createdAt };
-    setState({ ...state, preview: true, serial, uploads: [...state.uploads, memory] });
+    const uploads = [...state.uploads, memory];
+    const newlyGoldenId = forceGolden
+      ? buildTreeItems(uploads, state.date, state.previewHarvests)
+        .find((item) => item.stage === "quiz-ready" && item.newlyRipened)?.id
+      : undefined;
+    const previewGoldenIds = newlyGoldenId && !state.previewGoldenIds.includes(newlyGoldenId)
+      ? [...state.previewGoldenIds, newlyGoldenId]
+      : state.previewGoldenIds;
+    setState({ ...state, preview: true, serial, uploads, previewGoldenIds });
     queueUploadArrival(memory.id);
   };
 
@@ -188,7 +202,8 @@ function useTreeState() {
       if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));
     },
     advance: (days: number, months = 0) => setState((current) => ({ ...current, preview: true, date: advanceDate(current.date, days, months) })),
-    upload: uploadPreview,
+    upload: () => uploadPreview(),
+    uploadGolden: () => uploadPreview(true),
     reset: () => setState((current) => ({ ...emptyState(true),
       slots: Object.fromEntries(Object.entries(current.slots).filter(([key]) => key.startsWith("real:"))) })),
     harvest: async (id: string, word: string) => {

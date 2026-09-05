@@ -46,6 +46,7 @@ export function buildPersistedTreeItems(memories: Memory[], date: string, fruits
       fruitSlot: index,
       fruitTone: "peach" as const,
       growthStage,
+      golden: ripe && fruit?.isGolden === true,
       newlyAdded: laterUploads === 0,
       newlyFruited: laterUploads === 5,
       newlyRipened: ripe && laterUploads === LATER_UPLOADS_TO_HARVEST,
@@ -124,7 +125,7 @@ export function monthlyQueue(memories: Memory[], date: string) {
     .sort((a, b) => (a.createdAt ?? a.date).localeCompare(b.createdAt ?? b.date) || a.id.localeCompare(b.id));
 }
 
-export function buildTreeItems(memories: Memory[], date: string, harvests: Harvests): MemoryTreeItem[] {
+export function buildTreeItems(memories: Memory[], date: string, harvests: Harvests, goldenMemoryIds: ReadonlySet<string> = new Set()): MemoryTreeItem[] {
   const queue = monthlyQueue(memories, date);
   return queue.map((memory, index) => {
     const laterUploads = queue.length - index - 1;
@@ -143,6 +144,7 @@ export function buildTreeItems(memories: Memory[], date: string, harvests: Harve
       fruitSlot: index,
       fruitTone: "peach" as const,
       growthStage,
+      golden: ripe && goldenMemoryIds.has(memory.id),
       newlyAdded: laterUploads === 0,
       newlyFruited: laterUploads === 5,
       newlyRipened: laterUploads === LATER_UPLOADS_TO_HARVEST,

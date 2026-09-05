@@ -1,14 +1,17 @@
+import type { CSSProperties } from "react";
 import type { FruitAppearance } from "@/lib/tree-fruit-layout";
 
-export function TreeFruit({ uid, appearance, mature, newlyFormed = false, justRipened = false, x, y: hangY }: {
-  uid: string; appearance: FruitAppearance; mature: boolean; newlyFormed?: boolean; justRipened?: boolean; x: number; y: number;
+export function TreeFruit({ uid, appearance, mature, golden = false, newlyFormed = false, justRipened = false, x, y: hangY }: {
+  uid: string; appearance: FruitAppearance; mature: boolean; golden?: boolean; newlyFormed?: boolean; justRipened?: boolean; x: number; y: number;
 }) {
   const { variety, tilt, size } = appearance;
   const scale = (mature ? 1 : .52) * size;
   const y = mature ? 23 : 19;
   const fill = `${uid}-${variety}`;
 
-  return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}${newlyFormed ? " konoha-fruit--new" : ""}${justRipened ? " konoha-fruit--just-ripe" : ""}`} data-fruit-variety={variety}
+  const visiblyGolden = mature && golden;
+  return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}${newlyFormed ? " konoha-fruit--new" : ""}${justRipened ? " konoha-fruit--just-ripe" : ""}${visiblyGolden ? " konoha-fruit--golden" : ""}${visiblyGolden && justRipened ? " konoha-fruit--turning-golden" : ""}`} data-fruit-variety={variety} data-golden={visiblyGolden || undefined}
+    style={{ "--golden-fruit-filter": `url(#${uid}-golden-fruit)` } as CSSProperties}
     transform={`translate(${x} ${y + hangY}) rotate(${tilt}) scale(${scale})`}>
     <defs>
       <radialGradient id={`${uid}-le-lectier`} cx=".3" cy=".22" r=".82">
@@ -32,6 +35,9 @@ export function TreeFruit({ uid, appearance, mature, newlyFormed = false, justRi
       <radialGradient id={`${uid}-nikkori-pear`} cx=".32" cy=".2" r=".85">
         <stop stopColor="#f4d67d" /><stop offset=".48" stopColor="#c79a42" /><stop offset="1" stopColor="#79532b" />
       </radialGradient>
+      <filter id={`${uid}-golden-fruit`} colorInterpolationFilters="sRGB">
+        <feColorMatrix type="matrix" values=".27 .53 .10 0 .25  .225 .4425 .0825 0 .16  .075 .1475 .0275 0 .02  0 0 0 1 0" />
+      </filter>
     </defs>
 
     {newlyFormed && <g className="konoha-new-fruit-emphasis" aria-hidden="true">
@@ -50,6 +56,7 @@ export function TreeFruit({ uid, appearance, mature, newlyFormed = false, justRi
       </g>
     </g>}
     {mature && <ellipse className="konoha-ripe-aura" cx="0" cy="1" rx="20" ry="21" />}
+    <g className="konoha-fruit-color">
     <path d="M0 -15 Q-1 -11 1 -8" fill="none" stroke="#5b4a2d" strokeWidth="2" strokeLinecap="round" />
 
     {variety === "le-lectier" && <>
@@ -105,5 +112,6 @@ export function TreeFruit({ uid, appearance, mature, newlyFormed = false, justRi
     </>}
     {mature && <path className="konoha-ripe-sparkles" aria-hidden="true"
       d="M-18 -10V-4 M-21 -7H-15 M17 -3V3 M14 0H20 M-12 15V19 M-14 17H-10" />}
+    </g>
   </g>;
 }

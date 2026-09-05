@@ -27,6 +27,7 @@ export function TreePreviewControls() {
             <div className="konoha-preview-actions">
               <button type="button" onClick={() => tree.advance(1)}>1日進める</button>
               <button type="button" onClick={tree.upload} aria-label="プレビューに1枚アップロード">1枚追加</button>
+              <button type="button" onClick={tree.uploadGolden} aria-label="プレビューに1枚追加して新しく収穫可能になる実を金にする">1枚追加(金)</button>
             </div>
           </fieldset>
         ) : toggle}

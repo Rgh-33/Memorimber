@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type MemoryFruit = {
   memoryId: string;
   ripenedAt: string | null;
+  isGolden: boolean;
   harvestedAt: string | null;
   harvestWord: string | null;
   wordAssignedAt: string | null;
@@ -14,13 +15,14 @@ export type MemoryFruits = Record<string, MemoryFruit>;
 type MemoryFruitRow = {
   memory_id: string;
   ripened_at: string | null;
+  is_golden: boolean;
   harvested_at: string | null;
   harvest_word: string | null;
   word_assigned_at: string | null;
   home_visible_until: string | null;
 };
 
-const SELECT_COLUMNS = "memory_id, ripened_at, harvested_at, harvest_word, word_assigned_at, home_visible_until";
+const SELECT_COLUMNS = "memory_id, ripened_at, is_golden, harvested_at, harvest_word, word_assigned_at, home_visible_until";
 
 function errorDetail(error: unknown) {
   if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
@@ -33,6 +35,7 @@ function toMemoryFruit(row: MemoryFruitRow): MemoryFruit {
   return {
     memoryId: row.memory_id,
     ripenedAt: row.ripened_at,
+    isGolden: row.is_golden,
     harvestedAt: row.harvested_at,
     harvestWord: row.harvest_word,
     wordAssignedAt: row.word_assigned_at,
