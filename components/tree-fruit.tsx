@@ -1,62 +1,12 @@
-import type { CSSProperties } from "react";
 import type { FruitAppearance } from "@/lib/tree-fruit-layout";
 
-export function TreeFruit({ uid, appearance, mature, golden = false, newlyFormed = false, justRipened = false, x, y: hangY }: {
-  uid: string; appearance: FruitAppearance; mature: boolean; golden?: boolean; newlyFormed?: boolean; justRipened?: boolean; x: number; y: number;
+function FruitArtwork({ uid, variety, mature, fill }: {
+  uid: string;
+  variety: FruitAppearance["variety"];
+  mature: boolean;
+  fill: string;
 }) {
-  const { variety, tilt, size } = appearance;
-  const scale = (mature ? 1 : .52) * size;
-  const y = mature ? 23 : 19;
-  const fill = `${uid}-${variety}`;
-
-  const visiblyGolden = mature && golden;
-  return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}${newlyFormed ? " konoha-fruit--new" : ""}${justRipened ? " konoha-fruit--just-ripe" : ""}${visiblyGolden ? " konoha-fruit--golden" : ""}${visiblyGolden && justRipened ? " konoha-fruit--turning-golden" : ""}`} data-fruit-variety={variety} data-golden={visiblyGolden || undefined}
-    style={{ "--golden-fruit-filter": `url(#${uid}-golden-fruit)` } as CSSProperties}
-    transform={`translate(${x} ${y + hangY}) rotate(${tilt}) scale(${scale})`}>
-    <defs>
-      <radialGradient id={`${uid}-le-lectier`} cx=".3" cy=".22" r=".82">
-        <stop stopColor="#f6dc84" /><stop offset=".45" stopColor="#d9ae4f" /><stop offset=".78" stopColor="#a87935" /><stop offset="1" stopColor="#6f4f27" />
-      </radialGradient>
-      <radialGradient id={`${uid}-apple`} cx=".3" cy=".2" r=".82">
-        <stop stopColor="#ffd37b" /><stop offset=".3" stopColor="#d96642" /><stop offset=".72" stopColor="#a92f2f" /><stop offset="1" stopColor="#692a27" />
-      </radialGradient>
-      <radialGradient id={`${uid}-breadfruit`} cx=".3" cy=".2" r=".85">
-        <stop stopColor="#d6d87d" /><stop offset=".45" stopColor="#8ba653" /><stop offset="1" stopColor="#405f39" />
-      </radialGradient>
-      <radialGradient id={`${uid}-dragon-fruit`} cx=".32" cy=".18" r=".84">
-        <stop stopColor="#ffabc0" /><stop offset=".34" stopColor="#f14f87" /><stop offset=".72" stopColor="#cf286d" /><stop offset="1" stopColor="#861f50" />
-      </radialGradient>
-      <linearGradient id={`${uid}-dragon-bract`} x1="0" y1="0" x2="1" y2="1">
-        <stop stopColor="#e63e79" /><stop offset=".48" stopColor="#d53270" /><stop offset=".58" stopColor="#a8c85e" /><stop offset="1" stopColor="#4f8248" />
-      </linearGradient>
-      <radialGradient id={`${uid}-jatropha-curcas`} cx=".35" cy=".22" r=".84">
-        <stop stopColor="#e1db79" /><stop offset=".48" stopColor="#91a957" /><stop offset="1" stopColor="#4f6538" />
-      </radialGradient>
-      <radialGradient id={`${uid}-nikkori-pear`} cx=".32" cy=".2" r=".85">
-        <stop stopColor="#f4d67d" /><stop offset=".48" stopColor="#c79a42" /><stop offset="1" stopColor="#79532b" />
-      </radialGradient>
-      <filter id={`${uid}-golden-fruit`} colorInterpolationFilters="sRGB">
-        <feColorMatrix type="matrix" values=".27 .53 .10 0 .25  .225 .4425 .0825 0 .16  .075 .1475 .0275 0 .02  0 0 0 1 0" />
-      </filter>
-    </defs>
-
-    {newlyFormed && <g className="konoha-new-fruit-emphasis" aria-hidden="true">
-      <ellipse className="konoha-new-fruit-halo" cx="0" cy="1" rx="18" ry="19" />
-      <path className="konoha-new-fruit-glint" d="M0 -23V-16 M-3.5 -19.5H3.5 M18 -12V-7 M15.5 -9.5H20.5" />
-    </g>}
-    {justRipened && <g className="konoha-just-ripe-celebration" aria-hidden="true">
-      <ellipse className="konoha-just-ripe-flash" cx="0" cy="1" rx="19" ry="20" />
-      <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--one" cx="0" cy="1" rx="20" ry="21" />
-      <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--two" cx="0" cy="1" rx="24" ry="25" />
-      <path className="konoha-just-ripe-burst" d="M0 -29V-21 M0 23V31 M-28 1H-20 M20 1H28 M-20 -19L-14 -13 M14 15L20 21 M20 -19L14 -13 M-14 15L-20 21" />
-      <g className="konoha-just-ripe-sparks">
-        <circle cx="-25" cy="-12" r="2.1" /><circle cx="24" cy="-15" r="1.7" />
-        <circle cx="29" cy="8" r="2" /><circle cx="-28" cy="11" r="1.6" />
-        <circle cx="-14" cy="27" r="1.8" /><circle cx="15" cy="28" r="1.4" />
-      </g>
-    </g>}
-    {mature && <ellipse className="konoha-ripe-aura" cx="0" cy="1" rx="20" ry="21" />}
-    <g className="konoha-fruit-color">
+  return <>
     <path d="M0 -15 Q-1 -11 1 -8" fill="none" stroke="#5b4a2d" strokeWidth="2" strokeLinecap="round" />
 
     {variety === "le-lectier" && <>
@@ -110,8 +60,70 @@ export function TreeFruit({ uid, appearance, mature, golden = false, newlyFormed
       <path d="M-8 -6 Q-12 1 -9 8" fill="none" stroke="#ffedaa" strokeWidth="2.5" strokeLinecap="round" opacity=".48" />
       {mature && <g fill="#74512f" opacity=".55"><circle cx="4" cy="-4" r=".55" /><circle cx="8" cy="1" r=".6" /><circle cx="5" cy="9" r=".45" /><circle cx="-1" cy="12" r=".6" /><circle cx="-4" cy="4" r=".45" /><circle cx="10" cy="7" r=".45" /></g>}
     </>}
+  </>;
+}
+
+export function TreeFruit({ uid, appearance, mature, golden = false, newlyFormed = false, justRipened = false, x, y: hangY }: {
+  uid: string; appearance: FruitAppearance; mature: boolean; golden?: boolean; newlyFormed?: boolean; justRipened?: boolean; x: number; y: number;
+}) {
+  const { variety, tilt, size } = appearance;
+  const scale = (mature ? 1 : .52) * size;
+  const y = mature ? 23 : 19;
+  const fill = `${uid}-${variety}`;
+
+  const visiblyGolden = mature && golden;
+  return <g className={`konoha-fruit konoha-fruit--${mature ? "ripe" : "young"}${newlyFormed ? " konoha-fruit--new" : ""}${justRipened ? " konoha-fruit--just-ripe" : ""}${visiblyGolden ? " konoha-fruit--golden" : ""}${visiblyGolden && justRipened ? " konoha-fruit--turning-golden" : ""}`} data-fruit-variety={variety} data-golden={visiblyGolden || undefined}
+    transform={`translate(${x} ${y + hangY}) rotate(${tilt}) scale(${scale})`}>
+    <defs>
+      <radialGradient id={`${uid}-le-lectier`} cx=".3" cy=".22" r=".82">
+        <stop stopColor="#f6dc84" /><stop offset=".45" stopColor="#d9ae4f" /><stop offset=".78" stopColor="#a87935" /><stop offset="1" stopColor="#6f4f27" />
+      </radialGradient>
+      <radialGradient id={`${uid}-apple`} cx=".3" cy=".2" r=".82">
+        <stop stopColor="#ffd37b" /><stop offset=".3" stopColor="#d96642" /><stop offset=".72" stopColor="#a92f2f" /><stop offset="1" stopColor="#692a27" />
+      </radialGradient>
+      <radialGradient id={`${uid}-breadfruit`} cx=".3" cy=".2" r=".85">
+        <stop stopColor="#d6d87d" /><stop offset=".45" stopColor="#8ba653" /><stop offset="1" stopColor="#405f39" />
+      </radialGradient>
+      <radialGradient id={`${uid}-dragon-fruit`} cx=".32" cy=".18" r=".84">
+        <stop stopColor="#ffabc0" /><stop offset=".34" stopColor="#f14f87" /><stop offset=".72" stopColor="#cf286d" /><stop offset="1" stopColor="#861f50" />
+      </radialGradient>
+      <linearGradient id={`${uid}-dragon-bract`} x1="0" y1="0" x2="1" y2="1">
+        <stop stopColor="#e63e79" /><stop offset=".48" stopColor="#d53270" /><stop offset=".58" stopColor="#a8c85e" /><stop offset="1" stopColor="#4f8248" />
+      </linearGradient>
+      <radialGradient id={`${uid}-jatropha-curcas`} cx=".35" cy=".22" r=".84">
+        <stop stopColor="#e1db79" /><stop offset=".48" stopColor="#91a957" /><stop offset="1" stopColor="#4f6538" />
+      </radialGradient>
+      <radialGradient id={`${uid}-nikkori-pear`} cx=".32" cy=".2" r=".85">
+        <stop stopColor="#f4d67d" /><stop offset=".48" stopColor="#c79a42" /><stop offset="1" stopColor="#79532b" />
+      </radialGradient>
+      <filter id={`${uid}-golden-fruit`} colorInterpolationFilters="sRGB">
+        <feColorMatrix type="matrix" values=".27 .53 .10 0 .25  .225 .4425 .0825 0 .16  .075 .1475 .0275 0 .02  0 0 0 1 0" />
+      </filter>
+    </defs>
+
+    {newlyFormed && <g className="konoha-new-fruit-emphasis" aria-hidden="true">
+      <ellipse className="konoha-new-fruit-halo" cx="0" cy="1" rx="18" ry="19" />
+      <path className="konoha-new-fruit-glint" d="M0 -23V-16 M-3.5 -19.5H3.5 M18 -12V-7 M15.5 -9.5H20.5" />
+    </g>}
+    {justRipened && <g className="konoha-just-ripe-celebration" aria-hidden="true">
+      <ellipse className="konoha-just-ripe-flash" cx="0" cy="1" rx="19" ry="20" />
+      <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--one" cx="0" cy="1" rx="20" ry="21" />
+      <ellipse className="konoha-just-ripe-ring konoha-just-ripe-ring--two" cx="0" cy="1" rx="24" ry="25" />
+      <path className="konoha-just-ripe-burst" d="M0 -29V-21 M0 23V31 M-28 1H-20 M20 1H28 M-20 -19L-14 -13 M14 15L20 21 M20 -19L14 -13 M-14 15L-20 21" />
+      <g className="konoha-just-ripe-sparks">
+        <circle cx="-25" cy="-12" r="2.1" /><circle cx="24" cy="-15" r="1.7" />
+        <circle cx="29" cy="8" r="2" /><circle cx="-28" cy="11" r="1.6" />
+        <circle cx="-14" cy="27" r="1.8" /><circle cx="15" cy="28" r="1.4" />
+      </g>
+    </g>}
+    {mature && <ellipse className="konoha-ripe-aura" cx="0" cy="1" rx="20" ry="21" />}
+    <g className="konoha-fruit-color konoha-fruit-color--base">
+      <FruitArtwork uid={uid} variety={variety} mature={mature} fill={fill} />
+    </g>
+    {visiblyGolden && <g className="konoha-fruit-color konoha-fruit-color--golden" filter={`url(#${uid}-golden-fruit)`}>
+      <FruitArtwork uid={uid} variety={variety} mature={mature} fill={fill} />
+    </g>}
     {mature && <path className="konoha-ripe-sparkles" aria-hidden="true"
       d="M-18 -10V-4 M-21 -7H-15 M17 -3V3 M14 0H20 M-12 15V19 M-14 17H-10" />}
-    </g>
   </g>;
 }
