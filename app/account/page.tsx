@@ -1,5 +1,4 @@
 import { ChevronRight, KeyRound, Mail, ShieldCheck } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,8 +16,6 @@ export default async function AccountPage() {
 
   return (
     <div className="page-pad">
-      <AppHeader />
-
       <section className="pt-8 text-center">
         <p className="text-[10px] font-semibold tracking-[0.2em] text-coral">YOUR ACCOUNT</p>
         <h1 className="mt-2 text-[25px] font-semibold tracking-[0.1em] text-ink">アカウント</h1>

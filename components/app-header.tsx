@@ -37,7 +37,7 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="flex h-10 items-center justify-between">
+      <header className="app-header flex h-[62px] items-center justify-between px-5 pt-[22px] print:hidden">
         <BrandHomeLink />
         <div className="flex items-center gap-1.5">
           <Link

@@ -3,6 +3,7 @@
 import { useEffect, type MouseEvent } from "react";
 import { usePathname } from "next/navigation";
 import { useProcessing } from "@/lib/processing-context";
+import { AppHeader } from "./app-header";
 import { BottomNav } from "./bottom-nav";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[var(--page-bg)] text-ink">
       <div className={`app-shell relative mx-auto min-h-screen w-full max-w-[430px] bg-ivory shadow-phone ${isAlbumPage ? "app-shell--album" : ""}`} onClickCapture={handleNavigationStart}>
-        <main className={`min-h-screen ${isAuthPage ? "" : "pb-[92px]"}`}>{children}</main>
+        {!isAuthPage && <AppHeader />}
+        <main className={`min-h-screen ${isAuthPage ? "" : "pb-[92px] pt-[62px]"}`}>{children}</main>
         {!isAuthPage && <BottomNav />}
       </div>
     </div>

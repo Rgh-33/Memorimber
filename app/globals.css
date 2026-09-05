@@ -191,6 +191,15 @@ a {
   overflow: visible;
 }
 
+.app-header {
+  position: fixed;
+  inset: 0 auto auto 50%;
+  z-index: 40;
+  width: min(100%, 430px);
+  background: var(--ivory);
+  transform: translateX(-50%);
+}
+
 .brand-home-link {
   transform-origin: left center;
 }
@@ -226,22 +235,13 @@ a {
 }
 
 .page-pad {
-  padding: 22px 20px 34px;
+  padding: 0 20px 34px;
 }
 
 .album-page {
   display: flex;
   min-height: calc(100dvh - 128px);
   flex-direction: column;
-}
-
-.album-sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  margin: -22px -20px 0;
-  padding: 22px 20px 0;
-  background: var(--ivory);
 }
 
 .album-page-memory-slot {
@@ -1835,6 +1835,10 @@ details > summary::-webkit-details-marker {
     box-shadow: none;
     background: #fff !important;
     background-image: none !important;
+  }
+
+  .app-shell main {
+    padding-top: 0 !important;
   }
 
   .page-pad {

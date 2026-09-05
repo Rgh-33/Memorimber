@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Printer, Settings2, Trash2 } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { MemoryBookPage } from "@/components/memory-book-page";
 import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
@@ -172,21 +171,20 @@ export default function MemoryDetailPage() {
   }, [accountAppearanceRequired, albumAppearanceReady, resolvedAppearance.orientation]);
 
   if (loadState === "idle" || loadState === "loading") {
-    return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p role="status">思い出を読み込んでいます…</p></div></div>;
+    return <div className="page-pad"><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p role="status">思い出を読み込んでいます…</p></div></div>;
   }
 
   if (loadState === "error") {
-    return <div className="page-pad"><AppHeader /><div role="alert" className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p>{loadError}</p><button type="button" onClick={() => void fetchDetail()} className="mt-3 text-coral underline">再読み込み</button></div></div>;
+    return <div className="page-pad"><div role="alert" className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p>{loadError}</p><button type="button" onClick={() => void fetchDetail()} className="mt-3 text-coral underline">再読み込み</button></div></div>;
   }
 
   if (loadState === "not-found" || !memory) {
-    return <div className="page-pad"><AppHeader /><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center"><p className="font-medium">思い出が見つかりません</p><p className="mt-2 text-xs leading-5 text-ink/55">削除されたか、この思い出を閲覧する権限がありません。</p><Link href="/album" className="mt-4 inline-block rounded-lg bg-coral px-5 py-3 text-xs font-medium text-white">アルバムへ戻る</Link></div></div>;
+    return <div className="page-pad"><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center"><p className="font-medium">思い出が見つかりません</p><p className="mt-2 text-xs leading-5 text-ink/55">削除されたか、この思い出を閲覧する権限がありません。</p><Link href="/album" className="mt-4 inline-block rounded-lg bg-coral px-5 py-3 text-xs font-medium text-white">アルバムへ戻る</Link></div></div>;
   }
 
   if (accountAppearanceRequired && !albumAppearanceReady) {
     return (
       <div className="page-pad">
-        <AppHeader />
         {albumAppearanceLoading ? (
           <p role="status" className="mt-16 text-center text-sm text-ink/65">アルバム設定を読み込んでいます…</p>
         ) : (
@@ -305,7 +303,6 @@ export default function MemoryDetailPage() {
   return (
     <div className="memory-detail-page page-pad">
       <div className="print-hide">
-        <AppHeader />
         <Link
           href="/album?restore=1"
           scroll={false}

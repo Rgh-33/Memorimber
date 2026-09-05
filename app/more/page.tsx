@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ChevronRight, Info, RotateCcw, Settings, Sparkles } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { useMemories } from "@/lib/memories-context";
 
 export default function MorePage() {
@@ -10,7 +9,6 @@ export default function MorePage() {
 
   return (
     <div className="page-pad">
-      <AppHeader />
       <section className="pt-8 text-center">
         <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">その他</h1>
         <p className="mt-3 text-xs leading-6 text-ink/50">Memorimberについて</p>
