@@ -4,7 +4,6 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Check, Grid3X3, HelpCircle, X } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
 import { getFruitQuiz } from "@/lib/tree-growth";
@@ -123,7 +122,7 @@ export function QuizSession({ quiz, variant = "page", onClose, onHarvest }: {
     {harvest.error && <p role="alert" className="mt-3 rounded-lg border border-red-400/40 p-3 text-xs leading-6 text-ink">{harvest.error}</p>}
   </>;
 
-  if (!dialog) return <div className="page-pad"><AppHeader />{content}</div>;
+  if (!dialog) return <div className="page-pad">{content}</div>;
 
   return <section
     ref={dialogRef}

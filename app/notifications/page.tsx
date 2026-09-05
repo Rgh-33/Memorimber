@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Bell, ChevronRight, MailOpen } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listInvitationNotifications, type InvitationNotification } from "@/lib/supabase/shared-album-invitations";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +36,6 @@ export default async function NotificationsPage() {
 
   return (
     <div className="page-pad">
-      <AppHeader />
       <section className="pt-8">
         <div className="flex items-end justify-between gap-4">
           <div>

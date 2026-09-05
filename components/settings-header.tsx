@@ -2,7 +2,6 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { BrandHomeLink } from "@/components/brand-home-link";
 import { useProcessing } from "@/lib/processing-context";
 
 export function SettingsHeader() {
@@ -11,9 +10,6 @@ export function SettingsHeader() {
 
   return (
     <header>
-      <div className="flex h-10 items-center">
-        <BrandHomeLink />
-      </div>
       <button
         type="button"
         onClick={() => {

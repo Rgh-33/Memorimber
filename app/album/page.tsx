@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { MemoryCard } from "@/components/memory-card";
 import { getAlbumGridSlotCount } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
@@ -168,9 +167,6 @@ export default function AlbumPage() {
 
   return (
     <div className="album-page page-pad">
-      <div className="album-sticky-header">
-        <AppHeader />
-      </div>
       <section className="pt-7 text-center">
         <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">月間アルバム</h1>
       </section>

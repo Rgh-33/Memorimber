@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { CalendarDays, Camera, Check, ChevronRight, Images, Lightbulb, Medal, Pencil, Sprout, UserRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type Ref } from "react";
-import { AppHeader } from "@/components/app-header";
 import { useMemories } from "@/lib/memories-context";
 import {
   getProfileLevelProgress,
@@ -134,8 +133,6 @@ export default function ProfilePage() {
 
   return (
     <div className="page-pad">
-      <AppHeader />
-
       <section className="pt-8 text-center">
         <p className="text-[10px] font-semibold tracking-[0.2em] text-coral">MY PROFILE</p>
         <h1 className="mt-2 text-[25px] font-semibold tracking-[0.1em] text-ink">プロフィール</h1>

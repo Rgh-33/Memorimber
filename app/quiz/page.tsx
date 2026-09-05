@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, Camera, ChevronRight, History, Infinity as InfinityIcon, Sparkles, Type } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { useMemories } from "@/lib/memories-context";
 import {
@@ -367,12 +366,11 @@ export default function QuizPage() {
     });
   }, []);
 
-  if (isLoading) return <div className="page-pad"><AppHeader /><p role="status" className="quiz-loading">思い出を読み込んでいます…</p></div>;
-  if (error) return <div className="page-pad"><AppHeader /><div role="alert" className="quiz-load-error">{error}<button type="button" onClick={() => void refreshMemories()}>再読み込み</button></div></div>;
+  if (isLoading) return <div className="page-pad"><p role="status" className="quiz-loading">思い出を読み込んでいます…</p></div>;
+  if (error) return <div className="page-pad"><div role="alert" className="quiz-load-error">{error}<button type="button" onClick={() => void refreshMemories()}>再読み込み</button></div></div>;
 
   return (
     <div className="page-pad quiz-page">
-      {!active && !showHistory && !showMixedSetup && <AppHeader />}
       {active ? (
         <QuizSession initial={active} memories={memories} onComplete={saveResult} onClose={() => setActive(null)} />
       ) : showHistory ? (
