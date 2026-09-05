@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const sql = readFileSync(new URL("../supabase/migrations/20260905000000_add_golden_memory_fruits.sql", import.meta.url), "utf8");
-const reconciliation = readFileSync(new URL("../supabase/migrations/20260905080000_reconcile_golden_memory_fruits.sql", import.meta.url), "utf8");
+const reconciliation = readFileSync(new URL("../supabase/migrations/20260905100000_reconcile_golden_memory_fruits.sql", import.meta.url), "utf8");
 
 test("golden fruit migration stores one draw only when a fruit first ripens", () => {
   assert.match(sql, /add column is_golden boolean not null default false/i);
