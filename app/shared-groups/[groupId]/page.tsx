@@ -124,7 +124,7 @@ export default async function SharedGroupDetailPage({ params, searchParams }: Pa
                     </div>
                     <div className="p-3">
                       <p className="line-clamp-2 text-xs font-semibold leading-5 text-ink">{entry.memory.caption}</p>
-                      <p className="mt-1 text-[10px] text-ink/45">{formatShortDate(entry.memory.date)} · {memberNames.get(entry.addedBy) ?? "メンバー"}</p>
+                      <p className="mt-1 text-[10px] text-ink/45">{formatShortDate(entry.memory.date)} · {entry.contributorName ?? memberNames.get(entry.addedBy ?? "") ?? "メンバー"}</p>
                     </div>
                   </Link>
                   {canRemove ? (
@@ -206,7 +206,7 @@ export default async function SharedGroupDetailPage({ params, searchParams }: Pa
             <input type="hidden" name="groupId" value={groupId} />
             <label className="flex items-start gap-2 text-[11px] leading-5 text-ink/65">
               <input type="checkbox" name="confirm" value="delete" required className="mt-1 accent-red-500" />
-              グループを削除することを確認しました。共有関係だけが消え、元の思い出と写真は残ります。
+              グループを削除することを確認しました。現在のメンバーが所有する元の思い出と写真は残ります。退会者の保持写真は、最後の共有先がなくなると削除されます。
             </label>
             <SharedGroupSubmitButton tone="danger" pendingLabel="削除中…" className="mt-3 w-full"><span className="flex items-center justify-center gap-2"><Trash2 size={15} />グループを削除</span></SharedGroupSubmitButton>
           </form>

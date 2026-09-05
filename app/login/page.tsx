@@ -20,6 +20,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 const SUCCESS_MESSAGES: Record<string, string> = {
   check_email: "登録を受け付けました。確認メールが届く設定の場合は、メール内のリンクを開いてください。",
   signed_out: "ログアウトしました。",
+  account_deleted: "アカウントと削除対象のデータを削除しました。",
 };
 
 type PageProps = {

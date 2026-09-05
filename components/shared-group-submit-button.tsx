@@ -7,6 +7,7 @@ type Props = {
   pendingLabel?: string;
   tone?: "primary" | "secondary" | "danger";
   className?: string;
+  disabled?: boolean;
 };
 
 const toneClasses = {
@@ -20,13 +21,14 @@ export function SharedGroupSubmitButton({
   pendingLabel = "処理中…",
   tone = "primary",
   className = "",
+  disabled = false,
 }: Props) {
   const { pending } = useFormStatus();
 
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={disabled || pending}
       className={`rounded-xl px-4 py-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${toneClasses[tone]} ${className}`}
     >
       {pending ? pendingLabel : children}

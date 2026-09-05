@@ -34,7 +34,9 @@ export default async function SharedMemoryDetailPage({ params }: PageProps) {
   ]);
   const entry = memoryResult.entries.find((candidate) => candidate.memory.id === memoryId);
   if (!album || !entry) notFound();
-  const contributor = members.find((member) => member.userId === entry.addedBy)?.displayName ?? "メンバー";
+  const contributor = entry.contributorName
+    ?? members.find((member) => member.userId === entry.addedBy)?.displayName
+    ?? "メンバー";
   const memory = entry.memory;
 
   return (

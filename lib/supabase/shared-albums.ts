@@ -5,7 +5,7 @@ import { MEMORY_IMAGE_BUCKET, MEMORY_IMAGE_URL_LIFETIME } from "./memories.ts";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MEMORY_COLUMNS = "id, user_id, image_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at";
-const SHARED_MEMORY_COLUMNS = `album_id, memory_id, added_by, created_at, memory:memories!inner(${MEMORY_COLUMNS})`;
+const SHARED_MEMORY_COLUMNS = `album_id, memory_id, added_by, added_by_display_name, created_at, memory:memories!inner(${MEMORY_COLUMNS})`;
 
 export type SharedAlbum = {
   id: string;
@@ -24,9 +24,10 @@ export type SharedAlbumMember = {
 
 export type SharedAlbumMemoryEntry = {
   albumId: string;
-  addedBy: string;
+  addedBy: string | null;
+  contributorName: string | null;
   addedAt: string;
-  memoryOwnerId: string;
+  memoryOwnerId: string | null;
   memory: Memory;
 };
 
@@ -40,7 +41,7 @@ export type SharedMemoryChoice = Pick<Memory, "id" | "date" | "caption">;
 type AlbumRow = { id: string; owner_id: string; name: string; created_at: string; updated_at: string };
 type MemoryRow = {
   id: string;
-  user_id: string;
+  user_id: string | null;
   image_path: string;
   caption: string;
   memory_date: string;
@@ -54,7 +55,8 @@ type MemoryRow = {
 type SharedMemoryRow = {
   album_id: string;
   memory_id: string;
-  added_by: string;
+  added_by: string | null;
+  added_by_display_name: string | null;
   created_at: string;
   memory: MemoryRow | MemoryRow[];
 };
@@ -227,6 +229,7 @@ export async function loadSharedAlbumMemoryEntries(
     entries: normalized.map(({ row, memory }) => ({
       albumId: row.album_id,
       addedBy: row.added_by,
+      contributorName: row.added_by_display_name ?? null,
       addedAt: row.created_at,
       memoryOwnerId: memory.user_id,
       memory: toMemory(memory, urls.get(memory.image_path) ?? ""),
