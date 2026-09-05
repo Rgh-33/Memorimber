@@ -180,7 +180,7 @@ Supabase未設定時のローカル開発ではサンプルを閲覧できます
 
 実装内容と実環境での確認手順は [思い出保存の引き継ぎ](docs/issue-34-save-memories.md) を参照してください。
 
-Supabaseには、ユーザーごとの思い出を保存する `memories` テーブルと、非公開の `memory-images` Storageバケットを作成するmigrationがあります。RLSにより本人のレコードと画像だけを操作できる設計ですが、現在の投稿UIとはまだ接続していません。
+Supabaseには、ユーザーごとの思い出を保存する `memories` テーブルと、非公開の `memory-images` Storageバケットを作成するmigrationがあります。本人は自分のレコードと画像を操作でき、共有アルバムの正式メンバーにはアルバムへ追加された思い出と画像の閲覧だけを許可します。共有時も写真やcaptionは複製せず、`shared_album_memories` から元の `memories` を参照します。
 
 ## 認証について
 
