@@ -1,5 +1,7 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 /* eslint-disable @next/next/no-img-element */
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
@@ -33,6 +35,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const configured = isSupabaseConfigured();
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
+  const mounted = useRef(false);
   const thumbnailPromiseRef = useRef<Promise<GeneratedMemoryThumbnail | null>>(Promise.resolve(null));
   const [image, setImage] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState("");
@@ -46,6 +49,11 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingMemoryUpload | null>(null);
   const busy = stage !== null;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     try {
@@ -89,6 +97,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   };
 
   const onSaved = (memory: Memory) => {
+    if (!mounted.current) return;
     setSaveError(null);
     clearPending();
     setImage(null);
@@ -111,8 +120,11 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   };
 
   const rememberPending = (attempt: PendingMemoryUpload) => {
+    if (!mounted.current) throw new Error("投稿画面を閉じたため、投稿を中止しました。");
     try {
-      window.sessionStorage.setItem(PENDING_MEMORY_STORAGE_KEY, JSON.stringify(attempt));
+      if (!setBrowserSessionItem(window.sessionStorage, PENDING_MEMORY_STORAGE_KEY, JSON.stringify(attempt))) {
+        throw new Error("session ended");
+      }
     } catch {
       throw new Error("投稿の復旧情報をブラウザに記録できません。ブラウザのストレージ設定を確認してください。まだ写真は送信していません。");
     }
@@ -120,6 +132,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   };
 
   const showSaveError = (cause: unknown) => {
+    if (!mounted.current) return;
     setSaveError(cause instanceof Error ? cause.message : "保存できませんでした。通信状態を確認してください。");
     if (cause instanceof MemorySaveError && cause.pending) setPending(cause.pending);
     else clearPending();
@@ -141,6 +154,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     startProcessing();
     try {
       const thumbnail = await thumbnailPromiseRef.current;
+      if (!mounted.current) return;
       const saved = await saveMemory(createClient(), { image, thumbnail, caption, date, people, tags }, setStage, rememberPending);
       onSaved(saved);
     } catch (cause) {

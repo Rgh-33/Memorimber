@@ -54,9 +54,13 @@ export async function signup(formData: FormData) {
 }
 
 export async function logout() {
-  if (!isSupabaseConfigured()) redirect("/login?error=configuration");
-
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect("/login?message=signed_out");
+  if (!isSupabaseConfigured()) return { error: null };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) return { error: "ログアウトできませんでした。通信状態を確認して再試行してください。" };
+    return { error: null };
+  } catch {
+    return { error: "ログアウトできませんでした。通信状態を確認して再試行してください。" };
+  }
 }
