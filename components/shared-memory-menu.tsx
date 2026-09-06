@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useActionState, useRef, useState, type RefObject } from "react";
+import { Component, useActionState, useEffect, useRef, useState, type RefObject } from "react";
 import { unstable_rethrow } from "next/navigation";
 import { Ellipsis } from "lucide-react";
 import { SharedGroupDialog } from "@/components/shared-group-dialog";
@@ -64,10 +64,25 @@ export function SharedMemoryMenu({ groupId, memoryId, caption }: MemoryMenuProps
   const triggerRef = useRef<HTMLElement>(null);
   const close = () => setConfirming(false);
 
+  useEffect(() => {
+    const details = detailsRef.current;
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      if (details?.open && event.target instanceof Node && !details.contains(event.target)) {
+        details.open = false;
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown, true);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown, true);
+  }, []);
+
   return (
     <>
       <details ref={detailsRef} className="shared-memory-menu relative shrink-0" onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+        // Safari may blur the summary without focusing the clicked button.
+        // A null destination must not hide that button before its click fires.
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+          event.currentTarget.open = false;
+        }
       }} onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.currentTarget.open = false;

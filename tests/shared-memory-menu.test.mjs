@@ -29,6 +29,14 @@ function find(element, predicate) {
 function harness({ result = null, pending = false } = {}) {
   const submissions = [];
   const closed = [];
+  const effects = [];
+  const listeners = [];
+  const removedListeners = [];
+  class DomNode {}
+  const document = {
+    addEventListener(...args) { listeners.push(args); },
+    removeEventListener(...args) { removedListeners.push(args); },
+  };
   const removeAction = async (previous, formData) => {
     submissions.push({ previous, entries: [...formData] });
   };
@@ -39,6 +47,7 @@ function harness({ result = null, pending = false } = {}) {
       ...React,
       useState: () => [true, (state) => closed.push(state)],
       useRef: () => ({ current: null }),
+      useEffect: (effect) => { effects.push(effect); },
       useActionState(action, initial) {
         assert.equal(action, removeAction);
         assert.equal(initial, null);
@@ -53,10 +62,10 @@ function harness({ result = null, pending = false } = {}) {
     "@/app/shared-groups/actions": { removeSharedMemoryAction: removeAction },
   };
   const loaded = { exports: {} };
-  new Function("require", "module", "exports", outputText)((name) => {
+  new Function("require", "module", "exports", "document", "Node", outputText)((name) => {
     assert.ok(Object.hasOwn(modules, name), `Unexpected component dependency: ${name}`);
     return modules[name];
-  }, loaded, loaded.exports);
+  }, loaded, loaded.exports, document, DomNode);
   const menu = loaded.exports.SharedMemoryMenu(props);
   const boundaryElement = find(menu, (element) => Boolean(element.type.getDerivedStateFromError));
   assert.ok(boundaryElement, "the opened menu must contain a removal dialog boundary");
@@ -64,8 +73,58 @@ function harness({ result = null, pending = false } = {}) {
   const child = boundary.render();
   const dialog = child.type(child.props);
   const form = find(dialog, (element) => element.type === "form");
-  return { boundary, dialog, form, dispatch, SubmitButton, submissions, closed };
+  const details = find(menu, (element) => element.type === "details");
+  return { boundary, dialog, form, dispatch, SubmitButton, submissions, closed, details, effects, listeners, removedListeners, DomNode };
 }
+
+test("a blur without a focus destination leaves the menu available for its click", () => {
+  const h = harness();
+  const element = { open: true, contains: () => false };
+  h.details.props.onBlur({ currentTarget: element, relatedTarget: null });
+  assert.equal(element.open, true);
+  find(h.details, (node) => node.type === "button").props.onClick();
+  assert.deepEqual(h.closed, [true], "the click opens confirmation");
+  assert.deepEqual(h.submissions, [], "opening confirmation must never submit deletion");
+});
+
+test("focus moving inside stays open; focus moving outside closes without stealing focus", () => {
+  const h = harness();
+  const inside = {};
+  const element = { open: true, contains: (target) => target === inside };
+  h.details.props.onBlur({ currentTarget: element, relatedTarget: inside });
+  assert.equal(element.open, true);
+  h.details.props.onBlur({ currentTarget: element, relatedTarget: {} });
+  assert.equal(element.open, false);
+  assert.deepEqual(h.closed, []);
+});
+
+test("outside pointer handling preserves internal targets and unregisters its listener", () => {
+  const h = harness();
+  const inside = new h.DomNode();
+  const element = { open: true, contains: (target) => target === inside };
+  h.details.props.ref.current = element;
+  const cleanup = h.effects[0]();
+  const [name, listener, capture] = h.listeners[0];
+  assert.equal(name, "pointerdown");
+  assert.equal(capture, true);
+  listener({ target: inside });
+  assert.equal(element.open, true);
+  listener({ target: new h.DomNode() });
+  assert.equal(element.open, false);
+  assert.deepEqual(h.submissions, []);
+  cleanup();
+  assert.deepEqual(h.removedListeners, h.listeners);
+});
+
+test("Escape closes the menu and returns focus to its summary", () => {
+  const h = harness();
+  const element = { open: true };
+  let focused = 0;
+  find(h.details, (node) => node.type === "summary").props.ref.current = { focus() { focused += 1; } };
+  h.details.props.onKeyDown({ key: "Escape", currentTarget: element });
+  assert.equal(element.open, false);
+  assert.equal(focused, 1);
+});
 
 test("the confirmation form directly dispatches the server action with both IDs", async () => {
   const h = harness();
