@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import ts from "typescript";
+import * as albums from "../lib/supabase/shared-albums.ts";
 import * as invitations from "../lib/supabase/shared-album-invitations.ts";
 
 const ALBUM_ID = "11111111-1111-4111-8111-111111111111";
@@ -21,9 +22,14 @@ class Redirect extends Error {
 
 function harness({ user = { id: USER_ID }, rpcError = null } = {}) {
   const rpcCalls = [];
+  const insertCalls = [];
   const revalidatedPaths = [];
   const errors = [];
   const client = {
+    from(table) {
+      assert.equal(table, "shared_album_memories");
+      return { async insert(rows) { insertCalls.push(rows); return { error: rpcError }; } };
+    },
     auth: { async getUser() { return { data: { user }, error: null }; } },
     async rpc(name, args) {
       rpcCalls.push({ name, args });
@@ -40,7 +46,7 @@ function harness({ user = { id: USER_ID }, rpcError = null } = {}) {
     "@/lib/supabase/admin": {},
     "@/lib/supabase/config": { isSupabaseConfigured: () => true },
     "@/lib/supabase/shared-album-invitations": invitations,
-    "@/lib/supabase/shared-albums": {},
+    "@/lib/supabase/shared-albums": albums,
     "@/lib/supabase/server": { createClient: async () => client },
   };
   const actionModule = { exports: {} };
@@ -54,7 +60,7 @@ function harness({ user = { id: USER_ID }, rpcError = null } = {}) {
     actionModule.exports,
     { error(...args) { errors.push(args); } },
   );
-  return { respondInvitationAction: actionModule.exports.respondInvitationAction, rpcCalls, revalidatedPaths, errors };
+  return { addSharedMemoryAction: actionModule.exports.addSharedMemoryAction, insertCalls, respondInvitationAction: actionModule.exports.respondInvitationAction, rpcCalls, revalidatedPaths, errors };
 }
 
 async function acceptInvitation(h) {
@@ -107,4 +113,59 @@ test("unauthenticated invitation response redirects with a friendly error before
   assert.deepEqual([...url.searchParams], [["error", "ログイン状態を確認できませんでした。"]]);
   assert.deepEqual(h.rpcCalls, []);
   assert.deepEqual(h.revalidatedPaths, []);
+});
+
+async function shareMemories(h, ids) {
+  const form = new FormData();
+  form.set("groupId", ALBUM_ID);
+  for (const id of ids) form.append("memoryId", id);
+  let url;
+  await assert.rejects(h.addSharedMemoryAction(form), (error) => {
+    assert.ok(error instanceof Redirect);
+    url = new URL(error.path, "https://memorinber.test");
+    return true;
+  });
+  return url;
+}
+
+test("multiple selected memories share in one insert and report the unique count", async () => {
+  const h = harness();
+  const url = await shareMemories(h, [INVITATION_ID, USER_ID, INVITATION_ID]);
+  assert.deepEqual(h.insertCalls, [[
+    { album_id: ALBUM_ID, memory_id: INVITATION_ID },
+    { album_id: ALBUM_ID, memory_id: USER_ID },
+  ]]);
+  assert.equal(url.pathname, `/shared-groups/${ALBUM_ID}`);
+  assert.equal(url.searchParams.get("success"), "思い出を2件共有しました。");
+  assert.deepEqual(h.revalidatedPaths, ["/shared-groups", `/shared-groups/${ALBUM_ID}`, "/notifications"]);
+});
+
+test("sharing still accepts a single selection", async () => {
+  const h = harness();
+  assert.equal((await shareMemories(h, [USER_ID])).searchParams.get("success"), "思い出を1件共有しました。");
+  assert.equal(h.insertCalls[0].length, 1);
+});
+
+test("empty, malformed and unauthenticated sharing never reaches the insert", async () => {
+  for (const ids of [[], [USER_ID, "bad-id"]]) {
+    const h = harness();
+    assert.ok((await shareMemories(h, ids)).searchParams.has("error"));
+    assert.deepEqual(h.insertCalls, []);
+    assert.deepEqual(h.revalidatedPaths, []);
+  }
+  const h = harness({ user: null });
+  assert.ok((await shareMemories(h, [USER_ID])).searchParams.has("error"));
+  assert.deepEqual(h.insertCalls, []);
+});
+
+test("a batch conflict or permission error reports failure without retrying individual rows", async () => {
+  for (const message of ["duplicate key", "new row violates row-level security policy"]) {
+    const h = harness({ rpcError: { message } });
+    const url = await shareMemories(h, [USER_ID, INVITATION_ID]);
+    assert.ok(url.searchParams.has("error"));
+    assert.ok(!url.searchParams.has("success"));
+    assert.equal(h.insertCalls.length, 1);
+    assert.equal(h.insertCalls[0].length, 2);
+    assert.deepEqual(h.revalidatedPaths, []);
+  }
 });
