@@ -1,4 +1,4 @@
-import { logout } from "@/app/auth/actions";
+import { LogoutButton } from "@/components/session-boundary";
 import { setInitialUsername } from "@/app/onboarding/username/actions";
 import { AuthPageShell } from "@/components/auth-page-shell";
 import { AuthSubmitButton } from "@/components/auth-submit-button";
@@ -38,9 +38,7 @@ export default async function UsernameOnboardingPage({ searchParams }: PageProps
       description="グループのメンバーに表示する名前です。同じ名前のユーザーがいても登録できます。"
       notice={notice}
       footer={(
-        <form action={logout}>
-          <button type="submit" className="font-semibold text-coral hover:underline">別のアカウントでログイン</button>
-        </form>
+        <LogoutButton className="font-semibold text-coral hover:underline">別のアカウントでログイン</LogoutButton>
       )}
     >
       <form action={setInitialUsername}>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
+import { PageHeading } from "@/components/page-heading";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { SharedGroupCreateButton } from "@/components/shared-group-create-button";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -44,11 +45,7 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
   return (
     <div className="page-pad shared-groups-page">
       <AppHeader />
-      <section className="pt-8">
-        <p className="text-[10px] font-semibold tracking-[0.2em] text-coral">SHARED GROUPS</p>
-        <h1 className="mt-2 text-[25px] font-semibold tracking-[0.1em] text-ink">共有</h1>
-        <p className="mt-3 text-xs leading-6 text-ink/50">大切な人と、選んだ思い出だけを一緒に見られます。</p>
-      </section>
+      <PageHeading eyebrow="SHARED GROUPS" title="共有" />
 
       {!configured ? <p role="alert" className="auth-notice auth-notice--info mt-6">Supabaseの接続情報が設定されていません。</p> : null}
       {success ? <p role="status" className="auth-notice auth-notice--success mt-6">{success}</p> : null}

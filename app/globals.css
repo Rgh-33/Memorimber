@@ -265,15 +265,65 @@ a {
   pointer-events: auto;
 }
 
-.shared-group-create-dialog {
+.shared-group-dialog {
   width: min(390px, calc(100% - 40px));
   max-height: calc(100dvh - 32px);
   margin: auto;
   overflow-y: auto;
 }
 
-.shared-group-create-dialog::backdrop {
+.shared-group-dialog::backdrop {
   background: rgb(var(--ink-rgb) / 0.35);
+}
+
+.shared-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.shared-group-heading > div:first-child {
+  flex-basis: 150px;
+}
+
+.shared-group-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shared-group-heading-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.shared-memory-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-height: min(48dvh, 440px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 3px;
+}
+
+.shared-memory-choice:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shared-memory-picker-footer {
+  position: sticky;
+  bottom: -20px;
+  padding-bottom: 4px;
+  background: var(--ivory);
+}
+
+.shared-memory-menu summary::-webkit-details-marker {
+  display: none;
 }
 
 .album-page {

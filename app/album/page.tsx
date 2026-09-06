@@ -1,8 +1,11 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { MemoryCard } from "@/components/memory-card";
+import { PageHeading } from "@/components/page-heading";
 import { getAlbumGridSlotCount } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
@@ -154,7 +157,7 @@ export default function AlbumPage() {
 
   const rememberAlbumPosition = () => {
     try {
-      sessionStorage.setItem(ALBUM_RETURN_POSITION_KEY, JSON.stringify({ month: selectedMonth, scrollY: window.scrollY }));
+      setBrowserSessionItem(sessionStorage, ALBUM_RETURN_POSITION_KEY, JSON.stringify({ month: selectedMonth, scrollY: window.scrollY }));
     } catch { /* Browser history can still restore the nearest available position. */ }
   };
 
@@ -167,9 +170,7 @@ export default function AlbumPage() {
 
   return (
     <div className="album-page page-pad">
-      <section className="pt-7 text-center">
-        <h1 className="font-sans text-[25px] font-medium tracking-[0.1em] text-ink">月間アルバム</h1>
-      </section>
+      <PageHeading eyebrow="MONTHLY ALBUM" title="月間アルバム" />
 
       <section ref={memoryGridRef} className="album-page-memory-slot mt-5">
         {isDemo && <p className="mb-3 text-center text-xs text-ink/55">サンプルの思い出を表示しています</p>}

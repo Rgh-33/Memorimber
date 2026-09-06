@@ -1,5 +1,7 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { MemoryCard } from "@/components/memory-card";
@@ -425,13 +427,13 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
     const next = { ...stored, featuredId };
     setRecallState(next);
     setFadingMemoryId(featuredId);
-    try { localStorage.setItem(MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory selection still works. */ }
+    try { setBrowserSessionItem(localStorage, MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory selection still works. */ }
   }, [preview, shownWords]);
 
   const rememberInteraction = useCallback((memoryId: string) => {
     setRecallState((current) => {
       const next = recordMemoryReview(current, memoryId, Date.now());
-      try { localStorage.setItem(MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory tracking still works. */ }
+      try { setBrowserSessionItem(localStorage, MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory tracking still works. */ }
       return next;
     });
     setFadingMemoryId((current) => current === memoryId ? null : current);

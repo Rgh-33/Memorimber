@@ -8,16 +8,13 @@
   outline-offset: 3px;
 }
 
-.quiz-page-heading { padding: 28px 4px 0; text-align: center; }
-.quiz-page-heading > p, .quiz-results-eyebrow {
+.quiz-results-eyebrow {
   margin: 0;
   color: var(--accent);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .2em;
 }
-.quiz-page-heading h1 { margin: 7px 0 0; font-size: 25px; font-weight: 650; letter-spacing: .08em; }
-.quiz-page-heading > span { display: block; margin-top: 8px; color: rgb(var(--ink-rgb) / .53); font-size: 12px; }
 
 .quiz-mode-list { display: grid; gap: 12px; margin-top: 27px; }
 .quiz-mode-featured {

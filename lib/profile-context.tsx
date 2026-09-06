@@ -1,5 +1,7 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { validateProfileUsername } from "@/lib/profile-username";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -56,7 +58,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const username = validation.username;
     if (!isSupabaseConfigured()) {
       setNicknameState(username);
-      window.localStorage.setItem(NICKNAME_STORAGE_KEY, username);
+      setBrowserSessionItem(window.localStorage, NICKNAME_STORAGE_KEY, username);
       return;
     }
     const response = await fetch("/api/profile", {

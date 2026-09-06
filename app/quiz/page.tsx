@@ -1,8 +1,11 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, Camera, ChevronRight, History, Infinity as InfinityIcon, Sparkles, Type } from "lucide-react";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
+import { PageHeading } from "@/components/page-heading";
 import { useMemories } from "@/lib/memories-context";
 import {
   ALL_QUIZ_KINDS,
@@ -59,7 +62,7 @@ function CountPicker({ value, onChange, storageKey }: { value: number; onChange:
   const update = (next: number) => {
     const valueToSave = Math.max(0, Math.min(MAX_DIRECTION_COUNT, next));
     onChange(valueToSave);
-    try { localStorage.setItem(storageKey, String(valueToSave)); } catch { /* Keep the setting for this visit. */ }
+    try { setBrowserSessionItem(localStorage, storageKey, String(valueToSave)); } catch { /* Keep the setting for this visit. */ }
   };
   return (
     <div className="quiz-count-picker" aria-label={`問題数：${value}問`}>
@@ -79,11 +82,7 @@ function ModeMenu({ memoryCount, onStart, onMixedSetup, onHistory }: {
   const disabled = memoryCount === 0;
   return (
     <>
-      <section className="quiz-page-heading">
-        <p>MEMORY QUIZ</p>
-        <h1>思い出クイズ</h1>
-        <span>写真と一言から、あの日を思い出そう。</span>
-      </section>
+      <PageHeading eyebrow="MEMORY QUIZ" title="思い出クイズ" />
 
       <section className="quiz-mode-list" aria-label="クイズモードを選ぶ">
         <button type="button" className="quiz-mode-featured" onClick={() => onStart("quick", 10)} disabled={disabled}>
@@ -361,7 +360,7 @@ export default function QuizPage() {
     };
     setHistory((current) => {
       const next = [entry, ...current].slice(0, 30);
-      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* Keep history for this visit. */ }
+      try { setBrowserSessionItem(localStorage, HISTORY_KEY, JSON.stringify(next)); } catch { /* Keep history for this visit. */ }
       return next;
     });
   }, []);

@@ -1,5 +1,7 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_ALBUM_APPEARANCE,
@@ -305,13 +307,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const setTheme = useCallback((nextTheme: AppTheme) => {
     setThemeState(nextTheme);
     document.documentElement.dataset.accent = nextTheme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    setBrowserSessionItem(window.localStorage, THEME_STORAGE_KEY, nextTheme);
   }, []);
 
   const setColorMode = useCallback((nextMode: AppColorMode) => {
     setColorModeState(nextMode);
     document.documentElement.dataset.mode = nextMode;
-    window.localStorage.setItem(COLOR_MODE_STORAGE_KEY, nextMode);
+    setBrowserSessionItem(window.localStorage, COLOR_MODE_STORAGE_KEY, nextMode);
   }, []);
 
   const setAlbumAppearance = useCallback(async (appearance: AlbumAppearance) => {
@@ -336,12 +338,12 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         const saved = await updateAccountAlbumAppearance(createClient(), appearance);
         if (version === albumRequestVersion.current) setAccountAlbumAppearance(saved);
       } else {
-        window.localStorage.setItem(ALBUM_FONT_STORAGE_KEY, appearance.font);
-        window.localStorage.setItem(ALBUM_LAYOUT_STORAGE_KEY, appearance.layout);
-        window.localStorage.setItem(ALBUM_TEXT_COLOR_STORAGE_KEY, appearance.textColor);
-        window.localStorage.setItem(ALBUM_BACKGROUND_STORAGE_KEY, appearance.background);
-        window.localStorage.setItem(ALBUM_PATTERN_STORAGE_KEY, appearance.pattern);
-        window.localStorage.setItem(ALBUM_ORIENTATION_STORAGE_KEY, appearance.orientation);
+        setBrowserSessionItem(window.localStorage, ALBUM_FONT_STORAGE_KEY, appearance.font);
+        setBrowserSessionItem(window.localStorage, ALBUM_LAYOUT_STORAGE_KEY, appearance.layout);
+        setBrowserSessionItem(window.localStorage, ALBUM_TEXT_COLOR_STORAGE_KEY, appearance.textColor);
+        setBrowserSessionItem(window.localStorage, ALBUM_BACKGROUND_STORAGE_KEY, appearance.background);
+        setBrowserSessionItem(window.localStorage, ALBUM_PATTERN_STORAGE_KEY, appearance.pattern);
+        setBrowserSessionItem(window.localStorage, ALBUM_ORIENTATION_STORAGE_KEY, appearance.orientation);
       }
     } catch (cause) {
       if (version !== albumRequestVersion.current) return;
@@ -356,18 +358,18 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const setBgmVolume = useCallback((volume: number) => {
     const nextVolume = clampAudioVolumeLevel(volume);
     setBgmVolumeState(nextVolume);
-    window.localStorage.setItem(BGM_VOLUME_STORAGE_KEY, String(nextVolume));
+    setBrowserSessionItem(window.localStorage, BGM_VOLUME_STORAGE_KEY, String(nextVolume));
   }, []);
 
   const setSoundEffectVolume = useCallback((volume: number) => {
     const nextVolume = clampAudioVolumeLevel(volume);
     setSoundEffectVolumeState(nextVolume);
-    window.localStorage.setItem(SOUND_EFFECT_VOLUME_STORAGE_KEY, String(nextVolume));
+    setBrowserSessionItem(window.localStorage, SOUND_EFFECT_VOLUME_STORAGE_KEY, String(nextVolume));
   }, []);
 
   const setTreeMode = useCallback((mode: TreeDisplayMode) => {
     setTreeModeState(mode);
-    try { window.localStorage.setItem(TREE_DISPLAY_MODE_STORAGE_KEY, mode); } catch { /* In-memory choice still works. */ }
+    try { setBrowserSessionItem(window.localStorage, TREE_DISPLAY_MODE_STORAGE_KEY, mode); } catch { /* In-memory choice still works. */ }
   }, []);
 
   const albumAppearance = useMemo(
