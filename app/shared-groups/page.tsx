@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ChevronRight, Mail, Plus, UsersRound } from "lucide-react";
+import { ChevronRight, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
+import { SharedGroupCreateButton } from "@/components/shared-group-create-button";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listInvitationNotifications, type InvitationNotification } from "@/lib/supabase/shared-album-invitations";
 import { listSharedAlbums, type SharedAlbum } from "@/lib/supabase/shared-albums";
@@ -41,7 +42,7 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="page-pad">
+    <div className="page-pad shared-groups-page">
       <AppHeader />
       <section className="pt-8">
         <p className="text-[10px] font-semibold tracking-[0.2em] text-coral">SHARED GROUPS</p>
@@ -54,41 +55,34 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
       {actionError ? <p role="alert" className="auth-notice auth-notice--error mt-6">{actionError}</p> : null}
       {loadError ? <p role="alert" className="auth-notice auth-notice--error mt-6">{loadError}</p> : null}
 
-      <section className="mt-7" aria-labelledby="pending-invitations-title">
+      {invitations.length > 0 ? <section className="mt-7" aria-labelledby="pending-invitations-title">
         <div className="flex items-center justify-between">
           <h2 id="pending-invitations-title" className="text-sm font-semibold text-ink">届いている招待</h2>
           <span className="text-[11px] text-ink/40">{invitations.length}件</span>
         </div>
-        {invitations.length === 0 ? (
-          <div className="mt-3 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-xs text-ink/45">回答待ちの招待はありません。</div>
-        ) : (
-          <ol className="mt-3 grid gap-3">
-            {invitations.map((invitation) => (
-              <li key={invitation.invitationId} className={`rounded-2xl border bg-paper p-4 shadow-sm ${highlightedInvitation === invitation.invitationId ? "border-coral ring-2 ring-coral/15" : "border-line"}`}>
-                <div className="flex items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-coral/10 text-coral"><Mail size={18} /></span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{invitation.albumName}</p>
-                    <p className="mt-1 text-[11px] leading-5 text-ink/55">{invitation.inviterDisplayName}さんから招待されました</p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <form action={respondInvitationAction}>
-                    <input type="hidden" name="invitationId" value={invitation.invitationId} />
-                    <input type="hidden" name="response" value="declined" />
-                    <SharedGroupSubmitButton tone="secondary" pendingLabel="辞退中…" className="w-full">辞退する</SharedGroupSubmitButton>
-                  </form>
-                  <form action={respondInvitationAction}>
-                    <input type="hidden" name="invitationId" value={invitation.invitationId} />
-                    <input type="hidden" name="response" value="accepted" />
-                    <SharedGroupSubmitButton pendingLabel="承認中…" className="w-full">承認する</SharedGroupSubmitButton>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+        <ol className="mt-3 grid gap-3">
+          {invitations.map((invitation) => (
+            <li key={invitation.invitationId} className={`flex items-center gap-3 rounded-2xl border bg-paper p-3 shadow-sm ${highlightedInvitation === invitation.invitationId ? "border-coral ring-2 ring-coral/15" : "border-line"}`}>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-ink" title={invitation.albumName}>{invitation.albumName}</p>
+                <p className="mt-1 truncate text-[11px] text-ink/55" title={`${invitation.inviterDisplayName}さんからの招待`}>{invitation.inviterDisplayName}さんからの招待</p>
+              </div>
+              <div className="shared-group-invitation-responses flex shrink-0 items-center gap-2">
+                <form action={respondInvitationAction}>
+                  <input type="hidden" name="invitationId" value={invitation.invitationId} />
+                  <input type="hidden" name="response" value="declined" />
+                  <SharedGroupSubmitButton tone="secondary" pendingLabel="辞退中…">辞退</SharedGroupSubmitButton>
+                </form>
+                <form action={respondInvitationAction}>
+                  <input type="hidden" name="invitationId" value={invitation.invitationId} />
+                  <input type="hidden" name="response" value="accepted" />
+                  <SharedGroupSubmitButton pendingLabel="承認中…">承認</SharedGroupSubmitButton>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section> : null}
 
       <section className="mt-8" aria-labelledby="joined-groups-title">
         <div className="flex items-center justify-between">
@@ -115,16 +109,7 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
         )}
       </section>
 
-      <section className="mt-8 rounded-2xl border border-line bg-paper p-5" aria-labelledby="create-group-title">
-        <div className="flex items-center gap-2 text-coral"><Plus size={18} /><h2 id="create-group-title" className="text-sm font-semibold text-ink">新しいグループを作る</h2></div>
-        <form action={createSharedGroupAction} className="mt-4">
-          <label className="block text-xs font-medium text-ink">
-            グループ名
-            <input name="name" required maxLength={60} disabled={!configured} placeholder="家族の思い出" className="mt-2 w-full rounded-xl border border-line bg-ivory px-4 py-3 text-sm outline-none placeholder:text-ink/30 focus:border-coral focus:ring-2 focus:ring-coral/10 disabled:opacity-50" />
-          </label>
-          <SharedGroupSubmitButton className="mt-4 w-full">グループを作成</SharedGroupSubmitButton>
-        </form>
-      </section>
+      <SharedGroupCreateButton configured={configured} createAction={createSharedGroupAction} />
     </div>
   );
 }
