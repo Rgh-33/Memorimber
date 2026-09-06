@@ -5,6 +5,7 @@ import { setBrowserSessionItem } from "@/lib/browser-session-data";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowLeft, Camera, ChevronRight, History, Infinity as InfinityIcon, Sparkles, Type } from "lucide-react";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
+import { PageHeading } from "@/components/page-heading";
 import { useMemories } from "@/lib/memories-context";
 import {
   ALL_QUIZ_KINDS,
@@ -81,11 +82,7 @@ function ModeMenu({ memoryCount, onStart, onMixedSetup, onHistory }: {
   const disabled = memoryCount === 0;
   return (
     <>
-      <section className="quiz-page-heading">
-        <p>MEMORY QUIZ</p>
-        <h1>思い出クイズ</h1>
-        <span>写真と一言から、あの日を思い出そう。</span>
-      </section>
+      <PageHeading eyebrow="MEMORY QUIZ" title="思い出クイズ" />
 
       <section className="quiz-mode-list" aria-label="クイズモードを選ぶ">
         <button type="button" className="quiz-mode-featured" onClick={() => onStart("quick", 10)} disabled={disabled}>
