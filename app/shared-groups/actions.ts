@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { inviteToSharedAlbum, respondToSharedAlbumInvitation } from "@/lib/supabase/shared-album-invitations";
 import {
-  addMemoryToSharedAlbum,
+  addMemoriesToSharedAlbum,
   createSharedAlbum,
   deleteSharedAlbum,
   isUuid,
@@ -115,15 +115,16 @@ export async function addSharedMemoryAction(formData: FormData) {
   const groupId = formData.get("groupId");
   let path = "/shared-groups";
   let failure: string | null = null;
+  let count = 0;
   try {
     path = groupPath(groupId);
-    await addMemoryToSharedAlbum(await authenticatedClient(), String(groupId), String(formData.get("memoryId") ?? ""));
+    count = await addMemoriesToSharedAlbum(await authenticatedClient(), String(groupId), formData.getAll("memoryId"));
   } catch (error) {
     failure = errorText(error, "思い出を共有できませんでした。");
   }
   if (failure) redirect(noticePath(path, "error", failure));
   revalidateGroup(String(groupId));
-  redirect(noticePath(path, "success", "思い出を共有しました。"));
+  redirect(noticePath(path, "success", `思い出を${count}件共有しました。`));
 }
 
 export async function removeSharedMemoryAction(formData: FormData) {

@@ -41,7 +41,7 @@ export type SharedAlbumMemoryDetailResult = {
   warning: string | null;
 };
 
-export type SharedMemoryChoice = Pick<Memory, "id" | "date" | "caption">;
+export type SharedMemoryChoice = Pick<Memory, "id" | "date" | "caption"> & { displayUrl: string };
 
 type AlbumRow = { id: string; owner_id: string; name: string; created_at: string; updated_at: string };
 type MemoryRow = {
@@ -175,17 +175,21 @@ export async function listOwnMemoriesForSharing(
   userId: string,
 ): Promise<SharedMemoryChoice[]> {
   const { data, error } = await client.from("memories")
-    .select("id, caption, memory_date")
+    .select("id, caption, memory_date, thumbnail_path, image_path")
     .eq("user_id", requireUuid(userId, "ユーザー"))
     .order("memory_date", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false });
   if (error) throw new Error(albumError(error, "自分の思い出を読み込めませんでした。"));
-  return (Array.isArray(data) ? data : []).flatMap((raw): SharedMemoryChoice[] => {
+  const choices = (Array.isArray(data) ? data : []).flatMap((raw) => {
     const row = raw as Record<string, unknown>;
     if (typeof row.id !== "string" || typeof row.caption !== "string" || typeof row.memory_date !== "string") return [];
-    return [{ id: row.id, caption: row.caption, date: row.memory_date }];
+    const path = typeof row.thumbnail_path === "string" ? row.thumbnail_path
+      : typeof row.image_path === "string" ? row.image_path : "";
+    return [{ id: row.id, caption: row.caption, date: row.memory_date, path }];
   });
+  const { urls } = await signMemoryPaths(client, choices.map(({ path }) => path).filter(Boolean));
+  return choices.map(({ path, ...choice }) => ({ ...choice, displayUrl: urls.get(path) ?? "" }));
 }
 
 async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[]) {
@@ -288,12 +292,20 @@ export async function loadSharedAlbumMemories(client: SupabaseClient, albumId: s
   return entries.map((entry) => entry.memory);
 }
 
-export async function addMemoryToSharedAlbum(client: SupabaseClient, albumId: string, memoryId: string) {
-  const { error } = await client.from("shared_album_memories").insert({
-    album_id: requireUuid(albumId, "グループ"),
-    memory_id: requireUuid(memoryId, "思い出"),
-  });
+export async function addMemoriesToSharedAlbum(client: SupabaseClient, albumId: string, memoryIds: unknown[]) {
+  const id = requireUuid(albumId, "グループ");
+  const ids = [...new Set(memoryIds.map((memoryId) => requireUuid(memoryId, "思い出").toLowerCase()))];
+  if (ids.length === 0) throw new Error("共有する思い出を選択してください。");
+  // One statement preserves atomicity: a conflict or RLS failure rejects the whole selection.
+  const { error } = await client.from("shared_album_memories").insert(
+    ids.map((memoryId) => ({ album_id: id, memory_id: memoryId })),
+  );
   if (error) throw new Error(albumError(error, "思い出を共有できませんでした。"));
+  return ids.length;
+}
+
+export async function addMemoryToSharedAlbum(client: SupabaseClient, albumId: string, memoryId: string) {
+  await addMemoriesToSharedAlbum(client, albumId, [memoryId]);
 }
 
 export async function removeMemoryFromSharedAlbum(client: SupabaseClient, albumId: string, memoryId: string) {
