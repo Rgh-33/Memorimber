@@ -163,7 +163,7 @@ begin
 
   insert into public.shared_quiz_participants (quiz_id, user_id)
     values (current_quiz_id, caller_id)
-    on conflict (quiz_id, user_id) do nothing;
+    on conflict on constraint shared_quiz_participants_pkey do nothing;
 
   quiz_id := current_quiz_id;
   quiz_status := current_status;
@@ -378,7 +378,7 @@ begin
     quiz_id, user_id, question_index, selected_choice_id, is_correct, response_time_ms, answered_at
   ) values (
     target_quiz_id, caller_id, target_question_index, target_selected_choice_id, answer_correct, answer_time, received_at
-  ) on conflict (quiz_id, user_id, question_index) do nothing;
+  ) on conflict on constraint shared_quiz_answers_pkey do nothing;
 
   select answer.question_index, answer.selected_choice_id, answer.is_correct, answer.response_time_ms
     into question_index, selected_choice_id, is_correct, response_time_ms
