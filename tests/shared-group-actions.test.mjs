@@ -45,8 +45,10 @@ function harness({ user = { id: USER_ID }, rpcError = null } = {}) {
     "@/lib/supabase/account-deletion-runner": {},
     "@/lib/supabase/admin": {},
     "@/lib/supabase/config": { isSupabaseConfigured: () => true },
+    "@/lib/shared-quiz": {},
     "@/lib/supabase/shared-album-invitations": invitations,
     "@/lib/supabase/shared-albums": albums,
+    "@/lib/supabase/shared-quiz": {},
     "@/lib/supabase/server": { createClient: async () => client },
   };
   const actionModule = { exports: {} };

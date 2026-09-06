@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock3, Gamepad2, Trophy } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { MemoryPhoto } from "@/components/memory-photo";
 import { SharedGroupControls } from "@/components/shared-group-controls";
+import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { SharedMemoryMenu } from "@/components/shared-memory-menu";
 import { formatShortDate } from "@/lib/data";
 import { getMemoryDisplayUrl } from "@/lib/types";
@@ -19,6 +20,7 @@ import {
   type SharedMemoryChoice,
 } from "@/lib/supabase/shared-albums";
 import { createClient } from "@/lib/supabase/server";
+import { joinSharedQuizAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +98,26 @@ export default async function SharedGroupDetailPage({ params, searchParams }: Pa
       {actionError ? <p role="alert" className="auth-notice auth-notice--error mt-6">{actionError}</p> : null}
       {loadError ? <p role="alert" className="auth-notice auth-notice--error mt-6">{loadError}</p> : null}
       {imageWarning ? <p role="status" className="auth-notice auth-notice--info mt-6">{imageWarning}</p> : null}
+
+      <section className="mt-7 overflow-hidden rounded-3xl border border-coral/20 bg-paper shadow-card" aria-labelledby="shared-quiz-title">
+        <div className="accent-gradient px-5 py-5 text-white">
+          <div className="flex items-center gap-2 text-white/80"><Gamepad2 size={17} /><span className="text-[10px] font-semibold tracking-[0.18em]">GROUP QUIZ</span></div>
+          <h2 id="shared-quiz-title" className="mt-2 text-xl font-semibold">みんなでクイズ</h2>
+          <p className="mt-1 text-xs leading-5 text-white/80">このグループの写真と一言で、10問勝負。</p>
+        </div>
+        <div className="grid grid-cols-2 gap-px bg-line">
+          <div className="bg-paper px-4 py-3"><span className="flex items-center gap-1.5 text-[10px] text-ink/45"><Clock3 size={13} />回答時間</span><strong className="mt-1 block text-sm text-ink">各問 5秒</strong></div>
+          <div className="bg-paper px-4 py-3"><span className="flex items-center gap-1.5 text-[10px] text-ink/45"><Trophy size={13} />順位</span><strong className="mt-1 block text-sm text-ink">正答数＋速さ</strong></div>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-[11px] leading-5 text-ink/50">写真から一言 5問 ＋ 一言から写真 5問。1人でも始められます。</p>
+          <form action={joinSharedQuizAction} className="mt-3">
+            <input type="hidden" name="groupId" value={groupId} />
+            <SharedGroupSubmitButton disabled={entries.length === 0} pendingLabel="参加中…" className="min-h-11 w-full text-sm">クイズに参加</SharedGroupSubmitButton>
+          </form>
+          {entries.length === 0 ? <p className="mt-2 text-center text-[10px] text-ink/45">思い出を1件以上共有すると参加できます。</p> : null}
+        </div>
+      </section>
 
       <section className="mt-8" aria-labelledby="shared-memories-title">
         <div className="flex items-center justify-between">
