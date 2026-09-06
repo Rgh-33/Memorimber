@@ -8,6 +8,7 @@ import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { PageHeading } from "@/components/page-heading";
 import { useBackgroundMusic, type BackgroundMusicMode } from "@/components/background-music";
 import { useMemories } from "@/lib/memories-context";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import {
   ALL_QUIZ_KINDS,
   QUIZ_KIND_LABELS,
@@ -227,6 +228,7 @@ function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
   onResults: () => void;
   onClose: () => void;
 }) {
+  const { recordActivity } = useProfileLevel();
   const [questions, setQuestions] = useState(initial.questions);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -260,6 +262,8 @@ function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
       selectedLabel: answerLabel(question, selected),
       correct: selected === question.correctChoiceId,
     };
+    if (nextAnswer.correct) recordActivity("correctQuizAnswers");
+    if (initial.mode === "endless") recordActivity("endlessQuizQuestions");
     setAnswers((current) => [...current, nextAnswer]);
     setAnswered(true);
   };
@@ -350,6 +354,7 @@ function QuizHistory({ entries, onBack }: { entries: QuizHistoryEntry[]; onBack:
 
 export default function QuizPage() {
   const { memories, isLoading, error, refreshMemories } = useMemories();
+  const { recordActivity } = useProfileLevel();
   const setBackgroundMusicMode = useBackgroundMusic();
   const [photoCount, setPhotoCount] = useState(DEFAULT_DIRECTION_COUNT);
   const [captionCount, setCaptionCount] = useState(DEFAULT_DIRECTION_COUNT);
@@ -390,7 +395,10 @@ export default function QuizPage() {
   const start = (mode: "quick" | "endless", count: number) => {
     const questionCount = mode === "endless" ? 1 : count;
     const questions = createQuizQuestions(memories, questionCount, ALL_QUIZ_KINDS);
-    if (questions.length) beginCountdown({ mode, questions, endless: mode === "endless" });
+    if (questions.length) {
+      if (mode === "quick") recordActivity("randomQuizChallenges");
+      beginCountdown({ mode, questions, endless: mode === "endless" });
+    }
   };
 
   const startMixed = () => {

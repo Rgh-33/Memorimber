@@ -198,12 +198,25 @@ export function createMixedQuizQuestions(
   captionToPhotoCount: number,
   random: () => number = Math.random,
 ) {
+  return createQuizQuestionsByKindCounts(memories, {
+    month: 0,
+    "photo-to-caption": photoToCaptionCount,
+    "caption-to-photo": captionToPhotoCount,
+  }, random);
+}
+
+export function createQuizQuestionsByKindCounts(
+  memories: Memory[],
+  counts: Record<QuizKind, number>,
+  random: () => number = Math.random,
+) {
   const source = uniqueMemories(memories);
   if (source.length === 0) return [];
 
   const kinds = shuffle<QuizKind>([
-    ...Array.from({ length: Math.max(0, photoToCaptionCount) }, () => "photo-to-caption" as const),
-    ...Array.from({ length: Math.max(0, captionToPhotoCount) }, () => "caption-to-photo" as const),
+    ...Array.from({ length: Math.max(0, Math.floor(counts.month)) }, () => "month" as const),
+    ...Array.from({ length: Math.max(0, Math.floor(counts["photo-to-caption"])) }, () => "photo-to-caption" as const),
+    ...Array.from({ length: Math.max(0, Math.floor(counts["caption-to-photo"])) }, () => "caption-to-photo" as const),
   ], random);
   const questions: MemoryQuizQuestion[] = [];
   const lastKindByMemory = new Map<string, QuizKind>();

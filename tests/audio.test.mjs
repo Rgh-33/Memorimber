@@ -78,7 +78,7 @@ test("quiz BGM is fixed, preloaded silently during the countdown, and fades betw
   assert.ok(loopEnd > loopStart);
   assert.match(component, /source\.loopStart = QUIZ_LOOP_START_SECONDS/);
   assert.match(component, /source\.loopEnd = Math\.min\(QUIZ_LOOP_END_SECONDS, buffer\.duration\)/);
-  assert.match(component, /trackGainTarget = mode === "quiz" \? QUIZ_RELATIVE_GAIN : 1/);
+  assert.match(component, /trackGainTarget = mode === "quiz"[\s\S]*QUIZ_RELATIVE_GAIN[\s\S]*mode === "harvest"[\s\S]*HARVEST_RELATIVE_GAIN[\s\S]*: 1/);
   assert.match(component, /mode === "quiz"[\s\S]*setValueAtTime\(trackGainTarget, now\)[\s\S]*else[\s\S]*linearRampToValueAtTime\(trackGainTarget, now \+ FADE_IN_SECONDS\)/);
   assert.match(component, /source\.start\(0, source\.loopStart\)/);
   assert.match(quizPage, /useState\(3\)/);
@@ -99,6 +99,7 @@ test("harvest flight audio plays once while the monthly BGM is faded out", () =>
   assert.equal(header.subarray(0, 4).toString("ascii"), "RIFF");
   assert.equal(header.subarray(8, 12).toString("ascii"), "WAVE");
   assert.match(component, /HARVEST_FLIGHT_MUSIC_URL = "\/audio\/september-fr-4926\.wav"/);
+  assert.match(component, /HARVEST_RELATIVE_GAIN = 0\.25/);
   assert.match(component, /mode === "countdown" \|\| mode === "harvest"[\s\S]*fadeOutActiveTrack\(context\)/);
   assert.match(component, /source\.loop = mode !== "harvest"/);
   assert.match(harvest, /setBackgroundMusicMode\("harvest"\)[\s\S]*setFlight/);

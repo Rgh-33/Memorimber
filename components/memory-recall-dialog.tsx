@@ -8,6 +8,7 @@ import { MemoryPetal } from "@/components/memory-petal";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
 import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
@@ -19,6 +20,7 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   onRemembered: () => void;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
+  const { recordActivity } = useProfileLevel();
   const [question] = useState(() => createMemoryQuizQuestion(
     memory,
     memories,
@@ -41,8 +43,15 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   }, [onClose]);
 
   const releasePetal = () => {
+    recordActivity("revivedFadedMemories", { eventId: question.id });
     onRemembered();
     onClose();
+  };
+
+  const confirmAnswer = () => {
+    if (!selected || answered) return;
+    if (selected === question.correctChoiceId) recordActivity("correctQuizAnswers");
+    setAnswered(true);
   };
 
   return (
@@ -61,7 +70,7 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
         {!answered ? (
           <div className="fruit-quiz-question-step">
             <QuizQuestionCard question={question} selectedChoiceId={selected} answered={false} onSelect={setSelected} />
-            <button type="button" className="quiz-primary-button" onClick={() => selected && setAnswered(true)} disabled={!selected}>答えを確認</button>
+            <button type="button" className="quiz-primary-button" onClick={confirmAnswer} disabled={!selected}>答えを確認</button>
           </div>
         ) : (
           <div className="fruit-quiz-word-step">

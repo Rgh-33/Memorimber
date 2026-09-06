@@ -116,6 +116,14 @@ test("outside pointer handling preserves internal targets and unregisters its li
   assert.deepEqual(h.removedListeners, h.listeners);
 });
 
+test("the thumbnail menu keeps a generous tap target around a compact control and opens downward", () => {
+  assert.match(source, /<summary[^>]*className="[^"]*h-11 w-11[^"]*"/);
+  assert.match(source, /<span className="[^"]*h-6 w-6[^"]*"/);
+  assert.match(source, /<Ellipsis size=\{14\}/);
+  assert.match(source, /className="absolute right-1 top-10/);
+  assert.doesNotMatch(source, /absolute bottom-11 right-0/);
+});
+
 test("Escape closes the menu and returns focus to its summary", () => {
   const h = harness();
   const element = { open: true };

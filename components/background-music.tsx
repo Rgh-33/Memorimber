@@ -11,8 +11,9 @@ const backgroundMusicUrl = process.env.NEXT_PUBLIC_BGM_URL?.trim() || SEPTEMBER_
 const QUICK_FADE_OUT_SECONDS = 0.18;
 const FADE_IN_SECONDS = 0.24;
 const QUIZ_RELATIVE_GAIN = 0.30;
+const HARVEST_RELATIVE_GAIN = 0.25;
 const QUIZ_LOOP_START_SECONDS = 0.0;
-const QUIZ_LOOP_END_SECONDS = 97.4;
+const QUIZ_LOOP_END_SECONDS = 97.5;
 
 export type BackgroundMusicMode = "default" | "countdown" | "quiz" | "harvest";
 
@@ -205,7 +206,11 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       }, { once: true });
 
       const now = context.currentTime;
-      const trackGainTarget = mode === "quiz" ? QUIZ_RELATIVE_GAIN : 1;
+      const trackGainTarget = mode === "quiz"
+        ? QUIZ_RELATIVE_GAIN
+        : mode === "harvest"
+          ? HARVEST_RELATIVE_GAIN
+          : 1;
       if (mode === "quiz" || mode === "harvest") {
         trackGain.gain.setValueAtTime(trackGainTarget, now);
       } else {

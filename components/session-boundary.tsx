@@ -120,15 +120,21 @@ export function SessionBoundary({ children }: { children: ReactNode }) {
           throw new Error("ログイン状態を確認できませんでした。通信状態を確認して再試行してください。");
         }
         if (publicPage) {
-          // A login tab left open before another tab signed in must never clear
-          // that new session's history when it regains focus.
-          if (user) { window.location.replace("/"); return; }
-          allowBrowserSessionWrites(false);
-          if (!clear()) throw new Error(STORAGE_ERROR);
-          owner.current = null;
-          if (!deletionNotified.current && new URLSearchParams(window.location.search).get("message") === "account_deleted") {
-            deletionNotified.current = true;
-            notify("finished");
+          if (user) {
+            // Middleware is authoritative for leaving public auth pages. If it
+            // rendered this page, a stale client-side session must not send the
+            // browser back to a server-protected page in a redirect loop.
+            owner.current = user.id;
+            deletionNotified.current = false;
+            allowBrowserSessionWrites(true);
+          } else {
+            allowBrowserSessionWrites(false);
+            if (!clear()) throw new Error(STORAGE_ERROR);
+            owner.current = null;
+            if (!deletionNotified.current && new URLSearchParams(window.location.search).get("message") === "account_deleted") {
+              deletionNotified.current = true;
+              notify("finished");
+            }
           }
         } else if (client) {
           if (!user || (owner.current && owner.current !== user.id)) {

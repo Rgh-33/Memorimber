@@ -11,6 +11,40 @@ import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 
 const TREE_ADVANCE_REVEAL_DELAY_MS = 260;
 
+const TREE_STAR_FIELD = [
+  [5, 10, 1.4, -1.8], [13, 23, 1, -5.2], [20, 8, 1.1, -3.7], [27, 36, 1.5, -7.1],
+  [34, 17, .9, -2.4], [42, 7, 1.3, -6.6], [49, 29, 1, -4.1], [56, 14, 1.6, -8.2],
+  [63, 40, 1, -3.2], [71, 22, 1.25, -6.1], [79, 8, .9, -2.7], [88, 31, 1.45, -7.7],
+  [95, 16, 1, -4.8], [8, 51, 1, -6.9], [17, 69, 1.35, -2.1], [24, 55, .8, -5.5],
+  [32, 78, 1.2, -3.4], [39, 49, .9, -8.5], [47, 65, 1.45, -1.4], [54, 83, .85, -5.9],
+  [61, 57, 1.25, -3], [68, 72, .9, -7.4], [76, 49, 1.5, -4.5], [84, 67, 1, -2.5],
+  [92, 53, 1.2, -6.3], [4, 84, .8, -3.9], [12, 39, .9, -7.9], [29, 25, .8, -4.9],
+  [58, 91, .8, -2], [73, 87, 1, -5.7], [87, 82, .75, -3.1], [97, 74, .9, -8.7],
+] as const;
+
+const TREE_UPPER_STAR_FIELD = [
+  [6, -28, .75, -4.6], [14, -65, .9, -2.9], [23, -43, .65, -7.3], [32, -81, .8, -5.4],
+  [41, -22, .7, -3.1], [50, -58, .95, -8], [59, -36, .7, -1.9], [68, -74, .85, -6.2],
+  [77, -48, .65, -4], [86, -84, .75, -7.7], [93, -56, .8, -2.3], [98, -27, .9, -5.8],
+] as const;
+
+function TreeAtmosphere() {
+  return <div className="konoha-tree-atmosphere" aria-hidden="true">
+    <span className="konoha-tree-sun" />
+    <span className="konoha-tree-cloud konoha-tree-cloud--one" />
+    <span className="konoha-tree-cloud konoha-tree-cloud--two" />
+    <span className="konoha-tree-stars">
+      {TREE_STAR_FIELD.map(([left, top, size, delay], index) => <i key={index} className="konoha-tree-star" style={{
+        left: `${left}%`, top: `${top}%`, width: `${size}px`, height: `${size}px`, animationDelay: `${delay}s`,
+      }} />)}
+      {TREE_UPPER_STAR_FIELD.map(([left, top, size, delay], index) => <i key={`upper-${index}`} className="konoha-tree-star" style={{
+        left: `${left}%`, top: `${top}px`, width: `${size}px`, height: `${size}px`, animationDelay: `${delay}s`,
+      }} />)}
+    </span>
+    <span className="konoha-tree-moon" />
+  </div>;
+}
+
 function Blossom({ x, y, scale, setting = false }: { x: number; y: number; scale: number; setting?: boolean }) {
   if (setting) return <g transform={`translate(${x} ${y}) scale(${scale})`} className="konoha-flower konoha-flower--setting">
     <ellipse cy="3.5" rx="4.3" ry="5.6" className="konoha-fruit-ovary" />
@@ -207,6 +241,7 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
   const nodeTreeStage = Math.min(7, count);
   const model = useMemo(() => getTreeGrowthModel(totalCount, mode), [totalCount, mode]);
   const canvas = model.canvas;
+  const groundY = (394 - canvas.minY) / canvas.height * 100;
   const treeScale = model.contentScale;
   const monthIndex = Number(month.slice(5, 7));
   const mirrored = monthIndex % 2 === 0;
@@ -225,7 +260,8 @@ export function GrowingTree({ items, memories, count, totalCount, month, mode, o
     <div className="konoha-tree-canvas" data-tree-growth={nodeTreeStage} data-tree-appearance={model.stage}
       data-tree-mode={mode}
       data-tree-photos={totalCount} data-tree-visible-fruits={count} data-tree-added-tips={canvas.addedTips}
-      data-month={month} style={{ "--leaf-color": leafColor, aspectRatio: `${canvas.width} / ${canvas.height}` } as CSSProperties}>
+      data-month={month} style={{ "--leaf-color": leafColor, "--konoha-ground-y": `${groundY}%`, aspectRatio: `${canvas.width} / ${canvas.height}` } as CSSProperties}>
+      <TreeAtmosphere />
       <svg viewBox={`${canvas.minX} ${canvas.minY} ${canvas.width} ${canvas.height}`} className="konoha-tree-svg" aria-hidden="true">
         <defs><TreeArtDefs uid={uid} /></defs>
         <TreeGround uid={uid} stage={model.soilStage} front={false} />

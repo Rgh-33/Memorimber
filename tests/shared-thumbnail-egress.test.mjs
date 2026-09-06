@@ -25,7 +25,7 @@ test("shared thumbnail migration extends read access without granting writes", (
 });
 
 test("a new migration version repairs databases that skipped shared thumbnail access", () => {
-  const statements = (sql) => sql.replace(/^--.*$/gm, "").trim();
+  const statements = (sql) => sql.replace(/\r\n?/g, "\n").replace(/^--.*$/gm, "").trim();
   assert.equal(statements(repairMigration), statements(migration));
 });
 

@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { processRetainedMemoryCleanupQueue } from "@/lib/supabase/account-deletion-runner";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createSharedQuizPlan } from "@/lib/shared-quiz";
+import {
+  createSharedQuizPlan,
+  parseSharedQuizConfig,
+  selectBalancedSharedQuizMemories,
+} from "@/lib/shared-quiz";
 import { inviteToSharedAlbum, respondToSharedAlbumInvitation } from "@/lib/supabase/shared-album-invitations";
 import {
   addMemoriesToSharedAlbum,
@@ -13,15 +17,21 @@ import {
   deleteSharedAlbum,
   isUuid,
   leaveSharedAlbum,
-  loadSharedAlbumMemories,
+  loadSharedAlbumMemoryEntries,
+  renameSharedAlbum,
   removeMemoryFromSharedAlbum,
   removeSharedAlbumMember,
 } from "@/lib/supabase/shared-albums";
-import { joinSharedQuiz, startSharedQuiz } from "@/lib/supabase/shared-quiz";
+import { joinSharedQuiz, listSharedQuizParticipants, startSharedQuiz } from "@/lib/supabase/shared-quiz";
 import { createClient } from "@/lib/supabase/server";
 
-function noticePath(path: string, tone: "success" | "error", message: string) {
-  return `${path}?${new URLSearchParams({ [tone]: message })}`;
+function noticePath(
+  path: string,
+  tone: "success" | "error",
+  message: string,
+  extra: Record<string, string> = {},
+) {
+  return `${path}?${new URLSearchParams({ [tone]: message, ...extra })}`;
 }
 
 function groupPath(groupId: unknown) {
@@ -73,6 +83,21 @@ export async function createSharedGroupAction(formData: FormData) {
   if (failure || !albumId) redirect(noticePath("/shared-groups", "error", failure ?? "グループを作成できませんでした。"));
   revalidateGroup(albumId);
   redirect(noticePath(`/shared-groups/${albumId}`, "success", "グループを作成しました。"));
+}
+
+export async function renameSharedGroupAction(formData: FormData) {
+  const groupId = formData.get("groupId");
+  let path = "/shared-groups";
+  let failure: string | null = null;
+  try {
+    path = groupPath(groupId);
+    await renameSharedAlbum(await authenticatedClient(), String(groupId), formData.get("name"));
+  } catch (error) {
+    failure = errorText(error, "グループ名を変更できませんでした。");
+  }
+  if (failure) redirect(noticePath(path, "error", failure));
+  revalidateGroup(String(groupId));
+  redirect(noticePath(path, "success", "グループ名を変更しました。"));
 }
 
 export async function respondInvitationAction(formData: FormData) {
@@ -133,7 +158,11 @@ export async function addSharedMemoryAction(formData: FormData) {
   }
   if (failure) redirect(noticePath(path, "error", failure));
   revalidateGroup(String(groupId));
-  redirect(noticePath(path, "success", `思い出を${count}件共有しました。`));
+  redirect(noticePath(path, "success", `思い出を${count}件共有しました。`, {
+    activity: "shared-memory",
+    activityId: `${String(groupId)}:${Date.now()}`,
+    activityCount: String(count),
+  }));
 }
 
 export async function joinSharedQuizAction(formData: FormData) {
@@ -161,8 +190,29 @@ export async function startSharedQuizAction(formData: FormData) {
   try {
     path = quizPath(groupId, sessionId);
     const client = await authenticatedClient();
-    const memories = await loadSharedAlbumMemories(client, String(groupId));
-    const questions = createSharedQuizPlan(memories);
+    const config = parseSharedQuizConfig({
+      mode: formData.get("quizMode"),
+      balanceContributors: formData.get("balanceQuizContributors") === "true",
+      monthCount: formData.get("quizMonthCount"),
+      photoToCaptionCount: formData.get("quizPhotoToCaptionCount"),
+      captionToPhotoCount: formData.get("quizCaptionToPhotoCount"),
+      secondsPerQuestion: Number(formData.get("quizSecondsPerQuestion")),
+    });
+    const [{ entries }, participants] = await Promise.all([
+      loadSharedAlbumMemoryEntries(client, String(groupId)),
+      listSharedQuizParticipants(client, String(sessionId)),
+    ]);
+    const memories = config.balanceContributors
+      ? selectBalancedSharedQuizMemories(
+        entries.map((entry) => ({ contributorId: entry.addedBy, memory: entry.memory })),
+        participants.map((participant) => participant.userId),
+      )
+      : entries.map((entry) => entry.memory);
+    if (memories.length === 0) throw new Error("参加者が投稿した思い出がないため、問題を作成できません。");
+    const contributorByMemory = config.balanceContributors
+      ? new Map(entries.flatMap((entry) => entry.addedBy ? [[entry.memory.id, entry.addedBy]] : []))
+      : undefined;
+    const questions = createSharedQuizPlan(memories, Math.random, config, contributorByMemory);
     await startSharedQuiz(client, String(sessionId), questions);
   } catch (error) {
     failure = errorText(error, "クイズを開始できませんでした。");

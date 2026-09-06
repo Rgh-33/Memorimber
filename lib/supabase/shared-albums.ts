@@ -4,6 +4,7 @@ import type { Memory } from "../types";
 import { MEMORY_IMAGE_BUCKET, MEMORY_IMAGE_URL_LIFETIME } from "./memories.ts";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHARED_ALBUM_COLUMNS = "id, owner_id, name, created_at, updated_at";
 const MEMORY_COLUMNS = "id, user_id, image_path, thumbnail_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at";
 const SHARED_MEMORY_COLUMNS = `album_id, memory_id, added_by, added_by_display_name, created_at, memory:memories!inner(${MEMORY_COLUMNS})`;
 
@@ -20,6 +21,8 @@ export type SharedAlbumMember = {
   displayName: string;
   role: "owner" | "member";
   joinedAt: string;
+  avatarUrl?: string | null;
+  level?: number;
 };
 
 export type SharedAlbumMemoryEntry = {
@@ -43,7 +46,13 @@ export type SharedAlbumMemoryDetailResult = {
 
 export type SharedMemoryChoice = Pick<Memory, "id" | "date" | "caption"> & { displayUrl: string };
 
-type AlbumRow = { id: string; owner_id: string; name: string; created_at: string; updated_at: string };
+type AlbumRow = {
+  id: string;
+  owner_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
 type MemoryRow = {
   id: string;
   user_id: string | null;
@@ -101,7 +110,13 @@ export function normalizeSharedAlbumName(value: unknown) {
 }
 
 function toAlbum(row: AlbumRow): SharedAlbum {
-  return { id: row.id, ownerId: row.owner_id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at };
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function toMemory(row: MemoryRow, imageUrl: string, thumbnailUrl?: string): Memory {
@@ -127,7 +142,7 @@ function singleMemory(value: MemoryRow | MemoryRow[]) {
 
 export async function listSharedAlbums(client: SupabaseClient): Promise<SharedAlbum[]> {
   const { data, error } = await client.from("shared_albums")
-    .select("id, owner_id, name, created_at, updated_at")
+    .select(SHARED_ALBUM_COLUMNS)
     .order("updated_at", { ascending: false })
     .order("id", { ascending: true });
   if (error) throw new Error(albumError(error, "グループを読み込めませんでした。"));
@@ -136,7 +151,7 @@ export async function listSharedAlbums(client: SupabaseClient): Promise<SharedAl
 
 export async function getSharedAlbum(client: SupabaseClient, albumId: string): Promise<SharedAlbum | null> {
   const { data, error } = await client.from("shared_albums")
-    .select("id, owner_id, name, created_at, updated_at")
+    .select(SHARED_ALBUM_COLUMNS)
     .eq("id", requireUuid(albumId, "グループ"))
     .maybeSingle();
   if (error) throw new Error(albumError(error, "グループを読み込めませんでした。"));
@@ -147,9 +162,22 @@ export async function createSharedAlbum(client: SupabaseClient, nameInput: unkno
   const name = normalizeSharedAlbumName(nameInput);
   const { data, error } = await client.from("shared_albums")
     .insert({ name })
-    .select("id, owner_id, name, created_at, updated_at")
+    .select(SHARED_ALBUM_COLUMNS)
     .single();
   if (error || !data) throw new Error(albumError(error, "グループを作成できませんでした。"));
+  return toAlbum(data as AlbumRow);
+}
+
+export async function renameSharedAlbum(client: SupabaseClient, albumId: string, nameInput: unknown) {
+  const id = requireUuid(albumId, "グループ");
+  const name = normalizeSharedAlbumName(nameInput);
+  const { data, error } = await client.from("shared_albums")
+    .update({ name })
+    .eq("id", id)
+    .select(SHARED_ALBUM_COLUMNS)
+    .maybeSingle();
+  if (error) throw new Error(albumError(error, "グループ名を変更できませんでした。"));
+  if (!data) throw new Error("グループ名を変更できるのはオーナーだけです。");
   return toAlbum(data as AlbumRow);
 }
 
@@ -158,7 +186,7 @@ export async function listSharedAlbumMembers(client: SupabaseClient, albumId: st
     target_album_id: requireUuid(albumId, "グループ"),
   });
   if (error) throw new Error(albumError(error, "メンバーを読み込めませんでした。"));
-  return (Array.isArray(data) ? data : []).flatMap((raw): SharedAlbumMember[] => {
+  const members = (Array.isArray(data) ? data : []).flatMap((raw): SharedAlbumMember[] => {
     const row = raw as Record<string, unknown>;
     if (
       typeof row.user_id !== "string"
@@ -166,7 +194,19 @@ export async function listSharedAlbumMembers(client: SupabaseClient, albumId: st
       || (row.role !== "owner" && row.role !== "member")
       || typeof row.joined_at !== "string"
     ) return [];
-    return [{ userId: row.user_id, displayName: row.display_name, role: row.role, joinedAt: row.joined_at }];
+    const level = Number(row.achieved_level);
+    return [{
+      userId: row.user_id,
+      displayName: row.display_name,
+      role: row.role,
+      joinedAt: row.joined_at,
+      ...(typeof row.avatar_signed_url === "string" ? { avatarUrl: row.avatar_signed_url } : {}),
+      ...(Number.isInteger(level) && level >= 1 && level <= 20 ? { level } : {}),
+    }];
+  });
+  return members.sort((left, right) => {
+    const roleOrder = Number(right.role === "owner") - Number(left.role === "owner");
+    return roleOrder || left.joinedAt.localeCompare(right.joinedAt) || left.userId.localeCompare(right.userId);
   });
 }
 

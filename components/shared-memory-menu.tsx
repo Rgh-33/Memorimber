@@ -89,8 +89,12 @@ export function SharedMemoryMenu({ groupId, memoryId, caption }: MemoryMenuProps
           triggerRef.current?.focus();
         }
       }}>
-        <summary ref={triggerRef} aria-label={`${caption}の操作`} className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-full border border-line text-ink/60 hover:bg-ivory focus-visible:outline-coral"><Ellipsis size={20} aria-hidden="true" /></summary>
-        <div className="absolute bottom-11 right-0 z-20 w-36 rounded-xl border border-line bg-ivory p-1 shadow-card">
+        <summary ref={triggerRef} aria-label={`${caption}の操作`} className="group grid h-11 w-11 cursor-pointer list-none place-items-center rounded-full focus-visible:outline-none">
+          <span className="grid h-6 w-6 place-items-center rounded-full border border-line/80 bg-ivory/90 text-ink/60 shadow-sm backdrop-blur-sm transition group-hover:bg-paper group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-coral">
+            <Ellipsis size={14} strokeWidth={2} aria-hidden="true" />
+          </span>
+        </summary>
+        <div className="absolute right-1 top-10 z-20 w-36 origin-top-right rounded-xl border border-line bg-ivory p-1 shadow-card">
           <button type="button" onClick={() => {
             if (detailsRef.current) detailsRef.current.open = false;
             triggerRef.current?.focus();

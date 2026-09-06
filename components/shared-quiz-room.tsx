@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Check, Clock3, LoaderCircle, Medal, Trophy, UserRound, UsersRound } from "lucide-react";
+import { Check, Clock3, LoaderCircle, Medal, Trophy, UsersRound } from "lucide-react";
 import { joinSharedQuizAction, startSharedQuizAction } from "@/app/shared-groups/actions";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
+import { SharedMemberAvatar, SharedMemberName } from "@/components/shared-member-identity";
+import { useSharedGroupPresentation } from "@/components/shared-group-presentation";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import {
   SHARED_QUIZ_QUESTION_COUNT,
   SHARED_QUIZ_SECONDS_PER_QUESTION,
@@ -35,6 +38,7 @@ type Props = {
   standings: SharedQuizStanding[];
   serverNow: number;
   actionError?: string | null;
+  isOwner: boolean;
 };
 
 function ParticipantList({ participants, userId }: { participants: SharedQuizParticipant[]; userId: string }) {
@@ -42,9 +46,9 @@ function ParticipantList({ participants, userId }: { participants: SharedQuizPar
     <ul className="mt-4 overflow-hidden rounded-2xl border border-line bg-paper">
       {participants.map((participant, index) => (
         <li key={participant.userId} className={`flex items-center gap-3 px-4 py-3.5 ${index ? "border-t border-line" : ""}`}>
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-coral/10 text-coral"><UserRound size={17} /></span>
+          <SharedMemberAvatar displayName={participant.displayName} avatarUrl={participant.avatarUrl} isCurrentUser={participant.userId === userId} />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
-            {participant.displayName}{participant.userId === userId ? "（あなた）" : ""}
+            <SharedMemberName displayName={participant.displayName} level={participant.level} isCurrentUser={participant.userId === userId} />
           </span>
           <Check size={16} className="text-coral" aria-label="参加済み" />
         </li>
@@ -53,8 +57,9 @@ function ParticipantList({ participants, userId }: { participants: SharedQuizPar
   );
 }
 
-function QuizLobby({ groupId, userId, session, participants, actionError }: Pick<Props, "groupId" | "userId" | "session" | "participants" | "actionError">) {
+function QuizLobby({ groupId, userId, session, participants, actionError, isOwner }: Pick<Props, "groupId" | "userId" | "session" | "participants" | "actionError" | "isOwner">) {
   const joined = participants.some((participant) => participant.userId === userId);
+  const { presentation } = useSharedGroupPresentation(groupId);
   return (
     <section className="shared-quiz-lobby" aria-labelledby="shared-quiz-lobby-title">
       <div className="shared-quiz-lobby-mark" aria-hidden="true"><UsersRound size={28} /></div>
@@ -70,12 +75,20 @@ function QuizLobby({ groupId, userId, session, participants, actionError }: Pick
       </div>
       <ParticipantList participants={participants} userId={userId} />
 
-      {joined ? (
+      {joined && isOwner ? (
         <form action={startSharedQuizAction} className="mt-6">
           <input type="hidden" name="groupId" value={groupId} />
           <input type="hidden" name="sessionId" value={session.id} />
+          <input type="hidden" name="quizMode" value={presentation.quizMode} />
+          <input type="hidden" name="balanceQuizContributors" value={String(presentation.balanceQuizContributors)} />
+          <input type="hidden" name="quizMonthCount" value={presentation.quizMonthCount} />
+          <input type="hidden" name="quizPhotoToCaptionCount" value={presentation.quizPhotoToCaptionCount} />
+          <input type="hidden" name="quizCaptionToPhotoCount" value={presentation.quizCaptionToPhotoCount} />
+          <input type="hidden" name="quizSecondsPerQuestion" value={presentation.quizSecondsPerQuestion} />
           <SharedGroupSubmitButton pendingLabel="問題を準備中…" className="min-h-12 w-full text-sm">クイズを開始</SharedGroupSubmitButton>
         </form>
+      ) : joined ? (
+        <p className="mt-6 rounded-xl bg-paper px-4 py-3 text-center text-xs font-medium text-ink/55">オーナーがクイズを開始するまでお待ちください。</p>
       ) : (
         <form action={joinSharedQuizAction} className="mt-6">
           <input type="hidden" name="groupId" value={groupId} />
@@ -113,7 +126,9 @@ function SharedQuizResults({ groupId, userId, standings }: Pick<Props, "groupId"
               {standing.rank <= 3 ? <Medal size={19} /> : null}<strong>{standing.rank}</strong>
             </span>
             <span className="min-w-0 flex-1">
-              <strong className="block truncate text-sm text-ink">{standing.displayName}{standing.userId === userId ? "（あなた）" : ""}</strong>
+              <strong className="block truncate text-sm text-ink">
+                <SharedMemberName displayName={standing.displayName} level={standing.level} isCurrentUser={standing.userId === userId} />
+              </strong>
               <small className="mt-0.5 block text-[10px] text-ink/45">正解までの合計 {formatSharedQuizTime(standing.correctTimeMs)}</small>
             </span>
             <span className="text-right"><strong className="text-lg text-coral">{standing.correctCount}</strong><small className="text-[10px] text-ink/40"> / 10</small></span>
@@ -134,8 +149,9 @@ function SharedQuizResults({ groupId, userId, standings }: Pick<Props, "groupId"
 }
 
 export function SharedQuizRoom(props: Props) {
-  const { groupId, groupName, userId, session, participants, questions, initialAnswers, standings, serverNow, actionError } = props;
+  const { groupId, groupName, userId, session, participants, questions, initialAnswers, standings, serverNow, actionError, isOwner } = props;
   const router = useRouter();
+  const { recordActivity } = useProfileLevel();
   const [now, setNow] = useState(serverNow);
   const [answers, setAnswers] = useState(initialAnswers);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
@@ -143,6 +159,17 @@ export function SharedQuizRoom(props: Props) {
   const clockOffset = useRef(serverNow - Date.now());
   const submitting = useRef(new Set<number>());
   const finalizing = useRef(false);
+
+  useEffect(() => {
+    const participated = participants.some((participant) => participant.userId === userId);
+    if (!participated || (session.status !== "active" && session.status !== "completed")) return;
+    recordActivity("sharedQuizChallenges", { eventId: session.id });
+    if (participants.length >= 2) recordActivity("friendQuizSessions", { eventId: session.id });
+    const ownStanding = standings.find((standing) => standing.userId === userId);
+    if (session.status === "completed" && participants.length >= 2 && ownStanding?.rank === 1) {
+      recordActivity("sharedQuizWins", { eventId: session.id });
+    }
+  }, [participants, recordActivity, session.id, session.status, standings, userId]);
 
   useEffect(() => {
     if (session.status !== "waiting") return;
@@ -158,7 +185,10 @@ export function SharedQuizRoom(props: Props) {
     return () => window.clearInterval(interval);
   }, [session.status]);
 
-  const timing = session.startedAt ? getSharedQuizTiming(session.startedAt, now) : null;
+  const secondsPerQuestion = session.questions[0]?.secondsPerQuestion ?? SHARED_QUIZ_SECONDS_PER_QUESTION;
+  const timing = session.startedAt
+    ? getSharedQuizTiming(session.startedAt, now, session.questions.length, secondsPerQuestion)
+    : null;
   const answerByIndex = useMemo(() => new Map(answers.map((answer) => [answer.questionIndex, answer])), [answers]);
 
   const selectAnswer = useCallback(async (questionIndex: number, choiceId: string) => {
@@ -168,6 +198,9 @@ export function SharedQuizRoom(props: Props) {
     setSubmitError(null);
     try {
       const answer = await submitSharedQuizAnswer(createClient(), session.id, questionIndex, choiceId);
+      if (answer.correct) {
+        recordActivity("correctQuizAnswers", { eventId: `${session.id}:${questionIndex}` });
+      }
       setAnswers((current) => [...current.filter((item) => item.questionIndex !== questionIndex), answer]);
     } catch (error) {
       setDrafts((current) => {
@@ -179,7 +212,7 @@ export function SharedQuizRoom(props: Props) {
     } finally {
       submitting.current.delete(questionIndex);
     }
-  }, [answerByIndex, session.id]);
+  }, [answerByIndex, recordActivity, session.id]);
 
   useEffect(() => {
     if (session.status !== "active" || timing?.phase !== "finished" || finalizing.current) return;
@@ -211,7 +244,7 @@ export function SharedQuizRoom(props: Props) {
   }, [router, session.id, session.status, timing?.phase]);
 
   if (session.status === "waiting") {
-    return <QuizLobby groupId={groupId} userId={userId} session={session} participants={participants} actionError={actionError} />;
+    return <QuizLobby groupId={groupId} userId={userId} session={session} participants={participants} actionError={actionError} isOwner={isOwner} />;
   }
 
   if (session.status === "completed") {
@@ -237,7 +270,7 @@ export function SharedQuizRoom(props: Props) {
   const savedAnswer = answerByIndex.get(timing.questionIndex);
   const selectedChoiceId = savedAnswer?.selectedChoiceId ?? drafts[timing.questionIndex] ?? null;
   const answered = Boolean(savedAnswer || drafts[timing.questionIndex]);
-  const progress = Math.max(0, Math.min(100, timing.remainingMs / (SHARED_QUIZ_SECONDS_PER_QUESTION * 1000) * 100));
+  const progress = Math.max(0, Math.min(100, timing.remainingMs / (secondsPerQuestion * 1000) * 100));
 
   return (
     <section className="shared-quiz-playing" aria-labelledby="shared-quiz-playing-title">

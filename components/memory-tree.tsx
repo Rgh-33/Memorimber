@@ -11,6 +11,7 @@ import { FruitQuizDialog } from "@/components/fruit-quiz-dialog";
 import { MemoryRecallDialog } from "@/components/memory-recall-dialog";
 import { useHarvest } from "@/lib/harvest-context";
 import { chooseFadingMemoryId, EMPTY_MEMORY_RECALL_STATE, MEMORY_RECALL_STORAGE_KEY, readMemoryRecallState, recordMemoryReview, type MemoryRecallState } from "@/lib/memory-recall";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
 import type { TreeDisplayMode } from "@/lib/tree-preferences";
@@ -399,6 +400,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
   onUploadAnimationComplete: (memoryId: string) => void;
 }) {
   const harvest = useHarvest();
+  const { recordActivity } = useProfileLevel();
   const [revealedItem, setRevealedItem] = useState<HarvestedTreeItem | null>(null);
   const [fruitMemoryId, setFruitMemoryId] = useState<string | null>(null);
   const [recallItem, setRecallItem] = useState<HarvestedTreeItem | null>(null);
@@ -473,8 +475,9 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
       return;
     }
     rememberInteraction(memoryId);
+    recordActivity("wordRecallReveals");
     setRevealedItem(item);
-  }, [fadingMemoryId, memoriesById, rememberInteraction]);
+  }, [fadingMemoryId, memoriesById, recordActivity, rememberInteraction]);
 
   useEffect(() => {
     if (!revealedItem) return;

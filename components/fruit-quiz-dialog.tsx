@@ -9,11 +9,13 @@ import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
 import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export function FruitQuizDialog({ memory, memories, golden = false, onClose }: { memory: Memory; memories: Memory[]; golden?: boolean; onClose: () => void }) {
   const harvest = useHarvest();
+  const { recordActivity } = useProfileLevel();
   const closeButton = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [question] = useState(() => {
@@ -40,7 +42,21 @@ export function FruitQuizDialog({ memory, memories, golden = false, onClose }: {
   const submitWord = async (event: FormEvent) => {
     event.preventDefault();
     input.current?.blur();
-    if (await harvest.launch(memory.id, word)) onClose();
+    if (await harvest.launch(memory.id, word)) {
+      recordActivity("harvestedFruits", { eventId: memory.id });
+      recordActivity("flownPetals", { eventId: memory.id });
+      if (golden) recordActivity("goldenFruits", { eventId: memory.id });
+      onClose();
+    }
+  };
+
+  const confirmAnswer = () => {
+    if (!selected || answered) return;
+    if (selected === question.correctChoiceId) {
+      recordActivity("fruitQuizCorrectAnswers", { eventId: question.id });
+      recordActivity("correctQuizAnswers");
+    }
+    setAnswered(true);
   };
 
   return (
@@ -59,7 +75,7 @@ export function FruitQuizDialog({ memory, memories, golden = false, onClose }: {
         {!answered ? (
           <div className="fruit-quiz-question-step">
             <QuizQuestionCard question={question} selectedChoiceId={selected} answered={false} onSelect={setSelected} />
-            <button type="button" className="quiz-primary-button" onClick={() => selected && setAnswered(true)} disabled={!selected}>答えを確認</button>
+            <button type="button" className="quiz-primary-button" onClick={confirmAnswer} disabled={!selected}>答えを確認</button>
           </div>
         ) : (
           <div className="fruit-quiz-word-step">

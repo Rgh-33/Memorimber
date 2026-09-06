@@ -3,11 +3,14 @@ import { ChevronRight, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { PageHeading } from "@/components/page-heading";
+import { ProfileLevelActivityTotalsMarker } from "@/components/profile-level-activity-marker";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { SharedGroupCreateButton } from "@/components/shared-group-create-button";
+import { SharedGroupIcon } from "@/components/shared-group-icon";
+import { SharedMemberName } from "@/components/shared-member-identity";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listInvitationNotifications, type InvitationNotification } from "@/lib/supabase/shared-album-invitations";
-import { listSharedAlbums, type SharedAlbum } from "@/lib/supabase/shared-albums";
+import { listSharedAlbumMembers, listSharedAlbums, type SharedAlbum, type SharedAlbumMember } from "@/lib/supabase/shared-albums";
 import { createClient } from "@/lib/supabase/server";
 import { createSharedGroupAction, respondInvitationAction } from "./actions";
 
@@ -22,19 +25,30 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
   const actionError = typeof query.error === "string" ? query.error : null;
   const configured = isSupabaseConfigured();
   let albums: SharedAlbum[] = [];
+  const membersByAlbumId = new Map<string, SharedAlbumMember[]>();
   let invitations: InvitationNotification[] = [];
   let loadError: string | null = null;
+  let currentUserId: string | null = null;
+  let groupSnapshotReady = false;
 
   if (configured) {
     const client = await createClient();
     const { data: { user } } = await client.auth.getUser();
     if (!user) redirect(`/login?${new URLSearchParams({ next: "/shared-groups" })}`);
+    currentUserId = user.id;
     const [albumResult, invitationResult] = await Promise.allSettled([
       listSharedAlbums(client),
       listInvitationNotifications(client),
     ]);
-    if (albumResult.status === "fulfilled") albums = albumResult.value;
-    else loadError = albumResult.reason instanceof Error ? albumResult.reason.message : "グループを読み込めませんでした。";
+    if (albumResult.status === "fulfilled") {
+      albums = albumResult.value;
+      const memberResults = await Promise.allSettled(albums.map((album) => listSharedAlbumMembers(client, album.id)));
+      memberResults.forEach((result, index) => {
+        if (result.status === "fulfilled") membersByAlbumId.set(albums[index].id, result.value);
+        else loadError ??= result.reason instanceof Error ? result.reason.message : "メンバーを読み込めませんでした。";
+      });
+      groupSnapshotReady = memberResults.every((result) => result.status === "fulfilled");
+    } else loadError = albumResult.reason instanceof Error ? albumResult.reason.message : "グループを読み込めませんでした。";
     if (invitationResult.status === "fulfilled") {
       invitations = invitationResult.value.filter((invitation) => invitation.status === "pending");
     } else {
@@ -42,8 +56,17 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
     }
   }
 
+  const connectedPeople = new Set(
+    [...membersByAlbumId.values()].flatMap((members) =>
+      members.filter((member) => member.userId !== currentUserId).map((member) => member.userId),
+    ),
+  ).size;
+
   return (
     <div className="page-pad shared-groups-page">
+      {groupSnapshotReady ? (
+        <ProfileLevelActivityTotalsMarker values={{ joinedGroups: albums.length, connectedPeople }} />
+      ) : null}
       <AppHeader />
       <PageHeading eyebrow="SHARED GROUPS" title="共有" />
 
@@ -81,32 +104,44 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
         </ol>
       </section> : null}
 
-      <section className="mt-8" aria-labelledby="joined-groups-title">
-        <div className="flex items-center justify-between">
+      <section className="mt-8 overflow-hidden rounded-2xl border border-line bg-paper shadow-sm" aria-labelledby="joined-groups-title">
+        <div className="flex min-h-14 items-center justify-between border-b border-line/70 px-4 py-2">
           <h2 id="joined-groups-title" className="text-sm font-semibold text-ink">参加中のグループ</h2>
-          <span className="text-[11px] text-ink/40">{albums.length}件</span>
+          <SharedGroupCreateButton configured={configured} createAction={createSharedGroupAction} />
         </div>
         {albums.length === 0 ? (
-          <div className="mt-3 rounded-2xl border border-dashed border-line px-5 py-8 text-center">
+          <div className="px-5 py-8 text-center">
             <UsersRound className="mx-auto text-coral" size={24} strokeWidth={1.5} />
             <p className="mt-3 text-xs leading-6 text-ink/50">まだ参加しているグループはありません。</p>
           </div>
         ) : (
-          <ol className="mt-3 overflow-hidden rounded-2xl border border-line bg-paper">
-            {albums.map((album, index) => (
-              <li key={album.id} className={index > 0 ? "border-t border-line" : ""}>
-                <Link href={`/shared-groups/${album.id}`} className="flex items-center gap-3 px-4 py-4 transition hover:bg-ivory">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-coral/10 text-coral"><UsersRound size={18} /></span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{album.name}</span>
-                  <ChevronRight size={17} className="text-ink/30" />
+          <ol>
+            {albums.map((album, index) => {
+              const groupMembers = membersByAlbumId.get(album.id) ?? [];
+              const memberNames = groupMembers.map((member) => `${member.displayName} Lv.${member.level ?? 1}`).join(" · ");
+              return <li key={album.id} className={index > 0 ? "border-t border-line/70" : ""}>
+                <Link href={`/shared-groups/${album.id}`} className="group flex min-h-[68px] items-center gap-3 px-4 py-3 transition hover:bg-ivory focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/40">
+                  <SharedGroupIcon groupId={album.id} />
+                  <span className="flex min-w-0 flex-1 items-baseline gap-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{album.name}</span>
+                    {memberNames ? (
+                      <span className="max-w-[52%] shrink-0 truncate text-[10px] text-ink/40" title={memberNames} aria-label={`メンバー: ${memberNames}`}>
+                        {groupMembers.map((member, memberIndex) => (
+                          <span key={member.userId}>
+                            {memberIndex ? " · " : ""}
+                            <SharedMemberName displayName={member.displayName} level={member.level} isCurrentUser={member.userId === currentUserId} />
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronRight size={16} className="shrink-0 text-ink/25 transition group-hover:translate-x-0.5 group-hover:text-coral/60" />
                 </Link>
-              </li>
-            ))}
+              </li>;
+            })}
           </ol>
         )}
       </section>
-
-      <SharedGroupCreateButton configured={configured} createAction={createSharedGroupAction} />
     </div>
   );
 }

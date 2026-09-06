@@ -92,6 +92,7 @@ export default async function SharedQuizPage({ params, searchParams }: PageProps
             standings={standings}
             serverNow={Date.now()}
             actionError={actionError}
+            isOwner={album.ownerId === user.id}
           />
         )}
       </div>
