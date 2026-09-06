@@ -2,10 +2,10 @@ export const FRUIT_VARIETY_POOL = [
   "le-lectier",
   "apple",
   "breadfruit",
-  "apple",
+  "heart",
   "dragon-fruit",
   "jatropha-curcas",
-  "apple",
+  "acorn",
   "nikkori-pear",
 ] as const;
 
