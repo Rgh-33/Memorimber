@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { processRetainedMemoryCleanupQueue } from "@/lib/supabase/account-deletion-runner";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createSharedQuizPlan } from "@/lib/shared-quiz";
 import { inviteToSharedAlbum, respondToSharedAlbumInvitation } from "@/lib/supabase/shared-album-invitations";
 import {
   addMemoryToSharedAlbum,
@@ -12,9 +13,11 @@ import {
   deleteSharedAlbum,
   isUuid,
   leaveSharedAlbum,
+  loadSharedAlbumMemories,
   removeMemoryFromSharedAlbum,
   removeSharedAlbumMember,
 } from "@/lib/supabase/shared-albums";
+import { joinSharedQuiz, startSharedQuiz } from "@/lib/supabase/shared-quiz";
 import { createClient } from "@/lib/supabase/server";
 
 function noticePath(path: string, tone: "success" | "error", message: string) {
@@ -24,6 +27,12 @@ function noticePath(path: string, tone: "success" | "error", message: string) {
 function groupPath(groupId: unknown) {
   if (!isUuid(groupId)) throw new Error("グループが正しくありません。");
   return `/shared-groups/${groupId}`;
+}
+
+function quizPath(groupId: unknown, sessionId: unknown) {
+  const path = groupPath(groupId);
+  if (!isUuid(sessionId)) throw new Error("クイズが正しくありません。");
+  return `${path}/quiz/${sessionId}`;
 }
 
 function errorText(error: unknown, fallback: string) {
@@ -124,6 +133,42 @@ export async function addSharedMemoryAction(formData: FormData) {
   if (failure) redirect(noticePath(path, "error", failure));
   revalidateGroup(String(groupId));
   redirect(noticePath(path, "success", "思い出を共有しました。"));
+}
+
+export async function joinSharedQuizAction(formData: FormData) {
+  const groupId = formData.get("groupId");
+  let path = "/shared-groups";
+  let sessionId: string | null = null;
+  let failure: string | null = null;
+  try {
+    path = groupPath(groupId);
+    const session = await joinSharedQuiz(await authenticatedClient(), String(groupId));
+    sessionId = session.id;
+  } catch (error) {
+    failure = errorText(error, "クイズに参加できませんでした。");
+  }
+  if (failure || !sessionId) redirect(noticePath(path, "error", failure ?? "クイズに参加できませんでした。"));
+  revalidateGroup(String(groupId));
+  redirect(quizPath(groupId, sessionId));
+}
+
+export async function startSharedQuizAction(formData: FormData) {
+  const groupId = formData.get("groupId");
+  const sessionId = formData.get("sessionId");
+  let path = "/shared-groups";
+  let failure: string | null = null;
+  try {
+    path = quizPath(groupId, sessionId);
+    const client = await authenticatedClient();
+    const memories = await loadSharedAlbumMemories(client, String(groupId));
+    const questions = createSharedQuizPlan(memories);
+    await startSharedQuiz(client, String(sessionId), questions);
+  } catch (error) {
+    failure = errorText(error, "クイズを開始できませんでした。");
+  }
+  if (failure) redirect(noticePath(path, "error", failure));
+  revalidatePath(path);
+  redirect(path);
 }
 
 export async function removeSharedMemoryAction(formData: FormData) {
