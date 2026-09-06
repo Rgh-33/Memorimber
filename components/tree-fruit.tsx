@@ -4,8 +4,10 @@ const FRUIT_ASSET_BY_VARIETY: Record<FruitAppearance["variety"], string> = {
   "le-lectier": "/memory-fruits/memory-drop.svg",
   apple: "/memory-fruits/memory-star.svg",
   breadfruit: "/memory-fruits/memory-geode.svg",
+  heart: "/memory-fruits/memory-heart.svg",
   "dragon-fruit": "/memory-fruits/memory-bloom.svg",
   "jatropha-curcas": "/memory-fruits/memory-cluster.svg",
+  acorn: "/memory-fruits/memory-acorn.svg",
   "nikkori-pear": "/memory-fruits/memory-moon.svg",
 };
 

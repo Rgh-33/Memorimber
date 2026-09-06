@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { ArrowLeft, Camera, ChevronRight, History, Infinity as InfinityIcon, Sparkles, Type } from "lucide-react";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { PageHeading } from "@/components/page-heading";
+import { useBackgroundMusic, type BackgroundMusicMode } from "@/components/background-music";
 import { useMemories } from "@/lib/memories-context";
 import {
   ALL_QUIZ_KINDS,
@@ -32,6 +33,8 @@ type ActiveQuiz = {
   questions: MemoryQuizQuestion[];
   endless: boolean;
 };
+
+type QuizStage = "countdown" | "playing" | "results";
 
 function readCount(key: string) {
   try {
@@ -197,10 +200,31 @@ function QuizResults({ mode, answers, onClose }: { mode: QuizMode; answers: Quiz
   );
 }
 
-function QuizSession({ initial, memories, onComplete, onClose }: {
+function QuizCountdown({ onComplete }: { onComplete: () => void }) {
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (countdown > 1) setCountdown((current) => current - 1);
+      else onComplete();
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [countdown, onComplete]);
+
+  return (
+    <section className="quiz-countdown" role="status" aria-live="assertive" aria-atomic="true">
+      <p>GET READY</p>
+      <div className="quiz-countdown-number" key={countdown}>{countdown}</div>
+      <h1>まもなくスタート</h1>
+    </section>
+  );
+}
+
+function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
   initial: ActiveQuiz;
   memories: ReturnType<typeof useMemories>["memories"];
   onComplete: (mode: QuizMode, answers: QuizAnswer[]) => void;
+  onResults: () => void;
   onClose: () => void;
 }) {
   const [questions, setQuestions] = useState(initial.questions);
@@ -221,6 +245,7 @@ function QuizSession({ initial, memories, onComplete, onClose }: {
       saved.current = true;
       onComplete(initial.mode, answers);
     }
+    onResults();
     setFinished(true);
   };
 
@@ -246,6 +271,7 @@ function QuizSession({ initial, memories, onComplete, onClose }: {
         saved.current = true;
         onComplete(initial.mode, answers);
       }
+      onResults();
       setFinished(true);
       return;
     }
@@ -324,9 +350,11 @@ function QuizHistory({ entries, onBack }: { entries: QuizHistoryEntry[]; onBack:
 
 export default function QuizPage() {
   const { memories, isLoading, error, refreshMemories } = useMemories();
+  const setBackgroundMusicMode = useBackgroundMusic();
   const [photoCount, setPhotoCount] = useState(DEFAULT_DIRECTION_COUNT);
   const [captionCount, setCaptionCount] = useState(DEFAULT_DIRECTION_COUNT);
   const [active, setActive] = useState<ActiveQuiz | null>(null);
+  const [quizStage, setQuizStage] = useState<QuizStage | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showMixedSetup, setShowMixedSetup] = useState(false);
   const [history, setHistory] = useState<QuizHistoryEntry[]>([]);
@@ -337,17 +365,39 @@ export default function QuizPage() {
     setHistory(readHistory());
   }, []);
 
+  const musicMode: BackgroundMusicMode = !active || quizStage === "results"
+    ? "default"
+    : quizStage === "countdown" ? "countdown" : "quiz";
+
+  useEffect(() => {
+    setBackgroundMusicMode(musicMode);
+  }, [musicMode, setBackgroundMusicMode]);
+
+  useEffect(() => () => setBackgroundMusicMode("default"), [setBackgroundMusicMode]);
+
+  const beginCountdown = (quiz: ActiveQuiz) => {
+    setActive(quiz);
+    setQuizStage("countdown");
+  };
+
+  const closeQuiz = () => {
+    setActive(null);
+    setQuizStage(null);
+  };
+
+  const finishCountdown = useCallback(() => setQuizStage("playing"), []);
+
   const start = (mode: "quick" | "endless", count: number) => {
     const questionCount = mode === "endless" ? 1 : count;
     const questions = createQuizQuestions(memories, questionCount, ALL_QUIZ_KINDS);
-    if (questions.length) setActive({ mode, questions, endless: mode === "endless" });
+    if (questions.length) beginCountdown({ mode, questions, endless: mode === "endless" });
   };
 
   const startMixed = () => {
     const questions = createMixedQuizQuestions(memories, photoCount, captionCount);
     if (questions.length) {
       setShowMixedSetup(false);
-      setActive({ mode: "mixed", questions, endless: false });
+      beginCountdown({ mode: "mixed", questions, endless: false });
     }
   };
 
@@ -371,7 +421,17 @@ export default function QuizPage() {
   return (
     <div className="page-pad quiz-page">
       {active ? (
-        <QuizSession initial={active} memories={memories} onComplete={saveResult} onClose={() => setActive(null)} />
+        quizStage === "countdown" ? (
+          <QuizCountdown onComplete={finishCountdown} />
+        ) : (
+          <QuizSession
+            initial={active}
+            memories={memories}
+            onComplete={saveResult}
+            onResults={() => setQuizStage("results")}
+            onClose={closeQuiz}
+          />
+        )
       ) : showHistory ? (
         <QuizHistory entries={history} onBack={() => setShowHistory(false)} />
       ) : showMixedSetup ? (

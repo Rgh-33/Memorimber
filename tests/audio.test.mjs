@@ -49,10 +49,59 @@ test("September BGM is bundled and uses a sample-accurate Web Audio loop", () =>
   assert.match(component, /document\.addEventListener\("visibilitychange", recoverPlayback\)/);
   assert.match(component, /context\.suspend\(\)\.then\(\(\) => context\.resume\(\)\)/);
   assert.match(component, /createBufferSource\(\)/);
-  assert.match(component, /source\.loop = true/);
+  assert.match(component, /source\.loop = mode !== "harvest"/);
   assert.match(component, /source\.loopStart = 0/);
   assert.match(component, /source\.loopEnd = buffer\.duration/);
   assert.match(middleware, /wav\|mp3\|ogg\|m4a\|aac\|flac/);
   assert.match(settings, /min="0"[\s\S]*max="5"[\s\S]*step="1"/);
   assert.doesNotMatch(settings, /\{value\}%/);
+});
+
+test("quiz BGM is fixed, preloaded silently during the countdown, and fades between tracks", () => {
+  const component = readFileSync(new URL("../components/background-music.tsx", import.meta.url), "utf8");
+  const quizPage = readFileSync(new URL("../app/quiz/page.tsx", import.meta.url), "utf8");
+  const audioUrl = new URL("../public/audio/memorimber-quiz-bgm.mp3", import.meta.url);
+  const descriptor = openSync(audioUrl, "r");
+  const header = Buffer.alloc(3);
+  readSync(descriptor, header, 0, header.length, 0);
+  closeSync(descriptor);
+
+  assert.ok(header.toString("ascii") === "ID3" || (header[0] === 0xff && (header[1] & 0xe0) === 0xe0));
+  assert.match(component, /QUIZ_BACKGROUND_MUSIC_URL = "\/audio\/memorimber-quiz-bgm\.mp3"/);
+  assert.match(component, /mode === "countdown"[\s\S]*fadeOutActiveTrack\(context\)[\s\S]*loadBuffer\(context, QUIZ_BACKGROUND_MUSIC_URL\)/);
+  assert.match(component, /linearRampToValueAtTime\(0, now \+ QUICK_FADE_OUT_SECONDS\)/);
+  const relativeGain = Number(component.match(/QUIZ_RELATIVE_GAIN = ([\d.]+)/)?.[1]);
+  const loopStart = Number(component.match(/QUIZ_LOOP_START_SECONDS = ([\d.]+)/)?.[1]);
+  const loopEnd = Number(component.match(/QUIZ_LOOP_END_SECONDS = ([\d.]+)/)?.[1]);
+  assert.ok(relativeGain > 0 && relativeGain <= 1);
+  assert.ok(loopStart >= 0);
+  assert.ok(loopEnd > loopStart);
+  assert.match(component, /source\.loopStart = QUIZ_LOOP_START_SECONDS/);
+  assert.match(component, /source\.loopEnd = Math\.min\(QUIZ_LOOP_END_SECONDS, buffer\.duration\)/);
+  assert.match(component, /trackGainTarget = mode === "quiz" \? QUIZ_RELATIVE_GAIN : 1/);
+  assert.match(component, /mode === "quiz"[\s\S]*setValueAtTime\(trackGainTarget, now\)[\s\S]*else[\s\S]*linearRampToValueAtTime\(trackGainTarget, now \+ FADE_IN_SECONDS\)/);
+  assert.match(component, /source\.start\(0, source\.loopStart\)/);
+  assert.match(quizPage, /useState\(3\)/);
+  assert.match(quizPage, /setBackgroundMusicMode\(musicMode\)/);
+  assert.match(quizPage, /onResults=\{\(\) => setQuizStage\("results"\)\}/);
+});
+
+test("harvest flight audio plays once while the monthly BGM is faded out", () => {
+  const component = readFileSync(new URL("../components/background-music.tsx", import.meta.url), "utf8");
+  const harvest = readFileSync(new URL("../lib/harvest-context.tsx", import.meta.url), "utf8");
+  const recall = readFileSync(new URL("../components/memory-recall-dialog.tsx", import.meta.url), "utf8");
+  const audioUrl = new URL("../public/audio/september-fr-4926.wav", import.meta.url);
+  const descriptor = openSync(audioUrl, "r");
+  const header = Buffer.alloc(12);
+  readSync(descriptor, header, 0, header.length, 0);
+  closeSync(descriptor);
+
+  assert.equal(header.subarray(0, 4).toString("ascii"), "RIFF");
+  assert.equal(header.subarray(8, 12).toString("ascii"), "WAVE");
+  assert.match(component, /HARVEST_FLIGHT_MUSIC_URL = "\/audio\/september-fr-4926\.wav"/);
+  assert.match(component, /mode === "countdown" \|\| mode === "harvest"[\s\S]*fadeOutActiveTrack\(context\)/);
+  assert.match(component, /source\.loop = mode !== "harvest"/);
+  assert.match(harvest, /setBackgroundMusicMode\("harvest"\)[\s\S]*setFlight/);
+  assert.match(harvest, /setFlight\(null\)[\s\S]*setBackgroundMusicMode\("default"\)/);
+  assert.doesNotMatch(recall, /relaunch|HarvestFlight|useHarvest/);
 });
