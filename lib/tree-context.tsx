@@ -1,5 +1,7 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SAMPLE_MEMORIES } from "./data";
 import { useMemories } from "./memories-context";
@@ -72,7 +74,7 @@ function useTreeState() {
 
   useEffect(() => {
     if (loadedKey !== storageKey) return;
-    try { sessionStorage.setItem(storageKey, JSON.stringify(state)); } catch { /* Storage may be disabled. */ }
+    try { setBrowserSessionItem(sessionStorage, storageKey, JSON.stringify(state)); } catch { /* Storage may be disabled. */ }
   }, [state, loadedKey, storageKey]);
 
   useEffect(() => {
@@ -160,7 +162,7 @@ function useTreeState() {
 
   const queueUploadArrival = useCallback((id: string) => {
     setArrivingUploadId(id);
-    try { sessionStorage.setItem(TREE_ARRIVAL_STORAGE_KEY, id); } catch { /* In-memory animation still works. */ }
+    try { setBrowserSessionItem(sessionStorage, TREE_ARRIVAL_STORAGE_KEY, id); } catch { /* In-memory animation still works. */ }
   }, []);
 
   const completeUploadArrival = useCallback((id: string) => {

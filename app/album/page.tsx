@@ -1,5 +1,7 @@
 "use client";
 
+import { setBrowserSessionItem } from "@/lib/browser-session-data";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { MemoryCard } from "@/components/memory-card";
@@ -154,7 +156,7 @@ export default function AlbumPage() {
 
   const rememberAlbumPosition = () => {
     try {
-      sessionStorage.setItem(ALBUM_RETURN_POSITION_KEY, JSON.stringify({ month: selectedMonth, scrollY: window.scrollY }));
+      setBrowserSessionItem(sessionStorage, ALBUM_RETURN_POSITION_KEY, JSON.stringify({ month: selectedMonth, scrollY: window.scrollY }));
     } catch { /* Browser history can still restore the nearest available position. */ }
   };
 
