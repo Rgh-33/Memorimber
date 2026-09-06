@@ -315,7 +315,7 @@ export async function removeMemoryFromSharedAlbum(client: SupabaseClient, albumI
     .eq("memory_id", requireUuid(memoryId, "思い出"))
     .select("memory_id")
     .maybeSingle();
-  if (error) throw new Error(albumError(error, "思い出の共有を解除できませんでした。"));
+  if (error) throw new Error("思い出の共有を解除できませんでした。時間をおいて、もう一度お試しください。", { cause: error });
   if (!data) throw new Error("思い出が見つからないか、共有を解除する権限がありません。");
 }
 
