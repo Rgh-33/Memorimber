@@ -12,7 +12,7 @@ import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
-export function FruitQuizDialog({ memory, memories, onClose }: { memory: Memory; memories: Memory[]; onClose: () => void }) {
+export function FruitQuizDialog({ memory, memories, golden = false, onClose }: { memory: Memory; memories: Memory[]; golden?: boolean; onClose: () => void }) {
   const harvest = useHarvest();
   const closeButton = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -44,7 +44,7 @@ export function FruitQuizDialog({ memory, memories, onClose }: { memory: Memory;
   };
 
   return (
-    <div className="fruit-quiz-overlay konoha-petal-colors" onMouseDown={(event) => {
+    <div className="fruit-quiz-overlay konoha-petal-colors" data-golden-quiz={golden || undefined} onMouseDown={(event) => {
       if (event.target === event.currentTarget && !harvest.busy) onClose();
     }}>
       <div className="fruit-quiz-petal-shower" aria-hidden="true">

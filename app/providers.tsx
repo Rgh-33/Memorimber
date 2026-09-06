@@ -22,14 +22,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
 function PrivateProviders({ children }: { children: React.ReactNode }) {
   return (
     <PreferencesProvider>
-      <BackgroundMusic />
-      <ProcessingProvider>
-        <NotificationsProvider>
-          <ProfileProvider>
-            <MemoriesProvider><TreeProvider><HarvestProvider>{children}</HarvestProvider></TreeProvider></MemoriesProvider>
-          </ProfileProvider>
-        </NotificationsProvider>
-      </ProcessingProvider>
+      <BackgroundMusic>
+        <ProcessingProvider>
+          <NotificationsProvider>
+            <ProfileProvider>
+              <MemoriesProvider><TreeProvider><HarvestProvider>{children}</HarvestProvider></TreeProvider></MemoriesProvider>
+            </ProfileProvider>
+          </NotificationsProvider>
+        </ProcessingProvider>
+      </BackgroundMusic>
     </PreferencesProvider>
   );
 }

@@ -24,6 +24,8 @@ const GESTURE_ROTATION_STEP_RADIANS = Math.PI;
 const GESTURE_MIN_TURN_RADIANS = Math.PI / 24;
 const GESTURE_STEPS_REQUIRED = 12;
 const SHAKE_PARTICLE_COUNT = 12;
+const PURIFICATION_SPARK_COUNT = 8;
+const PURIFICATION_DURATION_MS = 1_250;
 const WORD_MIN_OPACITY = 0.72;
 const WORD_MAX_OPACITY = 0.96;
 const WORD_OPACITY_DISTANCE_PX = 340;
@@ -63,6 +65,7 @@ function FloatingWord({
   onInteractionChange,
   onReveal,
   isFading,
+  isPurifying,
   isJustHarvested,
   onArrivalComplete,
 }: {
@@ -72,6 +75,7 @@ function FloatingWord({
   onInteractionChange: (id: string | null) => void;
   onReveal: (item: HarvestedTreeItem) => void;
   isFading: boolean;
+  isPurifying: boolean;
   isJustHarvested: boolean;
   onArrivalComplete: (id: string) => void;
 }) {
@@ -336,6 +340,7 @@ function FloatingWord({
       data-gesture={gestureState}
       data-dimmed={isDimmed || undefined}
       data-fading={isFading || undefined}
+      data-purifying={isPurifying || undefined}
       aria-label={isFading
         ? `消えかけている思い出。縦横に振るか、くるくる回して${GESTURE_STEPS_REQUIRED}回分の動きを加えると思い出しクイズが始まります`
         : `${item.word}。長押しすると画面内を移動できます。縦横に振るか、くるくる回して${GESTURE_STEPS_REQUIRED}回分の動きを加えると思い出を表示します`}
@@ -367,9 +372,14 @@ function FloatingWord({
           <MemoryPetal />
           <span className="memory-floating-word-label">{item.word}</span>
         </span>
-        {isFading && (
+        {(isFading || isPurifying) && (
           <span className="konoha-fading-pixels" aria-hidden="true">
             {Array.from({ length: 18 }, (_, index) => <span key={index} className="konoha-fading-pixel" />)}
+          </span>
+        )}
+        {isPurifying && (
+          <span className="konoha-memory-purification" aria-hidden="true">
+            {Array.from({ length: PURIFICATION_SPARK_COUNT }, (_, index) => <span key={index} />)}
           </span>
         )}
       </span>
@@ -394,6 +404,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
   const [recallItem, setRecallItem] = useState<HarvestedTreeItem | null>(null);
   const [, setRecallState] = useState<MemoryRecallState>(EMPTY_MEMORY_RECALL_STATE);
   const [fadingMemoryId, setFadingMemoryId] = useState<string | null>(null);
+  const [purifyingMemoryId, setPurifyingMemoryId] = useState<string | null>(null);
   const [activeWordId, setActiveWordId] = useState<string | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const treeArtRef = useRef<HTMLDivElement>(null);
@@ -403,6 +414,9 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
   const shownWords = useMemo(() => [...petals].reverse(), [petals]);
   const memoriesById = useMemo(() => new Map(memories.map((memory) => [memory.id, memory])), [memories]);
   const fruitQuizMemory = fruitMemoryId ? memoriesById.get(fruitMemoryId) ?? null : null;
+  const fruitQuizItem = fruitMemoryId
+    ? items.find((item) => (item.memoryId ?? item.id) === fruitMemoryId) ?? null
+    : null;
   const recallMemoryId = recallItem?.memoryId ?? recallItem?.id ?? null;
   const recallMemory = recallMemoryId ? memoriesById.get(recallMemoryId) ?? null : null;
   const relatedMemoryIds = revealedItem?.relatedMemoryIds?.length
@@ -439,6 +453,18 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
     setFadingMemoryId((current) => current === memoryId ? null : current);
   }, []);
 
+  const restoreFadingMemory = useCallback((memoryId: string) => {
+    rememberInteraction(memoryId);
+    setActiveWordId(null);
+    setPurifyingMemoryId(memoryId);
+  }, [rememberInteraction]);
+
+  useEffect(() => {
+    if (!purifyingMemoryId) return;
+    const timer = window.setTimeout(() => setPurifyingMemoryId(null), PURIFICATION_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [purifyingMemoryId]);
+
   const revealWord = useCallback((item: HarvestedTreeItem) => {
     const memoryId = item.memoryId ?? item.id;
     if (memoryId === fadingMemoryId && memoriesById.has(memoryId)) {
@@ -473,6 +499,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
             onInteractionChange={setActiveWordId}
             onReveal={revealWord}
             isFading={fadingMemoryId === (item.memoryId ?? item.id)}
+            isPurifying={purifyingMemoryId === (item.memoryId ?? item.id)}
             isJustHarvested={harvest.arrivingMemoryId === (item.memoryId ?? item.id)}
             onArrivalComplete={harvest.completeArrival}
           />
@@ -487,7 +514,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
       </div>
 
       <p className="sr-only" aria-live="polite">
-        {revealedItem ? `${revealedItem.word}に関連する思い出を表示しました` : ""}
+        {purifyingMemoryId ? "花びらのもやが晴れ、言葉が戻りました" : revealedItem ? `${revealedItem.word}に関連する思い出を表示しました` : ""}
       </p>
 
       {revealedItem && (
@@ -520,9 +547,9 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
           </section>
         </div>
       )}
-      {fruitQuizMemory && <FruitQuizDialog memory={fruitQuizMemory} memories={memories} onClose={closeFruitQuiz} />}
+      {fruitQuizMemory && <FruitQuizDialog memory={fruitQuizMemory} memories={memories} golden={fruitQuizItem?.golden === true} onClose={closeFruitQuiz} />}
       {recallItem && recallMemory && <MemoryRecallDialog memory={recallMemory} memories={memories} word={recallItem.word}
-        onClose={() => setRecallItem(null)} onRemembered={() => rememberInteraction(recallMemory.id)} />}
+        onClose={() => setRecallItem(null)} onRemembered={() => restoreFadingMemory(recallMemory.id)} />}
     </section>
   );
 }

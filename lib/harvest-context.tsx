@@ -1,13 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useBackgroundMusic } from "@/components/background-music";
 import { HarvestFlight } from "@/components/harvest-flight";
 import { useTree } from "@/lib/tree-context";
 
 type Flight = { memoryId: string; word: string };
 type HarvestContextValue = {
   launch: (id: string, word: string) => Promise<boolean>;
-  relaunch: (id: string, word: string) => boolean;
   busy: boolean;
   error: string | null;
   arrivingMemoryId: string | null;
@@ -17,6 +17,7 @@ const HarvestContext = createContext<HarvestContextValue | null>(null);
 
 export function HarvestProvider({ children }: { children: React.ReactNode }) {
   const tree = useTree();
+  const setBackgroundMusicMode = useBackgroundMusic();
   const [flight, setFlight] = useState<Flight | null>(null);
   const [arrivingMemoryId, setArrivingMemoryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -27,7 +28,8 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     active.current = false;
     setArrivingMemoryId(lastMemory.current);
     setFlight(null);
-  }, []);
+    setBackgroundMusicMode("default");
+  }, [setBackgroundMusicMode]);
   const completeArrival = useCallback((id: string) => {
     setArrivingMemoryId((current) => current === id ? null : current);
   }, []);
@@ -43,6 +45,7 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
       // lose the word. The provider survives the quiz disappearing afterward.
       if (!await tree.harvest(id, word)) throw new Error("この木の実は現在収穫できません。");
       lastMemory.current = id;
+      setBackgroundMusicMode("harvest");
       setFlight({ memoryId: id, word: word.trim() });
       return true;
     } catch (cause) {
@@ -52,17 +55,6 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setSaving(false);
     }
-  };
-
-  const relaunch = (id: string, word: string) => {
-    const normalizedWord = word.trim();
-    if (active.current || !normalizedWord) return false;
-    active.current = true;
-    setArrivingMemoryId(null);
-    setError(null);
-    lastMemory.current = id;
-    setFlight({ memoryId: id, word: normalizedWord });
-    return true;
   };
 
   useEffect(() => {
@@ -80,7 +72,7 @@ export function HarvestProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [arrivingMemoryId]);
 
-  return <HarvestContext.Provider value={{ launch, relaunch, busy: saving || Boolean(flight), error, arrivingMemoryId, completeArrival }}>
+  return <HarvestContext.Provider value={{ launch, busy: saving || Boolean(flight), error, arrivingMemoryId, completeArrival }}>
     <div inert={flight ? true : undefined}>{children}</div>
     {flight && <HarvestFlight word={flight.word} saved={tree.petals.some(petal => petal.id === flight.memoryId)} onFinish={finish} />}
   </HarvestContext.Provider>;
