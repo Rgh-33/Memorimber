@@ -1,13 +1,28 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { bgmGainForLevel } from "@/lib/audio-volume";
 import { usePreferences } from "@/lib/preferences-context";
 
 const SEPTEMBER_BACKGROUND_MUSIC_URL = "/audio/evoke-september.wav";
+const QUIZ_BACKGROUND_MUSIC_URL = "/audio/memorimber-quiz-bgm.mp3";
 const backgroundMusicUrl = process.env.NEXT_PUBLIC_BGM_URL?.trim() || SEPTEMBER_BACKGROUND_MUSIC_URL;
+const QUICK_FADE_OUT_SECONDS = 0.18;
+const FADE_IN_SECONDS = 0.24;
+const QUIZ_RELATIVE_GAIN = 0.30;
+const QUIZ_LOOP_START_SECONDS = 0.0;
+const QUIZ_LOOP_END_SECONDS = 97.4;
+
+export type BackgroundMusicMode = "default" | "countdown" | "quiz";
 
 type AudioContextConstructor = new (options?: AudioContextOptions) => AudioContext;
+type ActiveTrack = {
+  url: string;
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+};
+
+const BackgroundMusicContext = createContext<((mode: BackgroundMusicMode) => void) | null>(null);
 
 function getAudioContextConstructor() {
   const audioWindow = window as unknown as {
@@ -49,19 +64,34 @@ function createSilentWavUrl() {
   return URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
 }
 
-export function BackgroundMusic() {
+export function useBackgroundMusic() {
+  const setBackgroundMusicMode = useContext(BackgroundMusicContext);
+  if (!setBackgroundMusicMode) throw new Error("useBackgroundMusic must be used inside BackgroundMusic.");
+  return setBackgroundMusicMode;
+}
+
+export function BackgroundMusic({ children }: { children: ReactNode }) {
   const { bgmVolume, preferencesReady } = usePreferences();
   const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
-  const loadPromiseRef = useRef<Promise<void> | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const activeTrackRef = useRef<ActiveTrack | null>(null);
+  const buffersRef = useRef(new Map<string, AudioBuffer>());
+  const bufferPromisesRef = useRef(new Map<string, Promise<AudioBuffer>>());
   const iosMediaUnlockRef = useRef<HTMLAudioElement | null>(null);
   const desiredGainRef = useRef(bgmGainForLevel(bgmVolume));
-  const startPlaybackRef = useRef<() => Promise<void>>(async () => {});
+  const playbackModeRef = useRef<BackgroundMusicMode>("default");
+  const switchPlaybackRef = useRef<(mode: BackgroundMusicMode) => Promise<void>>(async () => {});
+
+  const setBackgroundMusicMode = useCallback((mode: BackgroundMusicMode) => {
+    playbackModeRef.current = mode;
+    void switchPlaybackRef.current(mode);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
     const abortController = new AbortController();
+    const buffers = buffersRef.current;
+    const bufferPromises = bufferPromisesRef.current;
     let silentMediaUrl: string | null = null;
 
     if (isIOSDevice()) {
@@ -74,55 +104,116 @@ export function BackgroundMusic() {
       iosMediaUnlockRef.current = silentMedia;
     }
 
-    const startPlayback = async () => {
-      if (disposed) return;
-
+    const ensureAudioGraph = () => {
       let context = audioContextRef.current;
-      let gain = gainRef.current;
-      if (!context || !gain) {
+      let masterGain = masterGainRef.current;
+      if (!context || !masterGain) {
         const AudioContextConstructor = getAudioContextConstructor();
-        if (!AudioContextConstructor) return;
+        if (!AudioContextConstructor) return null;
         context = new AudioContextConstructor({ latencyHint: "playback" });
-        gain = context.createGain();
-        gain.gain.value = desiredGainRef.current;
-        gain.connect(context.destination);
+        masterGain = context.createGain();
+        masterGain.gain.value = desiredGainRef.current;
+        masterGain.connect(context.destination);
         audioContextRef.current = context;
-        gainRef.current = gain;
+        masterGainRef.current = masterGain;
       }
-
-      if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
-      if (sourceRef.current) return;
-      if (loadPromiseRef.current) return loadPromiseRef.current;
-
-      loadPromiseRef.current = (async () => {
-        const response = await fetch(backgroundMusicUrl, { signal: abortController.signal });
-        if (!response.ok) throw new Error(`BGMを読み込めませんでした。(${response.status})`);
-        const buffer = await context.decodeAudioData(await response.arrayBuffer());
-        if (disposed) return;
-
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.loop = true;
-        source.loopStart = 0;
-        source.loopEnd = buffer.duration;
-        source.connect(gain);
-        source.start(0);
-        sourceRef.current = source;
-        if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
-      })().catch((error: unknown) => {
-        if (!abortController.signal.aborted) console.warn(error);
-      }).finally(() => {
-        loadPromiseRef.current = null;
-      });
-
-      return loadPromiseRef.current;
+      return { context, masterGain };
     };
 
-    startPlaybackRef.current = startPlayback;
+    const loadBuffer = (context: AudioContext, url: string) => {
+      const loaded = buffers.get(url);
+      if (loaded) return Promise.resolve(loaded);
+      const loading = bufferPromises.get(url);
+      if (loading) return loading;
+
+      const promise = (async () => {
+        const response = await fetch(url, { signal: abortController.signal });
+        if (!response.ok) throw new Error(`BGMを読み込めませんでした。(${response.status})`);
+        const buffer = await context.decodeAudioData(await response.arrayBuffer());
+        buffers.set(url, buffer);
+        return buffer;
+      })().finally(() => {
+        bufferPromises.delete(url);
+      });
+      bufferPromises.set(url, promise);
+      return promise;
+    };
+
+    const fadeOutActiveTrack = (context: AudioContext) => {
+      const activeTrack = activeTrackRef.current;
+      if (!activeTrack) return;
+      activeTrackRef.current = null;
+      const now = context.currentTime;
+      activeTrack.gain.gain.cancelScheduledValues(now);
+      activeTrack.gain.gain.setValueAtTime(activeTrack.gain.gain.value, now);
+      activeTrack.gain.gain.linearRampToValueAtTime(0, now + QUICK_FADE_OUT_SECONDS);
+      try { activeTrack.source.stop(now + QUICK_FADE_OUT_SECONDS + 0.03); } catch { /* The source may already be stopped. */ }
+    };
+
+    const switchPlayback = async (mode: BackgroundMusicMode) => {
+      if (disposed) return;
+      const graph = ensureAudioGraph();
+      if (!graph) return;
+      const { context, masterGain } = graph;
+      if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
+
+      if (mode === "countdown") {
+        fadeOutActiveTrack(context);
+        void loadBuffer(context, QUIZ_BACKGROUND_MUSIC_URL).catch((error: unknown) => {
+          if (!abortController.signal.aborted) console.warn(error);
+        });
+        return;
+      }
+
+      const url = mode === "quiz" ? QUIZ_BACKGROUND_MUSIC_URL : backgroundMusicUrl;
+      if (activeTrackRef.current?.url === url) return;
+
+      let buffer: AudioBuffer;
+      try {
+        buffer = await loadBuffer(context, url);
+      } catch (error) {
+        if (!abortController.signal.aborted) console.warn(error);
+        return;
+      }
+      if (disposed || playbackModeRef.current !== mode || activeTrackRef.current?.url === url) return;
+
+      fadeOutActiveTrack(context);
+      const trackGain = context.createGain();
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      if (mode === "quiz") {
+        source.loopStart = QUIZ_LOOP_START_SECONDS;
+        source.loopEnd = Math.min(QUIZ_LOOP_END_SECONDS, buffer.duration);
+      } else {
+        source.loopStart = 0;
+        source.loopEnd = buffer.duration;
+      }
+      source.connect(trackGain);
+      trackGain.connect(masterGain);
+      source.addEventListener("ended", () => {
+        source.disconnect();
+        trackGain.disconnect();
+      }, { once: true });
+
+      const now = context.currentTime;
+      const trackGainTarget = mode === "quiz" ? QUIZ_RELATIVE_GAIN : 1;
+      if (mode === "quiz") {
+        trackGain.gain.setValueAtTime(trackGainTarget, now);
+      } else {
+        trackGain.gain.setValueAtTime(0, now);
+        trackGain.gain.linearRampToValueAtTime(trackGainTarget, now + FADE_IN_SECONDS);
+      }
+      source.start(0, source.loopStart);
+      activeTrackRef.current = { url, source, gain: trackGain };
+      if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
+    };
+
+    switchPlaybackRef.current = switchPlayback;
     const unlockPlayback = () => {
       const silentMedia = iosMediaUnlockRef.current;
       if (silentMedia?.paused) void silentMedia.play().catch(() => {});
-      void startPlayback();
+      void switchPlayback(playbackModeRef.current);
 
       const context = audioContextRef.current;
       if (!context || context.state === "running" || context.state === "closed") return;
@@ -140,6 +231,7 @@ export function BackgroundMusic() {
       if (silentMedia?.paused) void silentMedia.play().catch(() => {});
       const context = audioContextRef.current;
       if (!context || context.state === "closed") return;
+      void switchPlayback(playbackModeRef.current);
       if (context.state === "running") {
         void context.suspend().then(() => context.resume()).catch(() => {});
       } else {
@@ -162,16 +254,19 @@ export function BackgroundMusic() {
       window.removeEventListener("keydown", unlockPlayback);
       window.removeEventListener("pageshow", recoverPlayback);
       document.removeEventListener("visibilitychange", recoverPlayback);
-      startPlaybackRef.current = async () => {};
+      switchPlaybackRef.current = async () => {};
       iosMediaUnlockRef.current?.pause();
       iosMediaUnlockRef.current?.removeAttribute("src");
       iosMediaUnlockRef.current = null;
       if (silentMediaUrl) URL.revokeObjectURL(silentMediaUrl);
-      try { sourceRef.current?.stop(); } catch { /* The source may already be stopped. */ }
-      sourceRef.current?.disconnect();
-      gainRef.current?.disconnect();
-      sourceRef.current = null;
-      gainRef.current = null;
+      try { activeTrackRef.current?.source.stop(); } catch { /* The source may already be stopped. */ }
+      activeTrackRef.current?.source.disconnect();
+      activeTrackRef.current?.gain.disconnect();
+      activeTrackRef.current = null;
+      masterGainRef.current?.disconnect();
+      masterGainRef.current = null;
+      buffers.clear();
+      bufferPromises.clear();
       const context = audioContextRef.current;
       audioContextRef.current = null;
       if (context && context.state !== "closed") void context.close();
@@ -182,15 +277,15 @@ export function BackgroundMusic() {
     const nextGain = bgmGainForLevel(bgmVolume);
     desiredGainRef.current = nextGain;
     const context = audioContextRef.current;
-    const gain = gainRef.current;
-    if (context && gain) {
+    const masterGain = masterGainRef.current;
+    if (context && masterGain) {
       const now = context.currentTime;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(nextGain, now + 0.12);
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(nextGain, now + 0.12);
     }
-    if (preferencesReady && nextGain > 0) void startPlaybackRef.current();
+    if (preferencesReady && nextGain > 0) void switchPlaybackRef.current(playbackModeRef.current);
   }, [bgmVolume, preferencesReady]);
 
-  return null;
+  return <BackgroundMusicContext.Provider value={setBackgroundMusicMode}>{children}</BackgroundMusicContext.Provider>;
 }

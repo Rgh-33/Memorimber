@@ -56,3 +56,32 @@ test("September BGM is bundled and uses a sample-accurate Web Audio loop", () =>
   assert.match(settings, /min="0"[\s\S]*max="5"[\s\S]*step="1"/);
   assert.doesNotMatch(settings, /\{value\}%/);
 });
+
+test("quiz BGM is fixed, preloaded silently during the countdown, and fades between tracks", () => {
+  const component = readFileSync(new URL("../components/background-music.tsx", import.meta.url), "utf8");
+  const quizPage = readFileSync(new URL("../app/quiz/page.tsx", import.meta.url), "utf8");
+  const audioUrl = new URL("../public/audio/memorimber-quiz-bgm.mp3", import.meta.url);
+  const descriptor = openSync(audioUrl, "r");
+  const header = Buffer.alloc(3);
+  readSync(descriptor, header, 0, header.length, 0);
+  closeSync(descriptor);
+
+  assert.ok(header.toString("ascii") === "ID3" || (header[0] === 0xff && (header[1] & 0xe0) === 0xe0));
+  assert.match(component, /QUIZ_BACKGROUND_MUSIC_URL = "\/audio\/memorimber-quiz-bgm\.mp3"/);
+  assert.match(component, /mode === "countdown"[\s\S]*fadeOutActiveTrack\(context\)[\s\S]*loadBuffer\(context, QUIZ_BACKGROUND_MUSIC_URL\)/);
+  assert.match(component, /linearRampToValueAtTime\(0, now \+ QUICK_FADE_OUT_SECONDS\)/);
+  const relativeGain = Number(component.match(/QUIZ_RELATIVE_GAIN = ([\d.]+)/)?.[1]);
+  const loopStart = Number(component.match(/QUIZ_LOOP_START_SECONDS = ([\d.]+)/)?.[1]);
+  const loopEnd = Number(component.match(/QUIZ_LOOP_END_SECONDS = ([\d.]+)/)?.[1]);
+  assert.ok(relativeGain > 0 && relativeGain <= 1);
+  assert.ok(loopStart >= 0);
+  assert.ok(loopEnd > loopStart);
+  assert.match(component, /source\.loopStart = QUIZ_LOOP_START_SECONDS/);
+  assert.match(component, /source\.loopEnd = Math\.min\(QUIZ_LOOP_END_SECONDS, buffer\.duration\)/);
+  assert.match(component, /trackGainTarget = mode === "quiz" \? QUIZ_RELATIVE_GAIN : 1/);
+  assert.match(component, /mode === "quiz"[\s\S]*setValueAtTime\(trackGainTarget, now\)[\s\S]*else[\s\S]*linearRampToValueAtTime\(trackGainTarget, now \+ FADE_IN_SECONDS\)/);
+  assert.match(component, /source\.start\(0, source\.loopStart\)/);
+  assert.match(quizPage, /useState\(3\)/);
+  assert.match(quizPage, /setBackgroundMusicMode\(musicMode\)/);
+  assert.match(quizPage, /onResults=\{\(\) => setQuizStage\("results"\)\}/);
+});
