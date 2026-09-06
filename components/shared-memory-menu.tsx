@@ -1,24 +1,68 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Component, useActionState, useRef, useState, type RefObject } from "react";
+import { unstable_rethrow } from "next/navigation";
 import { Ellipsis } from "lucide-react";
 import { SharedGroupDialog } from "@/components/shared-group-dialog";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { removeSharedMemoryAction } from "@/app/shared-groups/actions";
 
-export function SharedMemoryMenu({ groupId, memoryId, caption }: { groupId: string; memoryId: string; caption: string }) {
-  const router = useRouter();
+type MemoryMenuProps = { groupId: string; memoryId: string; caption: string };
+type RemovalDialogProps = MemoryMenuProps & {
+  onClose: () => void;
+  returnFocusRef: RefObject<HTMLElement | null>;
+};
+
+const cancelClassName = "rounded-xl border border-line px-4 py-3 text-xs font-semibold focus-visible:outline-coral disabled:opacity-45";
+
+function RemoveSharedMemoryDialog({ groupId, memoryId, caption, onClose, returnFocusRef }: RemovalDialogProps) {
+  const [result, formAction, pending] = useActionState(removeSharedMemoryAction, null);
+
+  return (
+    <SharedGroupDialog title="思い出の共有を解除" busy={pending} onClose={onClose} returnFocusRef={returnFocusRef}>
+      <p className="mt-4 break-words text-sm leading-6">「{caption}」の共有を解除しますか？</p>
+      <p className="mt-2 text-xs leading-6 text-ink/60">このグループから思い出が外れます。現在のメンバーが所有する元の思い出と写真は残ります。退会者の保持写真は、最後の共有先がなくなると削除されます。</p>
+      <form action={formAction} aria-busy={pending} className="mt-5 grid grid-cols-2 gap-3">
+        <input type="hidden" name="groupId" value={groupId} />
+        <input type="hidden" name="memoryId" value={memoryId} />
+        {result ? <p role="alert" className="auth-notice auth-notice--error col-span-2">{result.error}</p> : null}
+        <button type="button" onClick={onClose} disabled={pending} className={cancelClassName}>キャンセル</button>
+        <SharedGroupSubmitButton disabled={pending} tone="danger" pendingLabel="解除中…">{result ? "もう一度試す" : "解除する"}</SharedGroupSubmitButton>
+      </form>
+    </SharedGroupDialog>
+  );
+}
+
+// A rejected transport request stops useActionState's queue. Remount the form
+// on retry, while letting Next.js handle successful server redirects itself.
+class RemovalErrorBoundary extends Component<RemovalDialogProps, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(error: unknown) {
+    unstable_rethrow(error);
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return <RemoveSharedMemoryDialog {...this.props} />;
+
+    return (
+      <SharedGroupDialog title="思い出の共有を解除" onClose={this.props.onClose} returnFocusRef={this.props.returnFocusRef}>
+        <p role="alert" className="auth-notice auth-notice--error mt-4">通信状態を確認して、もう一度お試しください。</p>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" onClick={this.props.onClose} className={cancelClassName}>キャンセル</button>
+          <button type="button" onClick={() => this.setState({ failed: false })} className={cancelClassName}>もう一度試す</button>
+        </div>
+      </SharedGroupDialog>
+    );
+  }
+}
+
+export function SharedMemoryMenu({ groupId, memoryId, caption }: MemoryMenuProps) {
   const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const pendingRef = useRef(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const triggerRef = useRef<HTMLElement>(null);
-  const close = () => {
-    if (pendingRef.current) return;
-    setConfirming(false);
-  };
+  const close = () => setConfirming(false);
 
   return (
     <>
@@ -35,41 +79,11 @@ export function SharedMemoryMenu({ groupId, memoryId, caption }: { groupId: stri
           <button type="button" onClick={() => {
             if (detailsRef.current) detailsRef.current.open = false;
             triggerRef.current?.focus();
-            setError(null);
             setConfirming(true);
           }} className="min-h-11 w-full rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-paper focus-visible:outline-coral">共有を解除</button>
         </div>
       </details>
-      {confirming ? <SharedGroupDialog title="思い出の共有を解除" busy={busy} onClose={close} returnFocusRef={triggerRef}>
-        <p className="mt-4 break-words text-sm leading-6">「{caption}」の共有を解除しますか？</p>
-        <p className="mt-2 text-xs leading-6 text-ink/60">このグループから思い出が外れます。現在のメンバーが所有する元の思い出と写真は残ります。退会者の保持写真は、最後の共有先がなくなると削除されます。</p>
-        <form action={async (formData) => {
-          if (pendingRef.current) return;
-          pendingRef.current = true;
-          setBusy(true);
-          setError(null);
-          try {
-            const result = await removeSharedMemoryAction(formData);
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            setConfirming(false);
-            router.replace(`/shared-groups/${groupId}?${new URLSearchParams({ success: "共有を解除しました。" })}`, { scroll: false });
-            router.refresh();
-          } catch {
-            setError("通信状態を確認して、もう一度お試しください。");
-          } finally {
-            pendingRef.current = false;
-            setBusy(false);
-          }
-        }} aria-busy={busy} className="mt-5 grid grid-cols-2 gap-3">
-          <input type="hidden" name="groupId" value={groupId} /><input type="hidden" name="memoryId" value={memoryId} />
-          {error ? <p role="alert" className="auth-notice auth-notice--error col-span-2">{error}</p> : null}
-          <button type="button" onClick={close} disabled={busy} className="rounded-xl border border-line px-4 py-3 text-xs font-semibold focus-visible:outline-coral disabled:opacity-45">キャンセル</button>
-          <SharedGroupSubmitButton disabled={busy} tone="danger" pendingLabel="解除中…">{error ? "もう一度試す" : "解除する"}</SharedGroupSubmitButton>
-        </form>
-      </SharedGroupDialog> : null}
+      {confirming ? <RemovalErrorBoundary groupId={groupId} memoryId={memoryId} caption={caption} onClose={close} returnFocusRef={triggerRef} /> : null}
     </>
   );
 }

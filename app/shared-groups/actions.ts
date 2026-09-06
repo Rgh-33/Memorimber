@@ -172,9 +172,13 @@ export async function startSharedQuizAction(formData: FormData) {
   redirect(path);
 }
 
-export type RemoveSharedMemoryResult = { ok: true } | { ok: false; error: string };
+export type RemoveSharedMemoryResult = { ok: false; error: string };
 
-export async function removeSharedMemoryAction(formData: FormData): Promise<RemoveSharedMemoryResult> {
+export async function removeSharedMemoryAction(
+  _previousState: RemoveSharedMemoryResult | null,
+  formData: FormData,
+): Promise<RemoveSharedMemoryResult> {
+  console.info("[shared-groups] Memory removal started");
   const groupId = formData.get("groupId");
   try {
     groupPath(groupId);
@@ -191,8 +195,9 @@ export async function removeSharedMemoryAction(formData: FormData): Promise<Remo
     });
     return { ok: false, error: message };
   }
+  console.info("[shared-groups] Memory removal succeeded");
   revalidateGroup(String(groupId));
-  return { ok: true };
+  redirect(noticePath(groupPath(groupId), "success", "共有を解除しました。"));
 }
 
 export async function leaveSharedGroupAction(formData: FormData) {

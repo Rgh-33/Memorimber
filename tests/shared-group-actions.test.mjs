@@ -27,6 +27,7 @@ function harness({ user = { id: USER_ID }, rpcError = null, deleteResult = { mem
   let cleanupCalls = 0;
   const revalidatedPaths = [];
   const errors = [];
+  const infos = [];
   const client = {
     from(table) {
       assert.equal(table, "shared_album_memories");
@@ -76,9 +77,9 @@ function harness({ user = { id: USER_ID }, rpcError = null, deleteResult = { mem
     },
     actionModule,
     actionModule.exports,
-    { error(...args) { errors.push(args); } },
+    { error(...args) { errors.push(args); }, info(...args) { infos.push(args); } },
   );
-  return { removeSharedMemoryAction: actionModule.exports.removeSharedMemoryAction, deleteCalls, get cleanupCalls() { return cleanupCalls; }, addSharedMemoryAction: actionModule.exports.addSharedMemoryAction, insertCalls, respondInvitationAction: actionModule.exports.respondInvitationAction, rpcCalls, revalidatedPaths, errors };
+  return { removeSharedMemoryAction: actionModule.exports.removeSharedMemoryAction, deleteCalls, get cleanupCalls() { return cleanupCalls; }, addSharedMemoryAction: actionModule.exports.addSharedMemoryAction, insertCalls, respondInvitationAction: actionModule.exports.respondInvitationAction, rpcCalls, revalidatedPaths, errors, infos };
 }
 
 async function acceptInvitation(h) {
@@ -195,27 +196,42 @@ function removalForm({ groupId = ALBUM_ID, memoryId = INVITATION_ID } = {}) {
   return form;
 }
 
-test("unsharing removes exactly the selected group link and returns success without redirecting", async () => {
+async function unshareMemory(h) {
+  let url;
+  await assert.rejects(h.removeSharedMemoryAction(null, removalForm()), (error) => {
+    assert.ok(error instanceof Redirect);
+    assert.deepEqual(h.revalidatedPaths, ["/shared-groups", `/shared-groups/${ALBUM_ID}`, "/notifications"]);
+    url = new URL(error.path, "https://memorinber.test");
+    return true;
+  });
+  return url;
+}
+
+test("unsharing removes exactly the selected group link and redirects after revalidation", async () => {
   const h = harness();
-  assert.deepEqual(await h.removeSharedMemoryAction(removalForm()), { ok: true });
+  const url = await unshareMemory(h);
+  assert.equal(url.pathname, `/shared-groups/${ALBUM_ID}`);
+  assert.deepEqual([...url.searchParams], [["success", "共有を解除しました。"]]);
   assert.deepEqual(h.deleteCalls, [{ album_id: ALBUM_ID, memory_id: INVITATION_ID }]);
   assert.equal(h.cleanupCalls, 1);
   assert.deepEqual(h.revalidatedPaths, ["/shared-groups", `/shared-groups/${ALBUM_ID}`, "/notifications"]);
   assert.deepEqual(h.errors, []);
+  assert.deepEqual(h.infos, [["[shared-groups] Memory removal started"], ["[shared-groups] Memory removal succeeded"]]);
 });
 
 test("unsharing returns an explicit error when no row is removed", async () => {
   const h = harness({ deleteResult: null });
-  const result = await h.removeSharedMemoryAction(removalForm());
+  const result = await h.removeSharedMemoryAction(null, removalForm());
   assert.equal(result.ok, false);
   assert.match(result.error, /権限/);
   assert.deepEqual(h.revalidatedPaths, []);
   assert.equal(h.cleanupCalls, 0);
+  assert.deepEqual(h.infos, [["[shared-groups] Memory removal started"]]);
 });
 
 test("unsharing logs database diagnostics while returning a friendly error", async () => {
   const h = harness({ rpcError: { code: "42501", message: "permission denied for table shared_album_memories" } });
-  const result = await h.removeSharedMemoryAction(removalForm());
+  const result = await h.removeSharedMemoryAction(null, removalForm());
   assert.equal(result.ok, false);
   assert.match(result.error, /共有を解除できませんでした/);
   assert.doesNotMatch(result.error, /42501|shared_album_memories/);
@@ -224,28 +240,35 @@ test("unsharing logs database diagnostics while returning a friendly error", asy
   }]]);
   assert.deepEqual(h.revalidatedPaths, []);
   assert.equal(h.cleanupCalls, 0);
+  assert.deepEqual(h.infos, [["[shared-groups] Memory removal started"]]);
 });
 
 test("unsharing validates authentication and IDs before attempting deletion", async () => {
   const unauthenticated = harness({ user: null });
-  const result = await unauthenticated.removeSharedMemoryAction(removalForm());
+  const result = await unauthenticated.removeSharedMemoryAction(null, removalForm());
   assert.equal(result.ok, false);
   assert.match(result.error, /ログイン/);
   assert.deepEqual(unauthenticated.deleteCalls, []);
   assert.deepEqual(unauthenticated.revalidatedPaths, []);
+  assert.deepEqual(unauthenticated.infos, [["[shared-groups] Memory removal started"]]);
   for (const ids of [{ groupId: "invalid" }, { memoryId: "invalid" }]) {
     const h = harness();
-    const invalid = await h.removeSharedMemoryAction(removalForm(ids));
+    const invalid = await h.removeSharedMemoryAction(null, removalForm(ids));
     assert.equal(invalid.ok, false);
     assert.match(invalid.error, /正しくありません/);
     assert.deepEqual(h.revalidatedPaths, []);
+    assert.deepEqual(h.infos, [["[shared-groups] Memory removal started"]]);
   }
 });
 
 test("a cleanup outage does not turn an already removed sharing link into a failure", async () => {
   const h = harness({ cleanupError: new Error("Storage unavailable") });
-  assert.deepEqual(await h.removeSharedMemoryAction(removalForm()), { ok: true });
+  const url = await unshareMemory(h);
+  assert.equal(url.pathname, `/shared-groups/${ALBUM_ID}`);
+  assert.deepEqual([...url.searchParams], [["success", "共有を解除しました。"]]);
   assert.equal(h.cleanupCalls, 1);
   assert.deepEqual(h.deleteCalls, [{ album_id: ALBUM_ID, memory_id: INVITATION_ID }]);
   assert.deepEqual(h.revalidatedPaths, ["/shared-groups", `/shared-groups/${ALBUM_ID}`, "/notifications"]);
+  assert.deepEqual(h.errors, []);
+  assert.deepEqual(h.infos, [["[shared-groups] Memory removal started"], ["[shared-groups] Memory removal succeeded"]]);
 });
