@@ -6,6 +6,7 @@ import { usePreferences } from "@/lib/preferences-context";
 
 const SEPTEMBER_BACKGROUND_MUSIC_URL = "/audio/evoke-september.wav";
 const QUIZ_BACKGROUND_MUSIC_URL = "/audio/memorimber-quiz-bgm.mp3";
+const HARVEST_FLIGHT_MUSIC_URL = "/audio/september-fr-4926.wav";
 const backgroundMusicUrl = process.env.NEXT_PUBLIC_BGM_URL?.trim() || SEPTEMBER_BACKGROUND_MUSIC_URL;
 const QUICK_FADE_OUT_SECONDS = 0.18;
 const FADE_IN_SECONDS = 0.24;
@@ -13,7 +14,7 @@ const QUIZ_RELATIVE_GAIN = 0.30;
 const QUIZ_LOOP_START_SECONDS = 0.0;
 const QUIZ_LOOP_END_SECONDS = 97.4;
 
-export type BackgroundMusicMode = "default" | "countdown" | "quiz";
+export type BackgroundMusicMode = "default" | "countdown" | "quiz" | "harvest";
 
 type AudioContextConstructor = new (options?: AudioContextOptions) => AudioContext;
 type ActiveTrack = {
@@ -157,15 +158,21 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       const { context, masterGain } = graph;
       if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
 
-      if (mode === "countdown") {
+      if (mode === "countdown" || mode === "harvest") {
         fadeOutActiveTrack(context);
-        void loadBuffer(context, QUIZ_BACKGROUND_MUSIC_URL).catch((error: unknown) => {
-          if (!abortController.signal.aborted) console.warn(error);
-        });
-        return;
+        if (mode === "countdown") {
+          void loadBuffer(context, QUIZ_BACKGROUND_MUSIC_URL).catch((error: unknown) => {
+            if (!abortController.signal.aborted) console.warn(error);
+          });
+          return;
+        }
       }
 
-      const url = mode === "quiz" ? QUIZ_BACKGROUND_MUSIC_URL : backgroundMusicUrl;
+      const url = mode === "quiz"
+        ? QUIZ_BACKGROUND_MUSIC_URL
+        : mode === "harvest"
+          ? HARVEST_FLIGHT_MUSIC_URL
+          : backgroundMusicUrl;
       if (activeTrackRef.current?.url === url) return;
 
       let buffer: AudioBuffer;
@@ -181,7 +188,7 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       const trackGain = context.createGain();
       const source = context.createBufferSource();
       source.buffer = buffer;
-      source.loop = true;
+      source.loop = mode !== "harvest";
       if (mode === "quiz") {
         source.loopStart = QUIZ_LOOP_START_SECONDS;
         source.loopEnd = Math.min(QUIZ_LOOP_END_SECONDS, buffer.duration);
@@ -192,13 +199,14 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       source.connect(trackGain);
       trackGain.connect(masterGain);
       source.addEventListener("ended", () => {
+        if (activeTrackRef.current?.source === source) activeTrackRef.current = null;
         source.disconnect();
         trackGain.disconnect();
       }, { once: true });
 
       const now = context.currentTime;
       const trackGainTarget = mode === "quiz" ? QUIZ_RELATIVE_GAIN : 1;
-      if (mode === "quiz") {
+      if (mode === "quiz" || mode === "harvest") {
         trackGain.gain.setValueAtTime(trackGainTarget, now);
       } else {
         trackGain.gain.setValueAtTime(0, now);
@@ -206,6 +214,11 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       }
       source.start(0, source.loopStart);
       activeTrackRef.current = { url, source, gain: trackGain };
+      if (mode === "default") {
+        void loadBuffer(context, HARVEST_FLIGHT_MUSIC_URL).catch((error: unknown) => {
+          if (!abortController.signal.aborted) console.warn(error);
+        });
+      }
       if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
     };
 

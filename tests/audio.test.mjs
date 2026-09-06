@@ -49,7 +49,7 @@ test("September BGM is bundled and uses a sample-accurate Web Audio loop", () =>
   assert.match(component, /document\.addEventListener\("visibilitychange", recoverPlayback\)/);
   assert.match(component, /context\.suspend\(\)\.then\(\(\) => context\.resume\(\)\)/);
   assert.match(component, /createBufferSource\(\)/);
-  assert.match(component, /source\.loop = true/);
+  assert.match(component, /source\.loop = mode !== "harvest"/);
   assert.match(component, /source\.loopStart = 0/);
   assert.match(component, /source\.loopEnd = buffer\.duration/);
   assert.match(middleware, /wav\|mp3\|ogg\|m4a\|aac\|flac/);
@@ -84,4 +84,24 @@ test("quiz BGM is fixed, preloaded silently during the countdown, and fades betw
   assert.match(quizPage, /useState\(3\)/);
   assert.match(quizPage, /setBackgroundMusicMode\(musicMode\)/);
   assert.match(quizPage, /onResults=\{\(\) => setQuizStage\("results"\)\}/);
+});
+
+test("harvest flight audio plays once while the monthly BGM is faded out", () => {
+  const component = readFileSync(new URL("../components/background-music.tsx", import.meta.url), "utf8");
+  const harvest = readFileSync(new URL("../lib/harvest-context.tsx", import.meta.url), "utf8");
+  const recall = readFileSync(new URL("../components/memory-recall-dialog.tsx", import.meta.url), "utf8");
+  const audioUrl = new URL("../public/audio/september-fr-4926.wav", import.meta.url);
+  const descriptor = openSync(audioUrl, "r");
+  const header = Buffer.alloc(12);
+  readSync(descriptor, header, 0, header.length, 0);
+  closeSync(descriptor);
+
+  assert.equal(header.subarray(0, 4).toString("ascii"), "RIFF");
+  assert.equal(header.subarray(8, 12).toString("ascii"), "WAVE");
+  assert.match(component, /HARVEST_FLIGHT_MUSIC_URL = "\/audio\/september-fr-4926\.wav"/);
+  assert.match(component, /mode === "countdown" \|\| mode === "harvest"[\s\S]*fadeOutActiveTrack\(context\)/);
+  assert.match(component, /source\.loop = mode !== "harvest"/);
+  assert.match(harvest, /setBackgroundMusicMode\("harvest"\)[\s\S]*setFlight/);
+  assert.match(harvest, /setFlight\(null\)[\s\S]*setBackgroundMusicMode\("default"\)/);
+  assert.doesNotMatch(recall, /relaunch|HarvestFlight|useHarvest/);
 });

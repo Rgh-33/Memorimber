@@ -217,6 +217,34 @@
   opacity: .38;
   animation: konoha-fading-memory-haze 7.7s ease-in-out -2.1s infinite reverse;
 }
+.konoha-scene .memory-floating-word[data-purifying="true"] { z-index: 8; }
+.konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive {
+  animation: konoha-memory-purify-petal 1.05s ease-out both;
+}
+.konoha-scene .memory-floating-word[data-purifying="true"] .memory-floating-word-label {
+  animation: konoha-memory-purify-word .92s ease-out .14s both;
+}
+.konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive::before,
+.konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive::after {
+  position: absolute;
+  z-index: 5;
+  border-radius: 48% 55% 46% 58%;
+  content: "";
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive::before {
+  inset: 15% 7% 14% 9%;
+  background:
+    radial-gradient(circle at 28% 46%, rgb(5 7 7 / .72) 0 12%, rgb(8 10 10 / .44) 31%, transparent 60%),
+    radial-gradient(circle at 68% 55%, rgb(0 0 0 / .62) 0 14%, rgb(11 12 12 / .4) 34%, transparent 65%);
+  animation: konoha-memory-purify-haze .96s ease-out both;
+}
+.konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive::after {
+  inset: 23% 13% 19% 16%;
+  background: radial-gradient(ellipse at 52% 48%, rgb(0 0 0 / .68), rgb(9 10 10 / .38) 43%, transparent 72%);
+  animation: konoha-memory-purify-haze .88s ease-out .08s both;
+}
 .konoha-fading-pixels { position: absolute; z-index: 7; inset: 13% 9% 14% 10%; pointer-events: none; }
 .konoha-fading-pixel {
   position: absolute;
@@ -244,6 +272,55 @@
 .konoha-fading-pixel:nth-child(16) { left: 42%; top: 76%; width: 4px; height: 4px; background: #030404; animation-delay: -1.1s; animation-duration: 4.7s; }
 .konoha-fading-pixel:nth-child(17) { left: 59%; top: 49%; width: 3px; height: 3px; background: #929496; animation-delay: -4.6s; animation-duration: 6.2s; }
 .konoha-fading-pixel:nth-child(18) { left: 82%; top: 76%; width: 5px; height: 5px; background: #1d2022; animation-delay: -2.2s; animation-duration: 5.3s; }
+.konoha-scene .memory-floating-word[data-purifying="true"] .konoha-fading-pixel {
+  animation: konoha-memory-purify-pixel .72s ease-out both;
+  animation-delay: 0ms;
+}
+.konoha-memory-purification {
+  position: absolute;
+  z-index: 9;
+  inset: -28%;
+  pointer-events: none;
+}
+.konoha-memory-purification::before,
+.konoha-memory-purification::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+.konoha-memory-purification::before {
+  inset: 24%;
+  border: 1px solid rgb(255 255 255 / .78);
+  border-radius: 50%;
+  box-shadow: 0 0 9px rgb(255 255 255 / .36);
+  animation: konoha-memory-purify-ring .92s ease-out .12s both;
+}
+.konoha-memory-purification::after {
+  inset: 29%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 255 255 / .6), rgb(255 255 255 / .16) 34%, transparent 70%);
+  filter: blur(2px);
+  animation: konoha-memory-purify-glow .76s ease-out .06s both;
+}
+.konoha-memory-purification > span {
+  --purify-angle: 0deg;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .92);
+  box-shadow: 0 0 5px rgb(255 255 255 / .58);
+  animation: konoha-memory-purify-spark .82s cubic-bezier(.2,.7,.25,1) .12s both;
+}
+.konoha-memory-purification > span:nth-child(2) { --purify-angle: 45deg; animation-delay: .18s; }
+.konoha-memory-purification > span:nth-child(3) { --purify-angle: 90deg; animation-delay: .1s; }
+.konoha-memory-purification > span:nth-child(4) { --purify-angle: 135deg; animation-delay: .2s; }
+.konoha-memory-purification > span:nth-child(5) { --purify-angle: 180deg; animation-delay: .14s; }
+.konoha-memory-purification > span:nth-child(6) { --purify-angle: 225deg; animation-delay: .22s; }
+.konoha-memory-purification > span:nth-child(7) { --purify-angle: 270deg; animation-delay: .16s; }
+.konoha-memory-purification > span:nth-child(8) { --purify-angle: 315deg; animation-delay: .24s; }
 .konoha-scene .memory-floating-word[data-gesture="pressing"] .konoha-petal-sway,
 .konoha-scene .memory-floating-word[data-gesture="armed"] .konoha-petal-sway { animation-play-state: paused; }
 .konoha-scene .memory-floating-word[data-gesture="pressing"],
@@ -512,6 +589,41 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
   70% { opacity: .62; transform: translate3d(2px, -8px, 0) scale(.82); }
   100% { opacity: 0; transform: translate3d(-1px, -19px, 0) scale(.3); }
 }
+@keyframes konoha-memory-purify-petal {
+  from { filter: saturate(.62) contrast(.92) opacity(.78); }
+  52% { filter: saturate(.86) contrast(.96) opacity(.92); }
+  to { filter: saturate(1) contrast(1) opacity(1); }
+}
+@keyframes konoha-memory-purify-word {
+  from { opacity: 0; filter: blur(3px); transform: translateY(2px); }
+  45% { opacity: .58; }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+@keyframes konoha-memory-purify-haze {
+  from { opacity: .52; filter: blur(4px); transform: scale(1); }
+  62% { opacity: .15; }
+  to { opacity: 0; filter: blur(9px); transform: scale(1.14); }
+}
+@keyframes konoha-memory-purify-pixel {
+  from { opacity: .76; filter: blur(0); transform: translateY(0) scale(1); }
+  44% { opacity: .28; }
+  to { opacity: 0; filter: blur(1.5px); transform: translateY(-12px) scale(.18); }
+}
+@keyframes konoha-memory-purify-ring {
+  from { opacity: 0; transform: scale(.48); }
+  28% { opacity: .68; }
+  to { opacity: 0; transform: scale(1.56); }
+}
+@keyframes konoha-memory-purify-glow {
+  from { opacity: 0; transform: scale(.45); }
+  32% { opacity: .56; }
+  to { opacity: 0; transform: scale(1.34); }
+}
+@keyframes konoha-memory-purify-spark {
+  from { opacity: 0; transform: translate(-50%, -50%) rotate(var(--purify-angle)) translateX(3px) scale(.45); }
+  28% { opacity: .72; }
+  to { opacity: 0; transform: translate(-50%, -50%) rotate(var(--purify-angle)) translateX(38px) scale(.16); }
+}
 @media (prefers-reduced-motion: reduce) {
   .konoha-tree-size, .konoha-seedling, .konoha-seedling-stem, .konoha-cotyledon-joint, .konoha-cotyledon, .konoha-trunk-detail, .konoha-young-wood, .konoha-young-trunk, .konoha-node-size { transition: none; }
   .konoha-tree-wind, .konoha-node-wind, .konoha-stage-enter, .konoha-growth-result, .konoha-magic-aura, .konoha-magic-orbit,
@@ -532,4 +644,10 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
   .konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::before,
   .konoha-scene .memory-floating-word[data-fading="true"] .konoha-petal-arrive::after { animation: none; }
   .konoha-fading-pixel { animation: none; opacity: .5; }
+  .konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive,
+  .konoha-scene .memory-floating-word[data-purifying="true"] .memory-floating-word-label { animation: none; filter: none; opacity: 1; }
+  .konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive::before,
+  .konoha-scene .memory-floating-word[data-purifying="true"] .konoha-petal-arrive::after,
+  .konoha-scene .memory-floating-word[data-purifying="true"] .konoha-fading-pixels,
+  .konoha-memory-purification { display: none; }
 }

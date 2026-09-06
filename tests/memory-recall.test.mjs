@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { MEMORY_RECALL_STALE_MS, chooseFadingMemoryId, readMemoryRecallState, recordMemoryReview } from "../lib/memory-recall.ts";
 
@@ -30,4 +31,21 @@ test("stored recall state rejects malformed timestamps", () => {
     reviewedAt: { ok: 123 }, featuredId: "ok",
   });
   assert.deepEqual(readMemoryRecallState("not json"), { reviewedAt: {}, featuredId: null });
+});
+
+test("recall restoration returns directly to the tree with a subtle purification effect", () => {
+  const dialog = readFileSync(new URL("../components/memory-recall-dialog.tsx", import.meta.url), "utf8");
+  const tree = readFileSync(new URL("../components/memory-tree.tsx", import.meta.url), "utf8");
+  const treeCss = readFileSync(new URL("../app/konoha.css", import.meta.url), "utf8");
+  const fruitQuiz = readFileSync(new URL("../components/fruit-quiz-dialog.tsx", import.meta.url), "utf8");
+  const quizCss = readFileSync(new URL("../app/quiz.css", import.meta.url), "utf8");
+
+  assert.match(dialog, /onRemembered\(\);\s*onClose\(\);/);
+  assert.match(dialog, /花びらをもとに戻す/);
+  assert.match(tree, /setPurifyingMemoryId\(memoryId\)/);
+  assert.match(tree, /data-purifying=\{isPurifying \|\| undefined\}/);
+  assert.match(treeCss, /konoha-memory-purify-haze/);
+  assert.match(treeCss, /konoha-memory-purification/);
+  assert.match(fruitQuiz, /data-golden-quiz=\{golden \|\| undefined\}/);
+  assert.match(quizCss, /fruit-quiz-overlay\[data-golden-quiz="true"\]/);
 });

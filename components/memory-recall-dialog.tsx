@@ -7,7 +7,6 @@ import { Check, X } from "lucide-react";
 import { MemoryPetal } from "@/components/memory-petal";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
-import { useHarvest } from "@/lib/harvest-context";
 import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -19,7 +18,6 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   onClose: () => void;
   onRemembered: () => void;
 }) {
-  const harvest = useHarvest();
   const closeButton = useRef<HTMLButtonElement>(null);
   const [question] = useState(() => createMemoryQuizQuestion(
     memory,
@@ -34,32 +32,31 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   useEffect(() => {
     closeButton.current?.focus();
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !harvest.busy) onClose();
+      if (event.key === "Escape") onClose();
     };
     document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [harvest.busy, onClose]);
+  }, [onClose]);
 
   const releasePetal = () => {
-    if (!harvest.relaunch(memory.id, word)) return;
     onRemembered();
     onClose();
   };
 
   return (
     <div className="fruit-quiz-overlay konoha-petal-colors" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !harvest.busy) onClose();
+      if (event.target === event.currentTarget) onClose();
     }}>
       <div className="fruit-quiz-petal-shower" aria-hidden="true">
         {Array.from({ length: 7 }, (_, index) => <MemoryPetal key={index} className="fruit-quiz-falling-petal" />)}
       </div>
       <section className="fruit-quiz-dialog memory-recall-dialog" data-step={answered ? "word" : "quiz"} role="dialog" aria-modal="true" aria-labelledby="memory-recall-title">
-        <button ref={closeButton} type="button" className="fruit-quiz-close" onClick={onClose} disabled={harvest.busy} aria-label="思い出しクイズを閉じる"><X size={18} /></button>
+        <button ref={closeButton} type="button" className="fruit-quiz-close" onClick={onClose} aria-label="思い出しクイズを閉じる"><X size={18} /></button>
         <p className="fruit-quiz-eyebrow">{answered ? "MEMORY RETURNED" : "FADING MEMORY"}</p>
         <h2 id="memory-recall-title">{answered ? (isCorrect ? "覚えてたね" : "失いかけてたね") : "消えかけた思い出"}</h2>
-        <p className="fruit-quiz-lead">{answered ? "前と同じ言葉を花びらに戻して、もう一度空へ飛ばそう。" : "クイズに答えて、この思い出をもう一度つなぎとめよう。"}</p>
+        <p className="fruit-quiz-lead">{answered ? "前と同じ言葉が花びらに戻ります。" : "クイズに答えて、この思い出をもう一度つなぎとめよう。"}</p>
 
         {!answered ? (
           <div className="fruit-quiz-question-step">
@@ -83,10 +80,9 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
               <MemoryPetal />
               <strong>{word}</strong>
             </div>
-            <button type="button" className="quiz-primary-button" onClick={releasePetal} disabled={harvest.busy}>もう一度花びらを飛ばす</button>
+            <button type="button" className="quiz-primary-button" onClick={releasePetal}>花びらをもとに戻す</button>
           </div>
         )}
-        {harvest.error && <p role="alert" className="fruit-quiz-error">{harvest.error}</p>}
       </section>
     </div>
   );
