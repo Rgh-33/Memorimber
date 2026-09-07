@@ -452,7 +452,7 @@ export async function updateMemory(client: SupabaseClient, id: string, input: Me
   if (!UUID_PATTERN.test(id)) throw new MemoryNotFoundError();
   const fields = validateMemoryFields(input);
   const user = await requireUser(client);
-  let payload: Record<string, unknown> = { ...fields, ...(input.letter !== undefined ? { letter_save_id: crypto.randomUUID() } : {}) };
+  let payload: Record<string, unknown> = { ...fields };
   let lastError: unknown = null;
   for (const columns of MEMORY_ROW_COLUMN_SETS) {
     const result = await client.from("memories").update(payload)

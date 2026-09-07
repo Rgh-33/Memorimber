@@ -2,15 +2,13 @@
 import { createClient } from "@/lib/supabase/client";
 import type { MemoryQuizQuestion, QuizHistoryEntry } from "@/lib/quiz";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
-export type SavedQuestion = MemoryQuizQuestion & { sessionId: string; correct?: boolean; selectedChoiceId?: string };
+export type SavedQuestion = MemoryQuizQuestion & { sessionId: string; correct?: boolean | null; selectedChoiceId?: string | null };
 function hydrate(question: SavedQuestion, memories: Memory[]): SavedQuestion {
-  const byId = new Map(memories.map((memory) => [memory.id, memory]));
-  const memory = byId.get(question.memoryId);
-  return {
-    ...question,
-    memory: { ...question.memory, imageUrl: memory?.imageUrl ?? "", thumbnailUrl: memory?.thumbnailUrl },
-    choices: question.choices.map((choice) => question.kind === "caption-to-photo" ? { ...choice, imageUrl: byId.has(choice.id) ? getMemoryDisplayUrl(byId.get(choice.id)!) : "" } : choice),
-  };
+  // Unanswered DTOs are already safe to render. Never reconstruct hidden
+  // metadata or choice mappings from the owner's memories cache.
+  if (question.correct === null || question.correct === undefined) return question;
+  const memory = memories.find((item) => item.id === question.memoryId);
+  return memory ? { ...question, memory: { ...question.memory, imageUrl: getMemoryDisplayUrl(memory), thumbnailUrl: memory.thumbnailUrl } } : question;
 }
 export async function startPersonalQuiz(mode: string, count: number, memories: Memory[], memoryId?: string, photoCount?: number) {
   const { data, error } = await createClient().rpc("start_personal_quiz", { p_mode: mode, p_count: count, p_memory: memoryId ?? null, p_photo_count: photoCount ?? null });

@@ -1,6 +1,5 @@
 alter table public.shared_album_memories add column activity_event_id uuid not null default gen_random_uuid();
 create unique index shared_album_memories_activity_event_idx on public.shared_album_memories(activity_event_id);
-alter table public.memories add column letter_save_id uuid;
 create table public.personal_quiz_sessions (
  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
  mode text not null check(mode in ('quick','mixed','photo-to-caption','caption-to-photo','endless','fruit','recall')),
@@ -19,16 +18,45 @@ alter table public.personal_quiz_questions enable row level security;
 revoke all on public.personal_quiz_sessions,public.personal_quiz_questions from anon,authenticated;
 -- Questions/answers are exposed only through authenticated RPCs: no answer key
 -- is available before an answer is committed.
+-- Only this explicit projection crosses the RPC boundary. The stored snapshot,
+-- answer key, source memory IDs and choice-to-memory map stay inside PostgreSQL.
 create function private.personal_question_json(p_question public.personal_quiz_questions) returns jsonb
 language sql stable set search_path='' as $$
- select p_question.snapshot || jsonb_build_object('id',p_question.id,'sessionId',p_question.session_id,'kind',p_question.kind,
- 'choices',p_question.choices,'correctChoiceId',case when p_question.answered_at is not null then p_question.correct_choice_id else '' end,
+ select jsonb_build_object('id',p_question.id,'sessionId',p_question.session_id,'kind',p_question.kind,
+ 'prompt',p_question.snapshot->>'prompt',
+ 'memoryId',case when p_question.answered_at is not null then p_question.snapshot->>'memoryId' else '' end,
+ 'memory',case when p_question.answered_at is not null then p_question.snapshot->'memory'
+   else jsonb_build_object('id','','caption','','date','','people','[]'::jsonb,'tags','[]'::jsonb) end
+   || jsonb_build_object('imageUrl',case when p_question.kind<>'caption-to-photo' or p_question.answered_at is not null
+     then '/api/personal-quizzes/'||p_question.id::text||'/media' else '' end),
+ 'choices',(select coalesce(jsonb_agg(jsonb_build_object('id',c.item->>'id') ||
+   case when p_question.kind='caption-to-photo'
+    then jsonb_build_object('imageUrl','/api/personal-quizzes/'||p_question.id::text||'/media?choice='||(c.item->>'id'))
+    else jsonb_build_object('label',c.item->>'label') end order by c.ordinal),'[]'::jsonb)
+   from jsonb_array_elements(p_question.choices) with ordinality c(item,ordinal)),
+ 'correctChoiceId',case when p_question.answered_at is not null then p_question.correct_choice_id else '' end,
  'correctLabel',case when p_question.answered_at is not null then case when p_question.kind='caption-to-photo' then 'この思い出の写真' else coalesce((select c->>'label' from jsonb_array_elements(p_question.choices) c where c->>'id'=p_question.correct_choice_id),p_question.snapshot->'memory'->>'caption') end else '' end,
- 'correct',p_question.is_correct,'selectedChoiceId',p_question.selected_choice_id);
+ 'correct',case when p_question.answered_at is not null then p_question.is_correct else null end,
+ 'selectedChoiceId',case when p_question.answered_at is not null then p_question.selected_choice_id else null end);
 $$;
+-- Service-only media lookup. The HTTP handler supplies a verified user ID and
+-- streams the image, never redirecting to an underlying Storage path/URL.
+create function public.server_personal_quiz_media(p_caller uuid,p_question uuid,p_choice text default null) returns text
+language sql stable security definer set search_path='' as $$
+ select coalesce(m.thumbnail_path,m.image_path)
+ from public.personal_quiz_questions q join public.personal_quiz_sessions s on s.id=q.session_id
+ join public.memories m on m.id=case
+   when p_choice is null and (q.kind<>'caption-to-photo' or q.answered_at is not null) then q.memory_id
+   when p_choice is not null and q.kind='caption-to-photo' then
+    (select c->>'memoryId' from jsonb_array_elements(q.choices) c where c->>'id'=p_choice)::uuid
+   end
+ where q.id=p_question and s.user_id=p_caller and m.user_id=p_caller;
+$$;
+revoke all on function public.server_personal_quiz_media(uuid,uuid,text) from public,anon,authenticated;
+grant execute on function public.server_personal_quiz_media(uuid,uuid,text) to service_role;
 create function private.append_personal_question(p_session uuid,p_memory uuid default null) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare v_session public.personal_quiz_sessions; v_memory public.memories; v_kind text; v_choices jsonb; v_correct text; v_question public.personal_quiz_questions; v_index integer;
+declare v_session public.personal_quiz_sessions; v_memory public.memories; v_kind text; v_choices jsonb; v_correct text; v_question public.personal_quiz_questions; v_index integer; v_month_offset integer;
 begin
  select * into strict v_session from public.personal_quiz_sessions s where s.id=p_session for update;
  select count(*) into v_index from public.personal_quiz_questions q where q.session_id=p_session;
@@ -38,16 +66,21 @@ begin
  when v_session.mode='mixed' then case when v_index < v_session.photo_count then 'photo-to-caption' else 'caption-to-photo' end
  when v_session.mode in ('fruit','recall') then (array['photo-to-caption','caption-to-photo'])[1+floor(random()*2)::integer]
  else (array['month','photo-to-caption','caption-to-photo'])[1+floor(random()*3)::integer] end;
+ -- Every choice has an independent random ID; source IDs and month values
+ -- are stored privately for grading/media lookup, never used as public IDs.
  if v_kind='month' then
-  v_correct:=to_char(v_memory.memory_date,'YYYY-MM');
-  select jsonb_agg(jsonb_build_object('id',x.month,'label',to_char(x.day,'YYYY年FMMM月')) order by random()) into v_choices
-   from (select to_char(v_memory.memory_date+g.n*interval '1 month','YYYY-MM') as month,v_memory.memory_date+g.n*interval '1 month' as day from generate_series(-1,1) g(n)) x;
+  -- Randomize the correct month's position in the date range as well as the
+  -- displayed ordering. A fixed [-1,0,+1] range leaks the median as the answer.
+  v_month_offset:=floor(random()*3)::integer;
+  select jsonb_agg(jsonb_build_object('id',gen_random_uuid()::text,'month',x.month,'label',to_char(x.day,'YYYY年FMMM月')) order by random()) into v_choices
+   from (select to_char(v_memory.memory_date+g.n*interval '1 month','YYYY-MM') as month,v_memory.memory_date+g.n*interval '1 month' as day from generate_series(-v_month_offset,2-v_month_offset) g(n)) x;
+  select c->>'id' into strict v_correct from jsonb_array_elements(v_choices) c where c->>'month'=to_char(v_memory.memory_date,'YYYY-MM');
  else
-  v_correct:=v_memory.id::text;
-  select jsonb_agg(jsonb_build_object('id',x.id,'label',x.caption) order by random()) into v_choices from (
+  select jsonb_agg(jsonb_build_object('id',gen_random_uuid()::text,'memoryId',x.id,'label',x.caption) order by random()) into v_choices from (
    select v_memory.id,v_memory.caption union all
    (select m.id,m.caption from public.memories m where m.user_id=v_session.user_id and m.id<>v_memory.id and (v_kind<>'photo-to-caption' or btrim(m.caption)<>btrim(v_memory.caption)) order by random() limit 2)
   ) x;
+  select c->>'id' into strict v_correct from jsonb_array_elements(v_choices) c where c->>'memoryId'=v_memory.id::text;
  end if;
  insert into public.personal_quiz_questions(session_id,question_index,memory_id,kind,choices,correct_choice_id,snapshot)
  values(p_session,v_index,v_memory.id,v_kind,v_choices,v_correct,jsonb_build_object('memoryId',v_memory.id,
@@ -123,8 +156,13 @@ declare v_user uuid; v_metrics jsonb;
 begin
  if tg_table_name='memories' then
   v_user:=case when tg_op='DELETE' then old.user_id else new.user_id end;
-  if tg_op='UPDATE' and new.user_id is not null and (new.letter is distinct from old.letter or new.letter_save_id is distinct from old.letter_save_id) and char_length(btrim(coalesce(new.letter,'')))>0 then
-   perform private.record_profile_event(new.user_id,'letter-saved',case when new.letter_save_id is distinct from old.letter_save_id then new.letter_save_id::text else gen_random_uuid()::text end,'{"savedAlbumLetters":1}');
+  -- The row lock for INSERT/UPDATE serializes the content comparison. A retry
+  -- of identical text, a whitespace-only edit, or an unrelated field update
+  -- creates no success event. Clients cannot supply an event identifier.
+  if tg_op='DELETE' then perform private.evaluate_profile(v_user);
+  elsif new.user_id is not null and char_length(btrim(coalesce(new.letter,'')))>0
+    and (tg_op='INSERT' or btrim(new.letter) is distinct from btrim(old.letter)) then
+   perform private.record_profile_event(new.user_id,'letter-saved',gen_random_uuid()::text,'{"savedAlbumLetters":1}');
   else perform private.evaluate_profile(v_user); end if;
  elsif tg_table_name='memory_fruits' then
   if old.harvested_at is null and new.harvested_at is not null then
