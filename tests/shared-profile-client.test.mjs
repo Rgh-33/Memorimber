@@ -17,6 +17,7 @@ function load(path) {
     if (name === "node:crypto") return { createHash };
     if (name === "@/lib/profile-avatar-path") return { isOwnedProfileAvatarPath };
     if (name === "@/lib/profile-data") return { createEmptyProfileActivityStats };
+    if (name === "./shared-members-diagnostics") return load("../lib/supabase/shared-members-diagnostics.ts");
     throw new Error(`Unexpected dependency (admin clients are forbidden): ${name}`);
   } });
   return exports;
