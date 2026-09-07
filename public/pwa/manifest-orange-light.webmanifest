@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Memorimber",
+  "short_name": "Memorimber",
+  "description": "写真1枚と一言で、日常の思い出を残すWebアプリ",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#edf5fd",
+  "theme_color": "#edf5fd",
+  "icons": [
+    {
+      "src": "/pwa/icon-orange-light-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/icon-orange-light-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

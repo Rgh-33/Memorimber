@@ -271,8 +271,7 @@
   line-height: 1.45;
 }
 
-.shared-quiz-lead,
-.shared-quiz-countdown p {
+.shared-quiz-lead {
   margin: 8px auto 0;
   color: rgb(var(--ink-rgb) / 0.55);
   font-size: 12px;
@@ -288,24 +287,7 @@
   text-align: center;
 }
 
-.shared-quiz-countdown-number {
-  display: grid;
-  width: 116px;
-  height: 116px;
-  margin-bottom: 18px;
-  place-items: center;
-  border: 2px solid rgb(var(--accent-rgb) / 0.34);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle, rgb(var(--accent-soft-rgb) / 0.2), transparent 68%),
-    var(--paper);
-  color: var(--accent);
-  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
-  font-size: 54px;
-  font-weight: 700;
-  box-shadow: 0 0 0 10px rgb(var(--accent-rgb) / 0.05), 0 18px 44px rgb(var(--accent-rgb) / 0.16);
-  animation: shared-quiz-countdown-pop 560ms ease-out both;
-}
+.shared-quiz-countdown-participants { margin-top: 9px; color: rgb(var(--ink-rgb) / 0.55); font-size: 12px; }
 
 .shared-quiz-playing {
   margin-top: 22px;
@@ -451,16 +433,7 @@
 .shared-quiz-rank[data-rank="2"] { background: rgb(126 145 165 / 0.14); color: #65788b; }
 .shared-quiz-rank[data-rank="3"] { background: rgb(184 111 62 / 0.13); color: #a05f34; }
 
-@keyframes shared-quiz-countdown-pop {
-  from { opacity: 0; transform: scale(0.74); }
-  to { opacity: 1; transform: scale(1); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .shared-quiz-countdown-number {
-    animation: none;
-  }
-
   .shared-quiz-timer-track span {
     transition: none;
   }
@@ -519,6 +492,10 @@
 .fruit-quiz-dialog .quiz-question-card { margin-top: 16px; }
 .fruit-quiz-dialog .quiz-question-title { min-height: 0; font-size: 15px; }
 .fruit-quiz-dialog .quiz-mosaic-photo:not(.quiz-mosaic-photo--compact) { margin-top: 11px; }
+.fruit-quiz-question-step--gentle .quiz-mosaic-mark { display: none; }
+.fruit-quiz-question-step--gentle .quiz-mosaic-photo:not([data-revealed]) img { filter: blur(5px) saturate(.95); }
+.fruit-quiz-question-step--gentle .quiz-mosaic-photo--compact:not([data-revealed]) img { filter: blur(3px) saturate(.95); }
+.fruit-quiz-question-step--gentle .quiz-mosaic-photo:not([data-revealed])::after { opacity: .2; }
 .fruit-quiz-dialog .quiz-text-choices, .fruit-quiz-dialog .quiz-photo-choices { margin-top: 11px; }
 .fruit-quiz-dialog .quiz-text-choices { gap: 7px; }
 .fruit-quiz-dialog .quiz-text-choices .quiz-choice { min-height: 43px; padding-block: 9px; }

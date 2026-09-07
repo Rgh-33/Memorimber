@@ -446,7 +446,10 @@ html[data-mode="dark"] .konoha-tree-moon { display: block; opacity: .56; }
   transform: translateX(-50%);
 }
 .konoha-preview-toggle { display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; }
-.konoha-preview-toggle input { width: 12px; height: 12px; accent-color: var(--accent); }
+.konoha-preview-toggle input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: var(--accent); }
+.konoha-preview-toggle span { font-weight: 700; color: var(--ink); }
+.konoha-preview-toolbar-heading { display: flex; min-height: 24px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 3px 4px; border-bottom: 1px solid rgb(var(--line-rgb) / .58); }
+.konoha-preview-toolbar-heading > span { color: rgb(var(--ink-rgb) / .42); font-size: 9px; letter-spacing: .08em; }
 .konoha-preview-date { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; }
 .konoha-preview-date input { width: 128px; min-width: 0; padding: 5px 0; background: transparent; color: inherit; font: inherit; text-align: center; }
 .konoha-preview-date button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
@@ -455,9 +458,9 @@ html[data-mode="dark"] .konoha-tree-moon { display: block; opacity: .56; }
 .konoha-preview--fixed fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .konoha-preview--fixed .konoha-preview-date {
   display: grid;
-  grid-template-columns: auto 36px minmax(82px, 1fr) 36px 36px;
+  grid-template-columns: 36px minmax(82px, 1fr) 36px 36px;
   gap: 4px;
-  margin-top: 0;
+  margin-top: 4px;
 }
 .konoha-preview--fixed .konoha-preview-toggle { justify-content: flex-start; gap: 5px; white-space: nowrap; }
 .konoha-preview--fixed .konoha-preview-date input { width: 100%; padding: 4px 0; }
