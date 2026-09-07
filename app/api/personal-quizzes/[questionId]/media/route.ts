@@ -1,7 +1,6 @@
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { MEMORY_IMAGE_BUCKET } from "@/lib/supabase/memories";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isUuid } from "@/lib/supabase/shared-albums";
 
 // Keep memory paths and IDs out of both JSON and image redirects. Auth and
@@ -16,11 +15,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ ques
     const client = await createClient();
     const { data: { user } } = await client.auth.getUser();
     if (!user) return missing();
-    const { data: path, error } = await createAdminClient().rpc("server_personal_quiz_media", {
-      p_caller: user.id, p_question: questionId, p_choice: choice,
+    const { data: ref, error } = await client.rpc("get_personal_quiz_media_ref", {
+      p_question: questionId, p_choice: choice,
     });
     if (error) throw error;
-    if (typeof path !== "string") return missing();
+    if (typeof ref !== "string") return missing();
+    const { data: memory, error: lookupError } = await client.from("memories").select("thumbnail_path,image_path")
+      .eq("user_id", user.id).eq("quiz_media_ref", ref).limit(1).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!memory) return missing();
+    const path = memory.thumbnail_path ?? memory.image_path;
     // The user-scoped Storage client adds the existing ownership/RLS check.
     const image = await client.storage.from(MEMORY_IMAGE_BUCKET).download(path);
     if (image.error || !image.data) return missing();

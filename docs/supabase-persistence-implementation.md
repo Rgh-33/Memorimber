@@ -84,7 +84,7 @@ Realtime payloadは状態へ取り込まず、version再確認の通知として
 - オーナー移譲は今回対象外。冠の確認は現在のDB roleとの一致まで。
 - 現在の共有クイズのカード構造、設定説明の「このタブ内」など、仕様書と異なる見た目・文言は変更していません。
 - Supabaseに残る過去履歴の実際の量、適用済みversion、手作業オブジェクト、RLS/Storageの実動作は未確認です。
-- 今回のメンバー画像署名で、既存の `SUPABASE_SECRET_KEY` がサーバー側に必要です。既存のcleanup実行にも `CRON_SECRET` と定期呼び出しが必要です。値をブラウザへ渡さないでください。
+- 通常の共有表示・個人クイズには `SUPABASE_SECRET_KEY` は不要です（後続 `20260907030000` 適用後）。アカウント削除・cleanupでは従来どおり必要で、cronには `CRON_SECRET` と定期呼び出しも必要です。管理用キーをブラウザへ渡さないでください。
 - `supabase_realtime` publicationが存在する場合は通知用テーブルを追加します。存在しない場合、操作成功・画面表示・focus時のversion確認は使えますが、他端末のリアルタイム反映は別途設定が必要です。
 - 発行済み署名URLそのものは期限まで有効です。アプリのキャッシュ破棄と、既に取得したURLの失効は別です。
 - ブラウザ保存の旧グループアイコン・設定・レベルは引き継がれません。オーナーが現在の既存操作から再保存してください。
@@ -371,7 +371,66 @@ Realtime payloadは状態へ取り込まず、version再確認の通知として
 
 調査時のローカル.env.localには公開URL・公開キーだけがあり、SUPABASE_SECRET_KEYは未設定でした。グループのメンバープロフィール取得がcreateAdminClientを共用しており、この未設定チェックの既存文言が表示されます。SafariのrandomUUID例外とは独立した設定不足です。
 
-同じSupabaseプロジェクトのサーバー用キーをローカル.env.localの `SUPABASE_SECRET_KEY` に設定し、開発サーバーを再起動してください。チャットへの貼り付け・NEXT_PUBLIC_付き変数への保存・Gitへのコミットはしません。.env.exampleの用途説明も更新しました。Codexは実際のキーを追加・推測・取得していません。設定後の取得成功は未確認です。
+このエラーへの当初の設定追加案は、下記の通常クライアントへの変更で置き換えます。通常の共有表示のためにSecret keyを追加する必要はありません。新規 `20260907030000` の適用と対応コードへの更新後に確認してください。Codexはキーを追加・推測・取得していません。
 
 
 今回のUUID修正後も `npm run lint`、`npm run build` とbuild内のTypeScriptチェックは終了コード0で成功しました。追加単体テスト・Safari/Chrome実機操作・DBテストは未実行です。migration差分はありません。UIのclassName・markupを変更せず、既存エラー領域と識別子生成の内部処理だけに接続しました。
+
+
+## 通常の共有表示からservice_role依存を除去（現在の最終構成）
+
+この節は、上に残る実装経緯の「メンバー画像を管理用clientで署名」「クイズ画像検索はservice_role専用」という記述を置き換えます。通常のShare表示・メンバー取得・メンバープロフィール・アバター・個人クイズ画像は、ログイン中ユーザーのSupabase clientだけで処理します。アカウント削除・retained memory cleanup・group icon cleanupは従来どおり管理用clientを使います。
+
+### 新規migrationと適用順
+
+`supabase/migrations/20260907030000_authenticated_shared_profiles_and_media.sql` を追加しました。既存の `20260907025000` の後に適用してください。今回一時編集した070210/070220は作業開始時の内容へ戻し、既存migrationは変更していません。DBへは適用していません。
+
+新規migrationの内容：
+
+- `get_shared_group_profiles(group, target)`：caller引数なし。auth.uidで呼び出し元を決定し、呼び出し元と対象の両者が指定グループの現メンバーであることを検査。最小限のプロフィールと16記録、アプリのアバター取得URLを返す。基準値・イベント・メール・Auth metadata・生のStorageパスは返さない。
+- `get_shared_group_avatar_ref(group, target)`：同じ所属検査の下、現アバターの不透明な参照値だけを返す。これは認証トークンではなく変更判別用で、画像取得にも毎回所属確認が必要。
+- `current_shared_member_avatar_read`：StorageのSELECTだけを追加。共通の現グループに属する本人の、現在profilesに設定されたアバターに限定。profiles全体へのSELECT拡張・他人の画像のINSERT/UPDATE/DELETEは追加しない。
+- `memories.quiz_media_ref` と索引：既存の写真パスから算出する参照値で、通常clientが本人のmemoriesを既存RLS下で効率よく検索するために使用。
+- `get_personal_quiz_media_ref(question, choice)`：auth.uidで所有セッションを検査し、不透明な参照値だけを返す。回答前の正解非公開・形式ごとの画像アクセス制限は維持。
+- 旧 `server_group_profiles` / `server_personal_quiz_media` の表示用service_role RPCを削除。アカウント削除・cleanup用の関数・権限は変更しない。
+
+### フロント／サーバーの変更ファイル
+
+- `lib/supabase/group-profiles.ts`：渡された通常clientで認証とRPCを実行。createAdminClientを廃止し、明示したDTO項目だけを返す。
+- `lib/supabase/shared-avatar.ts`：通常clientで所属・参照を確認し、RLSで閲覧可能なStorage metadataから該当画像だけを取得。本人の旧アップロードが残る場合にもページ送りで対象を検索し、ダウンロード前に現所属・現参照を再確認。
+- `app/api/shared-groups/[groupId]/members/[userId]/avatar/route.ts`：認証付き画像応答。Storage URLへのリダイレクトや内部パスの返却は行わない。グループ外・不存在・未認証は同じ404。共有キャッシュの分離とversion更新処理は変更しない。
+- `app/api/personal-quizzes/[questionId]/media/route.ts`：通常clientの参照RPC＋本人memories検索＋Storage読み取りへ変更。EXIF除去は維持。
+- `lib/profile-avatar-path.ts`：パス検査の実装は維持し、管理権限での署名を前提とするコメントを修正。
+- `.env.example`：Secret keyの用途をアカウント削除・cleanupと明記。通常表示には不要。
+- TSX・CSS・画面遷移・文言・ボタン・設定項目は変更なし。
+
+### レビューと未実行のテスト
+
+関数定義順、削除する旧RPCの参照、auth.uid、空search_path、完全修飾名、GRANT/REVOKE、JSON返却項目、RLS、NULL、名前衝突をソースでレビューしています。caller IDを偽装する引数はなく、プロフィール表のSELECTポリシーは変更していません。memoriesの生成列追加は活動イベントの再生や加算を行わず、070200/070250のbaseline・backfillは変更しません。
+
+- 追加：`tests/shared-profile-client.test.mjs`。通常clientのみでのメンバー取得、返却項目の限定、avatarページ送り、途中の所属喪失時のダウンロード抑止。
+- 追加：`supabase/tests/database/shared_profiles_auth.test.sql`。authenticated権限での取得、profileの直接SELECT制限、現在画像だけのStorage読み取り、他人の画像の更新・削除拒否、グループ外・退出後の拒否。
+- 更新：`profile_persistence.test.sql` と `personal_quiz_privacy.test.sql` のRPC呼び出し・本人判定を新しい引数へ合わせました。
+- 上記テスト、npm test、DBテスト、ブラウザ確認は未実行です。
+
+### ユーザー側のローカル確認手順
+
+1. 既存migrationの適用状況を確認し、新規 `20260907030000` を070250の後へ適用する。既存ファイルを編集・再適用しない。
+2. 通常表示を確認する環境では `SUPABASE_SECRET_KEY` を設定せず、公開URL・公開キーとログインセッションで開発サーバーを起動する。
+3. オーナー／メンバーで共有一覧→詳細→設定→メンバープロフィールを開く。名前・Lv.N・16記録・画像が表示され、「アカウント削除用のサーバー設定」エラーが出ないことを確認。
+4. NetworkでメンバーRPCとアバター応答を確認し、Storage内部パスやメール等の項目が返らず、Storageへのリダイレクトもないことを確認。
+5. 部外者・退出者・存在しない対象ではプロフィール／アバターが同じ404となることを確認。Storage経由でも他人の過去画像やグループ外の画像を閲覧できず、他人の画像を更新・削除できないことを確認。
+6. 個人クイズ画像もSecret keyなしで表示され、回答前の正解対応表を取得できないことを確認。
+7. 管理処理を確認する環境では従来どおりSecret keyを設定し、アカウント削除・cleanupを別途確認する。
+
+通常の表示経路のadmin依存をコードから除去したことと、実際のDB・Storageが正しく動くことは別です。実DBでの成功は未確認です。
+
+
+### 通常クライアント化の最終確認結果
+
+- `npm run lint`：成功、終了コード0。
+- `SUPABASE_SECRET_KEY= npm run build`：成功、終了コード0。Secret keyを空にしたプロセスでコンパイル・TypeScriptチェック・静的ページ生成・build tracesを完了。これは実DBに対する表示テストではありません。
+- 独立した型チェックscriptはなく、build内のTypeScriptチェックは成功。
+- `git diff --check`：問題なし。既存28 migrationは作業開始時のSHA-256と一致し、変更・削除・改名なし。TSXとCSSも変更なし。
+- origin取得後に65のGit参照を再確認。origin/mainは `da76d4131fa6126c28a2832377cd4bff5a4a169e`、参照内最大versionは070250。新規 `20260907030000` は後続の有効日時で、既知参照・作業ディレクトリにversion重複なし。
+- DB未適用、DBテスト・npm test・E2E・Safari/Chromeの操作確認は未実行。追加テストの合格は確認していません。

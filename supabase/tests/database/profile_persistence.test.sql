@@ -43,8 +43,10 @@ insert into public.shared_album_memories(album_id,memory_id,added_by)
  select '92000000-0000-4000-8000-000000000001',m.id,'91000000-0000-4000-8000-000000000001' from public.memories m where m.user_id='91000000-0000-4000-8000-000000000001' order by m.id limit 3;
 select is((private.profile_snapshot('91000000-0000-4000-8000-000000000001')->'stats'->>'sharedMemories')::integer,3,'three-row sharing adds three');
 select is((private.profile_snapshot('91000000-0000-4000-8000-000000000001')->'stats'->>'sharedMemories')::integer,3,'read does not count sharing again');
-select is(public.server_group_profiles('91000000-0000-4000-8000-000000000003','92000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001'),null::jsonb,'outsider cannot read group profile');
-select is(public.server_group_profiles('91000000-0000-4000-8000-000000000001','92000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000003'),null::jsonb,'outside target is indistinguishable from absent target');
+select set_config('request.jwt.claims','{"sub":"91000000-0000-4000-8000-000000000003","role":"authenticated"}',true);
+select is(public.get_shared_group_profiles('92000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000001'),null::jsonb,'outsider cannot read group profile');
+select set_config('request.jwt.claims','{"sub":"91000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+select is(public.get_shared_group_profiles('92000000-0000-4000-8000-000000000001','91000000-0000-4000-8000-000000000003'),null::jsonb,'outside target is indistinguishable from absent target');
 select ok(not has_table_privilege('authenticated','public.profile_activity_counters','INSERT'),'clients cannot increment counters');
 select ok(not has_function_privilege('authenticated','private.record_profile_event(uuid,text,text,jsonb,timestamptz,boolean)','EXECUTE'),'internal event writer is inaccessible');
 select set_config('request.jwt.claims','{"sub":"91000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
