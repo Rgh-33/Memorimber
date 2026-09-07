@@ -25,7 +25,9 @@ export async function GET() {
   const { user, profile, error } = await getCurrentUserProfile();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (error || !profile) return NextResponse.json({ error: "Profile could not be loaded." }, { status: 500 });
-  return NextResponse.json({ profile: await withSignedAvatar(profile) }, { headers: { "Cache-Control": "private, no-store" } });
+  const { data: progress, error: progressError } = await (await createClient()).rpc("get_profile_progress");
+  if (progressError) return NextResponse.json({ error: "Profile progress could not be loaded." }, { status: 500 });
+  return NextResponse.json({ profile: await withSignedAvatar(profile), progress }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(request: Request) {

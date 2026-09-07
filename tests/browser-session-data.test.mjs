@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { allowBrowserSessionWrites, clearBrowserSessionData, setBrowserSessionItem } from "../lib/browser-session-data.ts";
 
@@ -72,4 +73,12 @@ test("late quiz and upload callbacks cannot recreate data after logout starts", 
   allowBrowserSessionWrites(true);
   setBrowserSessionItem(local, "memorimber-quiz-history-v1", "new visit");
   assert.equal(local.data.get("memorimber-quiz-history-v1"), "new visit");
+});
+
+test("a stale browser session cannot bounce a server-rendered login page back to a protected route", () => {
+  const boundary = readFileSync(new URL("../components/session-boundary.tsx", import.meta.url), "utf8");
+  const publicPageBranch = boundary.match(/if \(publicPage\) \{([\s\S]*?)\n\s*\} else if \(client\)/)?.[1] ?? "";
+
+  assert.match(publicPageBranch, /if \(user\)[\s\S]*allowBrowserSessionWrites\(true\)/);
+  assert.doesNotMatch(publicPageBranch, /window\.location\.(?:replace|reload)/);
 });

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { AlertTriangle, Save, Trash2, X } from "lucide-react";
 import { useProcessing } from "@/lib/processing-context";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import { createClient } from "@/lib/supabase/client";
 import { deleteMemory, MAX_MEMORY_LETTER_LENGTH, updateMemory } from "@/lib/supabase/memories";
 import type { Memory, MemoryUpdateInput } from "@/lib/types";
@@ -26,6 +27,7 @@ export function MemoryDetailActions({
   onDraftChange?: (draft: MemoryUpdateInput) => void;
 }) {
   const { startProcessing, stopProcessing } = useProcessing();
+  const { recordActivity } = useProfileLevel();
   const [caption, setCaption] = useState(memory.caption);
   const [date, setDate] = useState(memory.date);
   const [people, setPeople] = useState(listValue(memory.people));
@@ -63,6 +65,7 @@ export function MemoryDetailActions({
         imageUrl: memory.imageUrl,
         thumbnailUrl: memory.thumbnailUrl,
       });
+      if (letter.trim()) recordActivity("savedAlbumLetters");
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "思い出を更新できませんでした。");

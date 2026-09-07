@@ -1,9 +1,11 @@
+import type { SignedUrlCache } from "../shared-group-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAlbumAppearance } from "../album-appearance.ts";
 import type { Memory } from "../types";
 import { MEMORY_IMAGE_BUCKET, MEMORY_IMAGE_URL_LIFETIME } from "./memories.ts";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHARED_ALBUM_COLUMNS = "id, owner_id, name, created_at, updated_at";
 const MEMORY_COLUMNS = "id, user_id, image_path, thumbnail_path, caption, memory_date, people, tags, letter, album_appearance, created_at, updated_at";
 const SHARED_MEMORY_COLUMNS = `album_id, memory_id, added_by, added_by_display_name, created_at, memory:memories!inner(${MEMORY_COLUMNS})`;
 
@@ -20,6 +22,8 @@ export type SharedAlbumMember = {
   displayName: string;
   role: "owner" | "member";
   joinedAt: string;
+  avatarUrl?: string | null;
+  level?: number;
 };
 
 export type SharedAlbumMemoryEntry = {
@@ -43,7 +47,13 @@ export type SharedAlbumMemoryDetailResult = {
 
 export type SharedMemoryChoice = Pick<Memory, "id" | "date" | "caption"> & { displayUrl: string };
 
-type AlbumRow = { id: string; owner_id: string; name: string; created_at: string; updated_at: string };
+type AlbumRow = {
+  id: string;
+  owner_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
 type MemoryRow = {
   id: string;
   user_id: string | null;
@@ -101,7 +111,13 @@ export function normalizeSharedAlbumName(value: unknown) {
 }
 
 function toAlbum(row: AlbumRow): SharedAlbum {
-  return { id: row.id, ownerId: row.owner_id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at };
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function toMemory(row: MemoryRow, imageUrl: string, thumbnailUrl?: string): Memory {
@@ -127,7 +143,7 @@ function singleMemory(value: MemoryRow | MemoryRow[]) {
 
 export async function listSharedAlbums(client: SupabaseClient): Promise<SharedAlbum[]> {
   const { data, error } = await client.from("shared_albums")
-    .select("id, owner_id, name, created_at, updated_at")
+    .select(SHARED_ALBUM_COLUMNS)
     .order("updated_at", { ascending: false })
     .order("id", { ascending: true });
   if (error) throw new Error(albumError(error, "グループを読み込めませんでした。"));
@@ -136,7 +152,7 @@ export async function listSharedAlbums(client: SupabaseClient): Promise<SharedAl
 
 export async function getSharedAlbum(client: SupabaseClient, albumId: string): Promise<SharedAlbum | null> {
   const { data, error } = await client.from("shared_albums")
-    .select("id, owner_id, name, created_at, updated_at")
+    .select(SHARED_ALBUM_COLUMNS)
     .eq("id", requireUuid(albumId, "グループ"))
     .maybeSingle();
   if (error) throw new Error(albumError(error, "グループを読み込めませんでした。"));
@@ -147,9 +163,22 @@ export async function createSharedAlbum(client: SupabaseClient, nameInput: unkno
   const name = normalizeSharedAlbumName(nameInput);
   const { data, error } = await client.from("shared_albums")
     .insert({ name })
-    .select("id, owner_id, name, created_at, updated_at")
+    .select(SHARED_ALBUM_COLUMNS)
     .single();
   if (error || !data) throw new Error(albumError(error, "グループを作成できませんでした。"));
+  return toAlbum(data as AlbumRow);
+}
+
+export async function renameSharedAlbum(client: SupabaseClient, albumId: string, nameInput: unknown) {
+  const id = requireUuid(albumId, "グループ");
+  const name = normalizeSharedAlbumName(nameInput);
+  const { data, error } = await client.from("shared_albums")
+    .update({ name })
+    .eq("id", id)
+    .select(SHARED_ALBUM_COLUMNS)
+    .maybeSingle();
+  if (error) throw new Error(albumError(error, "グループ名を変更できませんでした。"));
+  if (!data) throw new Error("グループ名を変更できるのはオーナーだけです。");
   return toAlbum(data as AlbumRow);
 }
 
@@ -158,7 +187,7 @@ export async function listSharedAlbumMembers(client: SupabaseClient, albumId: st
     target_album_id: requireUuid(albumId, "グループ"),
   });
   if (error) throw new Error(albumError(error, "メンバーを読み込めませんでした。"));
-  return (Array.isArray(data) ? data : []).flatMap((raw): SharedAlbumMember[] => {
+  const members = (Array.isArray(data) ? data : []).flatMap((raw): SharedAlbumMember[] => {
     const row = raw as Record<string, unknown>;
     if (
       typeof row.user_id !== "string"
@@ -166,7 +195,19 @@ export async function listSharedAlbumMembers(client: SupabaseClient, albumId: st
       || (row.role !== "owner" && row.role !== "member")
       || typeof row.joined_at !== "string"
     ) return [];
-    return [{ userId: row.user_id, displayName: row.display_name, role: row.role, joinedAt: row.joined_at }];
+    const level = Number(row.achieved_level);
+    return [{
+      userId: row.user_id,
+      displayName: row.display_name,
+      role: row.role,
+      joinedAt: row.joined_at,
+      ...(typeof row.avatar_signed_url === "string" ? { avatarUrl: row.avatar_signed_url } : {}),
+      ...(Number.isInteger(level) && level >= 1 && level <= 20 ? { level } : {}),
+    }];
+  });
+  return members.sort((left, right) => {
+    const roleOrder = Number(right.role === "owner") - Number(left.role === "owner");
+    return roleOrder || left.joinedAt.localeCompare(right.joinedAt) || left.userId.localeCompare(right.userId);
   });
 }
 
@@ -192,10 +233,14 @@ export async function listOwnMemoriesForSharing(
   return choices.map(({ path, ...choice }) => ({ ...choice, displayUrl: urls.get(path) ?? "" }));
 }
 
-async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[]) {
+async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[], cache?: SignedUrlCache) {
   const urls = new Map<string, string>();
   let warning: string | null = null;
-  const paths = [...new Set(requestedPaths)];
+  const paths = [...new Set(requestedPaths)].filter((path) => {
+    const stored = cache?.get(path);
+    if (stored && stored.expiresAt > Date.now() + 60000) { urls.set(path, stored.url); return false; }
+    return true;
+  });
   const pageSize = 100;
   for (let offset = 0; offset < paths.length; offset += pageSize) {
     const pagePaths = paths.slice(offset, offset + pageSize);
@@ -204,13 +249,16 @@ async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[])
         .createSignedUrls(pagePaths, MEMORY_IMAGE_URL_LIFETIME);
       if (error) throw error;
       for (const item of data ?? []) {
-        if (item.path && item.signedUrl && !item.error) urls.set(item.path, item.signedUrl);
+        if (item.path && item.signedUrl && !item.error) {
+          urls.set(item.path, item.signedUrl);
+          cache?.set(item.path, { url: item.signedUrl, expiresAt: Date.now() + MEMORY_IMAGE_URL_LIFETIME * 1000 });
+        }
       }
     } catch {
       warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
     }
   }
-  if (urls.size !== paths.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
+  if (urls.size !== new Set(requestedPaths).size) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
   return { urls, warning };
 }
 
@@ -233,6 +281,7 @@ function toSharedMemoryEntry(
 export async function loadSharedAlbumMemoryEntries(
   client: SupabaseClient,
   albumId: string,
+  cache?: SignedUrlCache,
 ): Promise<SharedAlbumMemoryResult> {
   const id = requireUuid(albumId, "グループ");
   const rows: SharedMemoryRow[] = [];
@@ -254,7 +303,7 @@ export async function loadSharedAlbumMemoryEntries(
     return memory ? [{ row, memory }] : [];
   });
   const displayPaths = normalized.map(({ memory }) => memory.thumbnail_path ?? memory.image_path);
-  const { urls, warning } = await signMemoryPaths(client, displayPaths);
+  const { urls, warning } = await signMemoryPaths(client, displayPaths, cache);
   return {
     entries: normalized.map(({ row, memory }) => memory.thumbnail_path
       ? toSharedMemoryEntry(row, memory, "", urls.get(memory.thumbnail_path))
@@ -268,6 +317,7 @@ export async function loadSharedAlbumMemoryDetail(
   client: SupabaseClient,
   albumId: string,
   memoryId: string,
+  cache?: SignedUrlCache,
 ): Promise<SharedAlbumMemoryDetailResult | null> {
   const { data, error } = await client.from("shared_album_memories")
     .select(SHARED_MEMORY_COLUMNS)
@@ -279,7 +329,7 @@ export async function loadSharedAlbumMemoryDetail(
   const row = data as unknown as SharedMemoryRow;
   const memory = singleMemory(row.memory);
   if (!memory) return null;
-  const { urls, warning } = await signMemoryPaths(client, [memory.image_path]);
+  const { urls, warning } = await signMemoryPaths(client, [memory.image_path], cache);
   return {
     entry: toSharedMemoryEntry(row, memory, urls.get(memory.image_path) ?? ""),
     warning,
@@ -315,7 +365,7 @@ export async function removeMemoryFromSharedAlbum(client: SupabaseClient, albumI
     .eq("memory_id", requireUuid(memoryId, "思い出"))
     .select("memory_id")
     .maybeSingle();
-  if (error) throw new Error(albumError(error, "思い出の共有を解除できませんでした。"));
+  if (error) throw new Error("思い出の共有を解除できませんでした。時間をおいて、もう一度お試しください。", { cause: error });
   if (!data) throw new Error("思い出が見つからないか、共有を解除する権限がありません。");
 }
 
@@ -345,4 +395,13 @@ export async function deleteSharedAlbum(client: SupabaseClient, albumId: string)
     .maybeSingle();
   if (error) throw new Error(albumError(error, "グループを削除できませんでした。"));
   if (!data) throw new Error("グループが見つからないか、削除する権限がありません。");
+}
+
+/** Refresh only expiring URLs; does not query the photo list. */
+export async function renewSharedMemoryUrls(client: SupabaseClient, result: SharedAlbumMemoryResult, cache: SignedUrlCache): Promise<SharedAlbumMemoryResult> {
+  const paths = result.entries.map(({ memory }) => memory.thumbnailPath ?? memory.imagePath ?? "").filter(Boolean);
+  const { urls, warning } = await signMemoryPaths(client, paths, cache);
+  return { entries: result.entries.map((entry) => ({ ...entry, memory: { ...entry.memory,
+    ...(entry.memory.thumbnailPath ? { thumbnailUrl: urls.get(entry.memory.thumbnailPath) } : { imageUrl: urls.get(entry.memory.imagePath ?? "") ?? "" }),
+  } })), warning };
 }

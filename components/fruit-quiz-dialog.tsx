@@ -8,18 +8,17 @@ import { MemoryPetal } from "@/components/memory-petal";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
 import { useHarvest } from "@/lib/harvest-context";
-import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
+import { usePersistedMemoryQuestion } from "@/lib/use-persisted-memory-question";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export function FruitQuizDialog({ memory, memories, golden = false, onClose }: { memory: Memory; memories: Memory[]; golden?: boolean; onClose: () => void }) {
   const harvest = useHarvest();
+  const { recordActivity } = useProfileLevel();
   const closeButton = useRef<HTMLButtonElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const [question] = useState(() => {
-    const kind = FRUIT_QUIZ_KINDS[Math.floor(Math.random() * FRUIT_QUIZ_KINDS.length)];
-    return createMemoryQuizQuestion(memory, memories, kind);
-  });
+  const { question, error: quizError, ready: quizReady, answer } = usePersistedMemoryQuestion("fruit", memory, memories);
   const [selected, setSelected] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const [word, setWord] = useState("");
@@ -40,7 +39,17 @@ export function FruitQuizDialog({ memory, memories, golden = false, onClose }: {
   const submitWord = async (event: FormEvent) => {
     event.preventDefault();
     input.current?.blur();
-    if (await harvest.launch(memory.id, word)) onClose();
+    if (await harvest.launch(memory.id, word)) {
+      recordActivity("harvestedFruits", { eventId: memory.id });
+      recordActivity("flownPetals", { eventId: memory.id });
+      if (golden) recordActivity("goldenFruits", { eventId: memory.id });
+      onClose();
+    }
+  };
+
+  const confirmAnswer = async () => {
+    if (!selected || answered) return;
+    if (await answer(selected)) setAnswered(true);
   };
 
   return (
@@ -59,7 +68,7 @@ export function FruitQuizDialog({ memory, memories, golden = false, onClose }: {
         {!answered ? (
           <div className="fruit-quiz-question-step">
             <QuizQuestionCard question={question} selectedChoiceId={selected} answered={false} onSelect={setSelected} />
-            <button type="button" className="quiz-primary-button" onClick={() => selected && setAnswered(true)} disabled={!selected}>答えを確認</button>
+            <button type="button" className="quiz-primary-button" onClick={confirmAnswer} disabled={!selected || !quizReady}>答えを確認</button>
           </div>
         ) : (
           <div className="fruit-quiz-word-step">
@@ -110,7 +119,7 @@ export function FruitQuizDialog({ memory, memories, golden = false, onClose }: {
             </form>
           </div>
         )}
-        {harvest.error && <p role="alert" className="fruit-quiz-error">{harvest.error}</p>}
+        {(harvest.error || quizError) && <p role="alert" className="fruit-quiz-error">{harvest.error || quizError}</p>}
       </section>
     </div>
   );

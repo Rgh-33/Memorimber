@@ -9,6 +9,7 @@ import { PageHeading } from "@/components/page-heading";
 import { getAlbumGridSlotCount } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import { createClient } from "@/lib/supabase/client";
 import { loadMemoryOriginalUrls } from "@/lib/supabase/memories";
 
@@ -36,6 +37,7 @@ function scrollAlbumImmediately(scroll: () => void) {
 
 export default function AlbumPage() {
   const { memories: allMemories, getMonthMemories, isLoading, error, warning, isDemo, refreshMemories } = useMemories();
+  const { recordActivity } = useProfileLevel();
   const [currentMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -120,6 +122,7 @@ export default function AlbumPage() {
 
   const handlePrint = async () => {
     if (printPreparing) return;
+    recordActivity("printAttempts");
     setPrintPreparing(true);
     setPrintError(null);
     try {

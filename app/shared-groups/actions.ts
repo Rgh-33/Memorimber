@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { processRetainedMemoryCleanupQueue } from "@/lib/supabase/account-deletion-runner";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { retryAuthenticatedCleanup } from "@/lib/supabase/authenticated-cleanup";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createSharedQuizPlan } from "@/lib/shared-quiz";
+
 import { inviteToSharedAlbum, respondToSharedAlbumInvitation } from "@/lib/supabase/shared-album-invitations";
 import {
   addMemoriesToSharedAlbum,
@@ -13,15 +12,20 @@ import {
   deleteSharedAlbum,
   isUuid,
   leaveSharedAlbum,
-  loadSharedAlbumMemories,
+  renameSharedAlbum,
   removeMemoryFromSharedAlbum,
   removeSharedAlbumMember,
 } from "@/lib/supabase/shared-albums";
 import { joinSharedQuiz, startSharedQuiz } from "@/lib/supabase/shared-quiz";
 import { createClient } from "@/lib/supabase/server";
 
-function noticePath(path: string, tone: "success" | "error", message: string) {
-  return `${path}?${new URLSearchParams({ [tone]: message })}`;
+function noticePath(
+  path: string,
+  tone: "success" | "error",
+  message: string,
+  extra: Record<string, string> = {},
+) {
+  return `${path}?${new URLSearchParams({ [tone]: message, ...extra })}`;
 }
 
 function groupPath(groupId: unknown) {
@@ -53,14 +57,6 @@ function revalidateGroup(groupId: string) {
   revalidatePath("/notifications");
 }
 
-async function cleanupUnsharedRetainedMemories() {
-  try {
-    await processRetainedMemoryCleanupQueue(createAdminClient());
-  } catch {
-    // The durable queue is retried by the daily cron when immediate cleanup fails.
-  }
-}
-
 export async function createSharedGroupAction(formData: FormData) {
   let albumId: string | null = null;
   let failure: string | null = null;
@@ -73,6 +69,21 @@ export async function createSharedGroupAction(formData: FormData) {
   if (failure || !albumId) redirect(noticePath("/shared-groups", "error", failure ?? "グループを作成できませんでした。"));
   revalidateGroup(albumId);
   redirect(noticePath(`/shared-groups/${albumId}`, "success", "グループを作成しました。"));
+}
+
+export async function renameSharedGroupAction(formData: FormData) {
+  const groupId = formData.get("groupId");
+  let path = "/shared-groups";
+  let failure: string | null = null;
+  try {
+    path = groupPath(groupId);
+    await renameSharedAlbum(await authenticatedClient(), String(groupId), formData.get("name"));
+  } catch (error) {
+    failure = errorText(error, "グループ名を変更できませんでした。");
+  }
+  if (failure) redirect(noticePath(path, "error", failure));
+  revalidateGroup(String(groupId));
+  redirect(noticePath(path, "success", "グループ名を変更しました。"));
 }
 
 export async function respondInvitationAction(formData: FormData) {
@@ -133,7 +144,11 @@ export async function addSharedMemoryAction(formData: FormData) {
   }
   if (failure) redirect(noticePath(path, "error", failure));
   revalidateGroup(String(groupId));
-  redirect(noticePath(path, "success", `思い出を${count}件共有しました。`));
+  redirect(noticePath(path, "success", `思い出を${count}件共有しました。`, {
+    activity: "shared-memory",
+    activityId: `${String(groupId)}:${Date.now()}`,
+    activityCount: String(count),
+  }));
 }
 
 export async function joinSharedQuizAction(formData: FormData) {
@@ -161,9 +176,7 @@ export async function startSharedQuizAction(formData: FormData) {
   try {
     path = quizPath(groupId, sessionId);
     const client = await authenticatedClient();
-    const memories = await loadSharedAlbumMemories(client, String(groupId));
-    const questions = createSharedQuizPlan(memories);
-    await startSharedQuiz(client, String(sessionId), questions);
+    await startSharedQuiz(client, String(sessionId));
   } catch (error) {
     failure = errorText(error, "クイズを開始できませんでした。");
   }
@@ -172,20 +185,33 @@ export async function startSharedQuizAction(formData: FormData) {
   redirect(path);
 }
 
-export async function removeSharedMemoryAction(formData: FormData) {
+export type RemoveSharedMemoryResult = { ok: false; error: string };
+
+export async function removeSharedMemoryAction(
+  _previousState: RemoveSharedMemoryResult | null,
+  formData: FormData,
+): Promise<RemoveSharedMemoryResult> {
+  console.info("[shared-groups] Memory removal started");
   const groupId = formData.get("groupId");
-  let path = "/shared-groups";
-  let failure: string | null = null;
   try {
-    path = groupPath(groupId);
-    await removeMemoryFromSharedAlbum(await authenticatedClient(), String(groupId), String(formData.get("memoryId") ?? ""));
-    await cleanupUnsharedRetainedMemories();
+    groupPath(groupId);
+    const client = await authenticatedClient();
+    await removeMemoryFromSharedAlbum(client, String(groupId), String(formData.get("memoryId") ?? ""));
+    await retryAuthenticatedCleanup(client);
   } catch (error) {
-    failure = errorText(error, "思い出の共有を解除できませんでした。");
+    const message = errorText(error, "思い出の共有を解除できませんでした。");
+    const cause = error instanceof Error && error.cause && typeof error.cause === "object"
+      ? error.cause as Record<string, unknown>
+      : null;
+    console.error("[shared-groups] Memory removal failed", {
+      code: typeof cause?.code === "string" ? cause.code : null,
+      message: typeof cause?.message === "string" ? cause.message : message,
+    });
+    return { ok: false, error: message };
   }
-  if (failure) redirect(noticePath(path, "error", failure));
+  console.info("[shared-groups] Memory removal succeeded");
   revalidateGroup(String(groupId));
-  redirect(noticePath(path, "success", "共有を解除しました。"));
+  redirect(noticePath(groupPath(groupId), "success", "共有を解除しました。"));
 }
 
 export async function leaveSharedGroupAction(formData: FormData) {
@@ -194,8 +220,9 @@ export async function leaveSharedGroupAction(formData: FormData) {
   let failure: string | null = null;
   try {
     path = groupPath(groupId);
-    await leaveSharedAlbum(await authenticatedClient(), String(groupId), formData.get("memoryHandling") === "remove");
-    await cleanupUnsharedRetainedMemories();
+    const client = await authenticatedClient();
+    await leaveSharedAlbum(client, String(groupId), formData.get("memoryHandling") === "remove");
+    await retryAuthenticatedCleanup(client);
   } catch (error) {
     failure = errorText(error, "グループから退出できませんでした。");
   }
@@ -210,8 +237,9 @@ export async function removeSharedGroupMemberAction(formData: FormData) {
   let failure: string | null = null;
   try {
     path = groupPath(groupId);
-    await removeSharedAlbumMember(await authenticatedClient(), String(groupId), String(formData.get("userId") ?? ""));
-    await cleanupUnsharedRetainedMemories();
+    const client = await authenticatedClient();
+    await removeSharedAlbumMember(client, String(groupId), String(formData.get("userId") ?? ""));
+    await retryAuthenticatedCleanup(client);
   } catch (error) {
     failure = errorText(error, "メンバーを除外できませんでした。");
   }
@@ -227,8 +255,9 @@ export async function deleteSharedGroupAction(formData: FormData) {
   try {
     path = groupPath(groupId);
     if (formData.get("confirm") !== "delete") throw new Error("削除の確認にチェックを入れてください。");
-    await deleteSharedAlbum(await authenticatedClient(), String(groupId));
-    await cleanupUnsharedRetainedMemories();
+    const client = await authenticatedClient();
+    await deleteSharedAlbum(client, String(groupId));
+    await retryAuthenticatedCleanup(client);
   } catch (error) {
     failure = errorText(error, "グループを削除できませんでした。");
   }

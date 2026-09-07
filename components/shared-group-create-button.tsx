@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type RefObject } from "react";
-import { Plus } from "lucide-react";
+import { SharedAddButton } from "@/components/shared-add-button";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
 import { SharedGroupDialog } from "@/components/shared-group-dialog";
 
@@ -47,12 +47,12 @@ export function SharedGroupCreateButton({ configured, createAction }: Props) {
 
   return (
     <>
-      <div className="shared-group-create-fab">
-        <button ref={triggerRef} type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="accent-gradient flex h-14 items-center gap-3 whitespace-nowrap rounded-full px-5 text-sm font-semibold text-white shadow-card transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-coral active:scale-95">
-          <Plus size={24} strokeWidth={2} aria-hidden="true" />
-          グループ作成
-        </button>
-      </div>
+      <SharedAddButton
+        ref={triggerRef}
+        onClick={() => setOpen(true)}
+        label="グループを作成"
+        aria-haspopup="dialog"
+      />
       {open ? <CreateGroupDialog configured={configured} createAction={createAction} onClose={closeDialog} returnFocusRef={triggerRef} /> : null}
     </>
   );

@@ -9,7 +9,7 @@ export default function HomePage() {
   const tree = useTree();
   return (
     <div className="page-pad overflow-visible">
-      <PageHeading eyebrow="MEMORIES" title="あなたの思い出" />
+      <PageHeading eyebrow="MEMORIES" title="思い出の木" />
 
       {tree.error ? (
         <div role="alert" className="mt-10 rounded-xl border border-line p-4 text-sm leading-6 text-ink">

@@ -12,6 +12,7 @@ import { createAlbumPdf, getAlbumPdfFilename } from "@/lib/album-pdf";
 import { resolveAlbumAppearance } from "@/lib/album-appearance";
 import { useMemories } from "@/lib/memories-context";
 import { usePreferences } from "@/lib/preferences-context";
+import { useProfileLevel } from "@/lib/profile-level-context";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { loadMemory, type LoadedMemory } from "@/lib/supabase/memories";
@@ -60,6 +61,7 @@ export default function MemoryDetailPage() {
     reloadAlbumAppearance,
   } = usePreferences();
   const tree = useTree();
+  const { recordActivity } = useProfileLevel();
   const configured = isSupabaseConfigured();
   const requestVersion = useRef(0);
   const previewMemory = tree.preview ? tree.memories.find((item) => item.id === params.id) : undefined;
@@ -221,6 +223,7 @@ export default function MemoryDetailPage() {
 
   const handlePrint = async () => {
     if (printPreparing) return;
+    recordActivity("printAttempts");
     setPrintPreparing(true);
     setPrintError(null);
     try {
@@ -268,6 +271,7 @@ export default function MemoryDetailPage() {
 
   const handleBrowserPrint = async () => {
     if (browserPrintPreparing) return;
+    recordActivity("printAttempts");
     setBrowserPrintPreparing(true);
     setPrintError(null);
     try {

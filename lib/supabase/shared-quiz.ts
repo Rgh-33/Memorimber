@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  SHARED_QUIZ_QUESTION_COUNT,
   SHARED_QUIZ_SECONDS_PER_QUESTION,
   parseSharedQuizPlan,
   type SharedQuizQuestionPlan,
@@ -24,6 +23,8 @@ export type SharedQuizParticipant = {
   displayName: string;
   joinedAt: string;
   answeredCount: number;
+  avatarUrl?: string | null;
+  level?: number;
 };
 
 export type SharedQuizAnswer = {
@@ -39,6 +40,8 @@ export type SharedQuizStanding = {
   displayName: string;
   correctCount: number;
   correctTimeMs: number;
+  avatarUrl?: string | null;
+  level?: number;
 };
 
 type QuizRow = {
@@ -67,6 +70,7 @@ function quizError(error: unknown, fallback: string) {
   if (message.includes("shared quiz has already started")) return "このクイズはすでに始まっています。次の回をお待ちください。";
   if (message.includes("shared quiz is not waiting")) return "このクイズはすでに開始または終了しています。";
   if (message.includes("shared quiz participant not found")) return "先にクイズへ参加してください。";
+  if (message.includes("only the shared album owner can start a quiz")) return "クイズを開始できるのはグループのオーナーだけです。";
   if (message.includes("shared quiz has not finished")) return "クイズはまだ終了していません。";
   if (message.includes("shared album membership not found")) return "このグループのメンバーではありません。";
   if (message.includes("shared quiz not found")) return "クイズが見つからないか、参加する権限がありません。";
@@ -102,12 +106,10 @@ export async function joinSharedQuiz(client: SupabaseClient, albumId: string) {
 export async function startSharedQuiz(
   client: SupabaseClient,
   sessionId: string,
-  questions: SharedQuizQuestionPlan[],
 ) {
-  if (questions.length !== SHARED_QUIZ_QUESTION_COUNT) throw new Error("10問を作成できる思い出がありません。");
   const { data, error } = await client.rpc("start_shared_quiz", {
     target_quiz_id: requireUuid(sessionId, "クイズ"),
-    quiz_questions: questions,
+    quiz_questions: null,
   });
   if (error) throw new Error(quizError(error, "クイズを開始できませんでした。"));
   const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;
@@ -128,10 +130,11 @@ async function selectSharedQuiz(client: SupabaseClient, sessionId: string) {
 
 export async function getSharedQuizSession(client: SupabaseClient, sessionId: string) {
   let session = await selectSharedQuiz(client, sessionId);
+  const secondsPerQuestion = session?.questions[0]?.secondsPerQuestion ?? SHARED_QUIZ_SECONDS_PER_QUESTION;
   if (
     session?.status === "active"
     && session.startedAt
-    && Date.now() >= new Date(session.startedAt).getTime() + SHARED_QUIZ_QUESTION_COUNT * SHARED_QUIZ_SECONDS_PER_QUESTION * 1000
+    && Date.now() >= new Date(session.startedAt).getTime() + session.questions.length * secondsPerQuestion * 1000
   ) {
     const { error } = await client.rpc("finalize_shared_quiz", { target_quiz_id: session.id });
     if (!error) session = await selectSharedQuiz(client, session.id);
@@ -147,11 +150,14 @@ export async function listSharedQuizParticipants(client: SupabaseClient, session
   return (Array.isArray(data) ? data : []).flatMap((raw): SharedQuizParticipant[] => {
     const row = raw as Record<string, unknown>;
     if (typeof row.user_id !== "string" || typeof row.display_name !== "string" || typeof row.joined_at !== "string") return [];
+    const level = Number(row.achieved_level);
     return [{
       userId: row.user_id,
       displayName: row.display_name,
       joinedAt: row.joined_at,
       answeredCount: Number(row.answered_count) || 0,
+      ...(typeof row.avatar_signed_url === "string" ? { avatarUrl: row.avatar_signed_url } : {}),
+      ...(Number.isInteger(level) && level >= 1 && level <= 20 ? { level } : {}),
     }];
   });
 }
@@ -219,12 +225,15 @@ export async function listSharedQuizStandings(client: SupabaseClient, sessionId:
   return (Array.isArray(data) ? data : []).flatMap((raw): SharedQuizStanding[] => {
     const row = raw as Record<string, unknown>;
     if (typeof row.user_id !== "string" || typeof row.display_name !== "string") return [];
+    const level = Number(row.achieved_level);
     return [{
       rank: Number(row.rank) || 0,
       userId: row.user_id,
       displayName: row.display_name,
       correctCount: Number(row.correct_count) || 0,
       correctTimeMs: Number(row.correct_time_ms) || 0,
+      ...(typeof row.avatar_signed_url === "string" ? { avatarUrl: row.avatar_signed_url } : {}),
+      ...(Number.isInteger(level) && level >= 1 && level <= 20 ? { level } : {}),
     }];
   });
 }

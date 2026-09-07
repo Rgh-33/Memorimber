@@ -35,7 +35,102 @@
   width: 100%;
   aspect-ratio: 380 / 420;
 }
-.konoha-tree-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.konoha-tree-atmosphere {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 0;
+  height: var(--konoha-ground-y, 94%);
+  overflow: visible;
+  pointer-events: none;
+}
+.konoha-tree-svg { position: relative; z-index: 1; display: block; width: 100%; height: 100%; overflow: visible; }
+.konoha-tree-sun {
+  position: absolute;
+  top: 7%;
+  right: 9%;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%, rgb(255 252 222 / .82), rgb(244 210 116 / .56) 62%, rgb(232 183 76 / .3));
+  box-shadow: 0 0 24px 11px rgb(247 218 135 / .13);
+  opacity: .58;
+  transition: opacity 360ms ease, visibility 360ms ease;
+}
+.konoha-tree-cloud {
+  --konoha-cloud-shift: 8px;
+  position: absolute;
+  width: 72px;
+  height: 15px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / .88);
+  box-shadow: inset 0 -6px 9px rgb(124 166 193 / .18);
+  opacity: .54;
+  filter: drop-shadow(0 4px 7px rgb(111 160 188 / .12)) blur(.15px);
+  animation: konoha-cloud-drift 19s ease-in-out infinite alternate;
+  transition: opacity 360ms ease, visibility 360ms ease;
+}
+.konoha-tree-cloud::before,
+.konoha-tree-cloud::after {
+  position: absolute;
+  bottom: 3px;
+  border-radius: 50%;
+  background: inherit;
+  content: "";
+}
+.konoha-tree-cloud::before { left: 14px; width: 27px; height: 25px; }
+.konoha-tree-cloud::after { right: 11px; width: 34px; height: 30px; opacity: .84; }
+.konoha-tree-cloud--one { top: 25%; left: 3%; }
+.konoha-tree-cloud--two {
+  --konoha-cloud-shift: -7px;
+  top: 39%;
+  right: 5%;
+  width: 55px;
+  height: 12px;
+  opacity: .38;
+  animation-duration: 24s;
+  animation-delay: -9s;
+}
+.konoha-tree-cloud--two::before { left: 10px; width: 21px; height: 19px; }
+.konoha-tree-cloud--two::after { right: 8px; width: 26px; height: 23px; }
+.konoha-tree-stars,
+.konoha-tree-moon {
+  display: none;
+  opacity: 0;
+}
+.konoha-tree-stars { position: absolute; inset: 0; }
+.konoha-tree-star {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: rgb(235 244 255 / .92);
+  box-shadow: 0 0 4px 1px rgb(164 202 241 / .18);
+  animation: konoha-star-shimmer 7s ease-in-out infinite;
+}
+.konoha-tree-moon {
+  position: absolute;
+  top: 7%;
+  left: 9%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 68% 29%, rgb(125 140 159 / .16) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 37% 67%, rgb(119 137 158 / .13) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 36% 31%, #fffdf0, #dfe9ee 72%);
+  box-shadow: 0 0 22px 8px rgb(184 213 234 / .12);
+}
+html[data-mode="dark"] .konoha-tree-sun,
+html[data-mode="dark"] .konoha-tree-cloud { display: none; }
+html[data-mode="dark"] .konoha-tree-stars { display: block; opacity: .62; }
+html[data-mode="dark"] .konoha-tree-moon { display: block; opacity: .56; }
+@keyframes konoha-cloud-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(var(--konoha-cloud-shift), -1px, 0); }
+}
+@keyframes konoha-star-shimmer {
+  0%, 100% { opacity: .46; }
+  50% { opacity: .9; }
+}
 .konoha-soil--back { filter: drop-shadow(0 3px 2.5px #26332938); }
 .konoha-soil-ridge { fill: none; stroke: #b09a70; stroke-width: 1; stroke-linecap: round; opacity: .5; }
 .konoha-soil-front-ridge { fill: none; stroke: #bda477; stroke-width: .85; stroke-linecap: round; opacity: .42; }
@@ -627,6 +722,7 @@ html[data-mode="dark"] .konoha-scene .memory-floating-word { color: var(--konoha
 @media (prefers-reduced-motion: reduce) {
   .konoha-tree-size, .konoha-seedling, .konoha-seedling-stem, .konoha-cotyledon-joint, .konoha-cotyledon, .konoha-trunk-detail, .konoha-young-wood, .konoha-young-trunk, .konoha-node-size { transition: none; }
   .konoha-tree-wind, .konoha-node-wind, .konoha-stage-enter, .konoha-growth-result, .konoha-magic-aura, .konoha-magic-orbit,
+  .konoha-tree-cloud, .konoha-tree-star,
   .konoha-memory-absorb-photo, .konoha-magic-core, .konoha-magic-burst, .konoha-magic-scatter, .konoha-calm-mote, .konoha-calm-glint, .konoha-ripe-aura, .konoha-ripe-sparkles,
   .konoha-new-fruit-halo, .konoha-new-fruit-glint, .konoha-just-ripe-pop, .konoha-fruit--turning-golden .konoha-fruit-color, .konoha-just-ripe-flash, .konoha-just-ripe-ring,
   .konoha-just-ripe-burst, .konoha-just-ripe-sparks, .konoha-petal-arrive, .konoha-petal-sway,

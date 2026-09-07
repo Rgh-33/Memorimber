@@ -54,6 +54,8 @@ select jsonb_agg(jsonb_build_object(
 ) order by question_number)
 from generate_series(1, 10) question_number;
 
+update public.shared_albums set quiz_mode='custom' where id in ('75000000-0000-4000-8000-000000000001','75000000-0000-4000-8000-000000000002');
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '71000000-0000-4000-8000-000000000001', true);
 
@@ -151,7 +153,7 @@ select results_eq(
 
 select throws_ok(
   $$select public.submit_shared_quiz_answer(
-    (select id from pg_temp.quiz_fixture), 0, '74000000-0000-4000-8000-000000000001'
+    (select id from pg_temp.quiz_fixture), 0, ((select questions->0->>'memoryId' from public.shared_quizzes where id=(select id from pg_temp.quiz_fixture))::uuid)
   )$$,
   '55000',
   null,
@@ -167,7 +169,7 @@ select set_config('request.jwt.claim.sub', '71000000-0000-4000-8000-000000000001
 
 select results_eq(
   $$select is_correct from public.submit_shared_quiz_answer(
-    (select id from pg_temp.quiz_fixture), 0, '74000000-0000-4000-8000-000000000001'
+    (select id from pg_temp.quiz_fixture), 0, ((select questions->0->>'memoryId' from public.shared_quizzes where id=(select id from pg_temp.quiz_fixture))::uuid)
   )$$,
   $$values (true)$$,
   'the server accepts a correct answer inside its five-second window'
@@ -175,9 +177,9 @@ select results_eq(
 
 select results_eq(
   $$select question_index, selected_choice_id, is_correct from public.submit_shared_quiz_answer(
-    (select id from pg_temp.quiz_fixture), 0, '74000000-0000-4000-8000-000000000002'
+    (select id from pg_temp.quiz_fixture), 0, ((select choice from public.shared_quizzes q cross join lateral jsonb_array_elements_text(q.questions->0->'choiceIds') c(choice) where q.id=(select id from pg_temp.quiz_fixture) and c.choice<>q.questions->0->>'memoryId' limit 1)::uuid)
   )$$,
-  $$values (0, '74000000-0000-4000-8000-000000000001'::uuid, true)$$,
+  $$values (0, ((select questions->0->>'memoryId' from public.shared_quizzes where id=(select id from pg_temp.quiz_fixture))::uuid), true)$$,
   'a duplicate submission returns the first choice and score'
 );
 
@@ -187,7 +189,7 @@ select results_eq(
     from public.shared_quiz_answers
     where quiz_id = (select id from pg_temp.quiz_fixture)
       and user_id = '71000000-0000-4000-8000-000000000001'$$,
-  $$values (0, '74000000-0000-4000-8000-000000000001'::uuid, true, true)$$,
+  $$values (0, ((select questions->0->>'memoryId' from public.shared_quizzes where id=(select id from pg_temp.quiz_fixture))::uuid), true, true)$$,
   'the first answer remains stored with a server-measured response time'
 );
 
@@ -209,7 +211,7 @@ select set_config('request.jwt.claim.sub', '72000000-0000-4000-8000-000000000002
 
 select results_eq(
   $$select is_correct from public.submit_shared_quiz_answer(
-    (select id from pg_temp.quiz_fixture), 0, '74000000-0000-4000-8000-000000000002'
+    (select id from pg_temp.quiz_fixture), 0, ((select choice from public.shared_quizzes q cross join lateral jsonb_array_elements_text(q.questions->0->'choiceIds') c(choice) where q.id=(select id from pg_temp.quiz_fixture) and c.choice<>q.questions->0->>'memoryId' limit 1)::uuid)
   )$$,
   $$values (false)$$,
   'another participant receives an independent score'
@@ -220,7 +222,7 @@ select results_eq(
     from public.shared_quiz_answers
     where quiz_id = (select id from pg_temp.quiz_fixture)
       and user_id = '72000000-0000-4000-8000-000000000002'$$,
-  $$values (0, '74000000-0000-4000-8000-000000000002'::uuid, false)$$,
+  $$values (0, ((select choice from public.shared_quizzes q cross join lateral jsonb_array_elements_text(q.questions->0->'choiceIds') c(choice) where q.id=(select id from pg_temp.quiz_fixture) and c.choice<>q.questions->0->>'memoryId' limit 1)::uuid), false)$$,
   'the second participant can read their persisted answer'
 );
 
@@ -237,7 +239,7 @@ select set_config('request.jwt.claim.sub', '73000000-0000-4000-8000-000000000003
 
 select throws_ok(
   $$select public.submit_shared_quiz_answer(
-    (select id from pg_temp.quiz_fixture), 0, '74000000-0000-4000-8000-000000000001'
+    (select id from pg_temp.quiz_fixture), 0, ((select questions->0->>'memoryId' from public.shared_quizzes where id=(select id from pg_temp.quiz_fixture))::uuid)
   )$$,
   'P0002',
   null,
