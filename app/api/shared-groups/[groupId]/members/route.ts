@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { retryAuthenticatedCleanup } from "@/lib/supabase/authenticated-cleanup";
 import { createClient } from "@/lib/supabase/server";
 import { getGroupProfiles } from "@/lib/supabase/group-profiles";
 import { isUuid } from "@/lib/supabase/shared-albums";
@@ -5,8 +7,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ gro
   const { groupId } = await params;
   if (!isUuid(groupId)) return Response.json({ error: "Not found" }, { status: 404 });
   try {
-    const rows = await getGroupProfiles(await createClient(), groupId);
+    const client = await createClient();
+    const rows = await getGroupProfiles(client, groupId);
     if (!rows) return Response.json({ error: "Not found" }, { status: 404 });
+    after(() => retryAuthenticatedCleanup(client));
     return Response.json(rows, { headers: { "Cache-Control": "private, no-store" } });
   } catch { return Response.json({ error: "メンバーを読み込めませんでした。" }, { status: 500 }); }
 }

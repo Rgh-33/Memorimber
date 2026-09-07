@@ -225,35 +225,22 @@ export async function processRetainedMemoryCleanupQueue(admin: SupabaseClient, l
   if (error) throw error;
   const rows = (data ?? []) as CleanupRow[];
   if (rows.length === 0) return { completed: 0, failed: 0 };
-  const paths = [...new Set(rows.flatMap((row) => [row.image_path, row.thumbnail_path].filter((path): path is string => Boolean(path))))];
-  const { error: removeError } = await admin.storage.from("memory-images").remove(paths);
-  if (removeError && !isMissingObjectError(removeError)) {
-    for (const row of rows) {
-      await admin.from("retained_memory_cleanup_queue").update({
-        status: "failed",
-        attempts: row.attempts + 1,
-        last_error: RETRY_ERROR,
-      }).eq("memory_id", row.memory_id);
-    }
-    return { completed: 0, failed: rows.length };
-  }
-
   let completed = 0;
   let failed = 0;
   for (const row of rows) {
-    const { error: memoryError } = await admin.from("memories").delete()
-      .eq("id", row.memory_id).is("user_id", null);
-    if (memoryError) {
+    const eligible = await admin.rpc("retained_cleanup_paths", { p_memory: row.memory_id });
+    if (eligible.error) throw eligible.error;
+    if (!eligible.data) continue;
+    await admin.storage.from("memory-images").remove(eligible.data as string[]);
+    const finish = await admin.rpc("finish_retained_cleanup", { p_memory: row.memory_id });
+    if (finish.error || finish.data !== true) {
       failed += 1;
       await admin.from("retained_memory_cleanup_queue").update({
-        status: "failed",
-        attempts: row.attempts + 1,
-        last_error: RETRY_ERROR,
+        status: "failed", attempts: row.attempts + 1, last_error: RETRY_ERROR,
       }).eq("memory_id", row.memory_id);
-      continue;
+    } else {
+      completed += 1;
     }
-    await admin.from("retained_memory_cleanup_queue").delete().eq("memory_id", row.memory_id);
-    completed += 1;
   }
   return { completed, failed };
 }

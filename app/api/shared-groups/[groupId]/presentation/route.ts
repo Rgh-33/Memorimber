@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { retryAuthenticatedCleanup } from "@/lib/supabase/authenticated-cleanup";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid } from "@/lib/supabase/shared-albums";
@@ -46,8 +48,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ gro
     if (upload.error) throw upload.error;
     const commit = await client.rpc("commit_group_icon", { p_group: groupId, p_path: path });
     if (commit.error) throw commit.error;
-    // Replaced and interrupted uploads are durably tracked; the cleanup worker
-    // deletes retired objects without risking a newly committed reference.
+    after(() => retryAuthenticatedCleanup(client));
     return Response.json({ ok: true });
-  } catch { return Response.json({ error: "グループ画像を反映できませんでした。" }, { status: 400 }); }
+  } catch {
+    after(() => retryAuthenticatedCleanup(client));
+    return Response.json({ error: "グループ画像を反映できませんでした。" }, { status: 400 });
+  }
 }

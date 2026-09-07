@@ -14,8 +14,8 @@ export async function processGroupIconCleanup(admin: SupabaseClient) {
     const result = await admin.storage.from("shared-group-icons").remove([task.path]);
     if (result.error) await admin.from("group_icon_uploads").update({ attempts: task.attempts + 1 }).eq("path", task.path).eq("state", "cleanup");
     else {
-      await admin.from("group_icon_uploads").delete().eq("path", task.path).eq("state", "cleanup");
-      removed++;
+      const finish = await admin.rpc("finish_group_icon_cleanup", { p_path: task.path });
+      if (!finish.error && finish.data === true) removed++;
     }
   }
   return { removed };

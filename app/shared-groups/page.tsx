@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { retryAuthenticatedCleanup } from "@/lib/supabase/authenticated-cleanup";
 import Link from "next/link";
 import { ChevronRight, UsersRound } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -37,6 +39,7 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
     const { data: { user } } = await client.auth.getUser();
     if (!user) redirect(`/login?${new URLSearchParams({ next: "/shared-groups" })}`);
     currentUserId = user.id;
+    after(() => retryAuthenticatedCleanup(client));
     const [albumResult, invitationResult] = await Promise.allSettled([
       listSharedAlbums(client),
       listInvitationNotifications(client),

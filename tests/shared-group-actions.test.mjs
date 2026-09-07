@@ -13,6 +13,12 @@ const { outputText } = ts.transpileModule(actionSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 });
 
+const cleanupModule = { exports: {} };
+new Function("require", "exports", "console", ts.transpileModule(
+  readFileSync(new URL("../lib/supabase/authenticated-cleanup.ts", import.meta.url), "utf8"),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
+).outputText)((name) => { assert.equal(name, "server-only"); return {}; }, cleanupModule.exports, { warn() {} });
+
 class Redirect extends Error {
   constructor(path) {
     super("Redirect");
@@ -46,6 +52,11 @@ function harness({ user = { id: USER_ID }, rpcError = null, deleteResult = { mem
     },
     auth: { async getUser() { return { data: { user }, error: null }; } },
     async rpc(name, args) {
+      if (name === "claim_authenticated_storage_cleanup") {
+        cleanupCalls += 1;
+        assert.equal(args.p_limit, 2);
+        return { data: [], error: cleanupError };
+      }
       rpcCalls.push({ name, args });
       return {
         data: rpcError ? null : [{ album_id: ALBUM_ID, status: "accepted" }],
@@ -56,11 +67,7 @@ function harness({ user = { id: USER_ID }, rpcError = null, deleteResult = { mem
   const modules = {
     "next/cache": { revalidatePath(path) { revalidatedPaths.push(path); } },
     "next/navigation": { redirect(path) { throw new Redirect(path); } },
-    "@/lib/supabase/account-deletion-runner": { async processRetainedMemoryCleanupQueue() {
-      cleanupCalls += 1;
-      if (cleanupError) throw cleanupError;
-    } },
-    "@/lib/supabase/admin": { createAdminClient: () => ({}) },
+    "@/lib/supabase/authenticated-cleanup": cleanupModule.exports,
     "@/lib/supabase/config": { isSupabaseConfigured: () => true },
     "@/lib/shared-quiz": {},
     "@/lib/supabase/shared-album-invitations": invitations,
