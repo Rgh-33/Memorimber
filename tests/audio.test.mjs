@@ -100,6 +100,10 @@ test("harvest flight audio plays once while the monthly BGM is faded out", () =>
   assert.equal(header.subarray(8, 12).toString("ascii"), "WAVE");
   assert.match(component, /HARVEST_FLIGHT_MUSIC_URL = "\/audio\/september-fr-4926\.wav"/);
   assert.match(component, /HARVEST_RELATIVE_GAIN = 0\.25/);
+  assert.match(component, /\{ bgmVolume, soundEffectVolume, preferencesReady \} = usePreferences\(\)/);
+  assert.match(component, /desiredSoundEffectGainRef = useRef\(bgmGainForLevel\(soundEffectVolume\)\)/);
+  assert.match(component, /mode === "harvest"[\s\S]*desiredSoundEffectGainRef\.current[\s\S]*desiredBgmGainRef\.current/);
+  assert.match(component, /playbackModeRef\.current === "harvest"[\s\S]*desiredSoundEffectGainRef\.current[\s\S]*desiredBgmGainRef\.current/);
   assert.match(component, /mode === "countdown" \|\| mode === "harvest"[\s\S]*fadeOutActiveTrack\(context\)/);
   assert.match(component, /source\.loop = mode !== "harvest"/);
   assert.match(harvest, /setBackgroundMusicMode\("harvest"\)[\s\S]*setFlight/);

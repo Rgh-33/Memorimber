@@ -165,6 +165,7 @@ test("configurable quiz migration accepts month questions and synchronizes custo
 test("shared group UI exposes the join flow and dedicated quiz room", () => {
   const groupPage = readFileSync(new URL("../components/shared-group-detail.tsx", import.meta.url), "utf8");
   const room = readFileSync(new URL("../components/shared-quiz-room.tsx", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../app/shared-groups/[groupId]/quiz/[sessionId]/page.tsx", import.meta.url), "utf8");
   assert.match(groupPage, /クイズに参加/);
   assert.match(groupPage, /joinSharedQuizAction/);
   assert.doesNotMatch(groupPage, /回答時間|各問 5秒|順位|正答数＋速さ|10問勝負|写真から一言 5問/);
@@ -173,6 +174,12 @@ test("shared group UI exposes the join flow and dedicated quiz room", () => {
   assert.match(room, /SHARED_QUIZ_SECONDS_PER_QUESTION/);
   assert.match(room, /balanceQuizContributors/);
   assert.match(room, /quizSecondsPerQuestion/);
+  assert.match(room, /useBackgroundMusic/);
+  assert.match(room, /timing\.phase === "countdown" \? "countdown" : "quiz"/);
+  assert.match(room, /quiz-countdown shared-quiz-countdown/);
+  assert.match(room, /<p>GET READY<\/p>/);
   assert.match(room, /オーナーがクイズを開始するまで/);
   assert.match(room, /正答数が多い順/);
+  assert.match(route, /<AppBackLink href=\{`\/shared-groups\/\$\{groupId\}`\} label=\{`\$\{album\.name\}へ戻る`\} \/>/);
+  assert.doesNotMatch(route, /<Link[^>]*>[^<]*<ArrowLeft/);
 });

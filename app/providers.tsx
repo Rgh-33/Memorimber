@@ -12,6 +12,7 @@ import { ProfileLevelProvider } from "@/lib/profile-level-context";
 import { TreeProvider } from "@/lib/tree-context";
 import { HarvestProvider } from "@/lib/harvest-context";
 import { NotificationsProvider } from "@/lib/notifications-context";
+import { PwaThemeMetadata } from "@/components/pwa-theme-metadata";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const publicPage = isPublicAuthPath(usePathname());
@@ -23,6 +24,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 function PrivateProviders({ children }: { children: React.ReactNode }) {
   return (
     <PreferencesProvider>
+      <PwaThemeMetadata />
       <BackgroundMusic>
         <ProcessingProvider>
           <NotificationsProvider>

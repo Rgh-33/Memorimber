@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AppShell } from "@/components/app-shell";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -11,7 +11,11 @@ const themeBootstrapScript = `try{const accent=localStorage.getItem("memorimber-
 export const metadata: Metadata = {
   title: "メモリンバー | 何もなかった、なんてことはない。",
   description: "写真1枚と一言で、日常の思い出を残すWebアプリのUIプロトタイプ",
+  manifest: "/pwa/manifest-light-blue-light.webmanifest",
+  icons: { apple: "/pwa/icon-light-blue-light-180.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#edf5fd" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
