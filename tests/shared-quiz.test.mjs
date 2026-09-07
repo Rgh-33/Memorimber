@@ -163,7 +163,7 @@ test("configurable quiz migration accepts month questions and synchronizes custo
 });
 
 test("shared group UI exposes the join flow and dedicated quiz room", () => {
-  const groupPage = readFileSync(new URL("../app/shared-groups/[groupId]/page.tsx", import.meta.url), "utf8");
+  const groupPage = readFileSync(new URL("../components/shared-group-detail.tsx", import.meta.url), "utf8");
   const room = readFileSync(new URL("../components/shared-quiz-room.tsx", import.meta.url), "utf8");
   assert.match(groupPage, /クイズに参加/);
   assert.match(groupPage, /joinSharedQuizAction/);

@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/auth/actions";
 import { allowBrowserSessionWrites, clearBrowserSessionData, isPublicAuthPath, SESSION_RESET_CHANNEL, SESSION_RESET_KEY } from "@/lib/browser-session-data";
+import { clearSharedGroupCache } from "@/lib/shared-group-cache";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -37,6 +38,7 @@ export function SessionBoundary({ children }: { children: ReactNode }) {
   }, []);
 
   const block = useCallback(() => {
+    clearSharedGroupCache();
     resetting.current = true;
     allowBrowserSessionWrites(false);
     setReadyPath(null);

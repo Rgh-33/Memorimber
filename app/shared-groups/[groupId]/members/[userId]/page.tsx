@@ -3,7 +3,8 @@ import { AppBackLink } from "@/components/app-back-link";
 import { AppHeader } from "@/components/app-header";
 import { SharedMemberProfile } from "@/components/shared-member-profile";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getSharedAlbum, isUuid, listSharedAlbumMembers } from "@/lib/supabase/shared-albums";
+import { getSharedAlbum, isUuid } from "@/lib/supabase/shared-albums";
+import { getGroupProfiles } from "@/lib/supabase/group-profiles";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -23,10 +24,10 @@ export default async function SharedMemberProfilePage({ params }: PageProps) {
 
   const [album, members] = await Promise.all([
     getSharedAlbum(client, groupId),
-    listSharedAlbumMembers(client, groupId),
+    getGroupProfiles(client, groupId, userId),
   ]);
   if (!album) notFound();
-  const member = members.find((candidate) => candidate.userId === userId);
+  const member = members?.find((candidate) => candidate.userId === userId);
   if (!member) notFound();
 
   return (

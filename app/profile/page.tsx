@@ -2,43 +2,21 @@
 
 import Image from "next/image";
 import { Camera, Check, Pencil, UserRound } from "lucide-react";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { ProfileLevelOverview } from "@/components/profile-level-overview";
 import { ProfileRecordGrid } from "@/components/profile-record-grid";
-import { useMemories } from "@/lib/memories-context";
-import { type ProfileActivityStats } from "@/lib/profile-data";
 import { useProfileLevel } from "@/lib/profile-level-context";
 import { useProcessing } from "@/lib/processing-context";
 import { useProfile } from "@/lib/profile-context";
 
 export default function ProfilePage() {
-  const { memories } = useMemories();
   const { nickname, avatarDataUrl, setNickname, setAvatarFile } = useProfile();
-  const { activityTotals, levelProgress } = useProfileLevel();
+  const { stats, levelProgress, error: progressError } = useProfileLevel();
   const { startProcessing, stopProcessing } = useProcessing();
   const [nicknameEditing, setNicknameEditing] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(nickname);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
-
-  const stats = useMemo<ProfileActivityStats>(() => ({
-    uploadedPhotos: memories.length,
-    harvestedFruits: activityTotals.harvestedFruits,
-    correctQuizAnswers: activityTotals.correctQuizAnswers,
-    activeMonths: new Set(memories.map((memory) => memory.date.slice(0, 7))).size,
-    flownPetals: activityTotals.flownPetals,
-    revivedFadedMemories: activityTotals.revivedFadedMemories,
-    wordRecallReveals: activityTotals.wordRecallReveals,
-    goldenFruits: activityTotals.goldenFruits,
-    joinedGroups: activityTotals.joinedGroups,
-    createdGroups: activityTotals.createdGroups,
-    connectedPeople: activityTotals.connectedPeople,
-    sharedQuizChallenges: activityTotals.sharedQuizChallenges,
-    sharedQuizWins: activityTotals.sharedQuizWins,
-    endlessQuizQuestions: activityTotals.endlessQuizQuestions,
-    sharedMemories: activityTotals.sharedMemories,
-    designedMemories: memories.filter((memory) => Boolean(memory.albumAppearance)).length,
-  }), [activityTotals, memories]);
 
   const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,7 +124,7 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
-        {profileError && <p role="alert" className="mt-3 text-center text-xs font-medium text-red-500">{profileError}</p>}
+        {(profileError || progressError) && <p role="alert" className="mt-3 text-center text-xs font-medium text-red-500">{profileError || progressError}</p>}
       </section>
 
       <div className="profile-record-divider mx-auto mt-8" aria-hidden="true" />

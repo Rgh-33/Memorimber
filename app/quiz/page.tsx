@@ -8,22 +8,17 @@ import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { PageHeading } from "@/components/page-heading";
 import { useBackgroundMusic, type BackgroundMusicMode } from "@/components/background-music";
 import { useMemories } from "@/lib/memories-context";
-import { useProfileLevel } from "@/lib/profile-level-context";
+import { startPersonalQuiz, answerPersonalQuiz, nextPersonalQuestion, loadPersonalQuizHistory, type SavedQuestion } from "@/lib/personal-quiz";
 import {
-  ALL_QUIZ_KINDS,
   QUIZ_KIND_LABELS,
   QUIZ_MODE_LABELS,
   answerLabel,
-  createMixedQuizQuestions,
-  createQuizQuestions,
-  toHistoryQuestion,
   type QuizAnswer,
   type QuizHistoryEntry,
   type QuizMode,
   type MemoryQuizQuestion,
 } from "@/lib/quiz";
 
-const HISTORY_KEY = "memorimber-quiz-history-v1";
 const PHOTO_TO_CAPTION_COUNT_KEY = "memorimber-quiz-photo-to-caption-count";
 const CAPTION_TO_PHOTO_COUNT_KEY = "memorimber-quiz-caption-to-photo-count";
 const DEFAULT_DIRECTION_COUNT = 5;
@@ -48,14 +43,6 @@ function readCount(key: string) {
   }
 }
 
-function readHistory() {
-  try {
-    const value = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
-    return Array.isArray(value) ? value.slice(0, 30) as QuizHistoryEntry[] : [];
-  } catch {
-    return [];
-  }
-}
 
 function scoreOf(answers: { correct: boolean }[]) {
   const correct = answers.filter((answer) => answer.correct).length;
@@ -228,7 +215,8 @@ function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
   onResults: () => void;
   onClose: () => void;
 }) {
-  const { recordActivity } = useProfileLevel();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const pendingSave = useRef(false);
   const [questions, setQuestions] = useState(initial.questions);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -254,21 +242,22 @@ function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
   if (finished) return <QuizResults mode={initial.mode} answers={answers} onClose={onClose} />;
   if (!question) return null;
 
-  const confirm = () => {
-    if (!selected || answered) return;
-    const nextAnswer: QuizAnswer = {
-      question,
-      selectedChoiceId: selected,
-      selectedLabel: answerLabel(question, selected),
-      correct: selected === question.correctChoiceId,
-    };
-    if (nextAnswer.correct) recordActivity("correctQuizAnswers");
-    if (initial.mode === "endless") recordActivity("endlessQuizQuestions");
-    setAnswers((current) => [...current, nextAnswer]);
-    setAnswered(true);
+  const confirm = async () => {
+    if (!selected || answered || pendingSave.current) return;
+    pendingSave.current = true;
+    setSaveError(null);
+    try {
+      const committed = await answerPersonalQuiz(question.id, selected, memories);
+      const nextAnswer: QuizAnswer = { question: committed, selectedChoiceId: committed.selectedChoiceId ?? selected, selectedLabel: answerLabel(committed, committed.selectedChoiceId ?? selected), correct: committed.correct === true };
+      setQuestions((current) => current.map((item) => item.id === committed.id ? committed : item));
+      setAnswers((current) => [...current, nextAnswer]);
+      setAnswered(true);
+    } catch (error) { setSaveError(error instanceof Error ? error.message : "回答を保存できませんでした。"); }
+    finally { pendingSave.current = false; }
   };
 
-  const advance = () => {
+  const advance = async () => {
+    if (pendingSave.current) return;
     if (!answered) return;
     if (!initial.endless && index >= questions.length - 1) {
       if (!saved.current) {
@@ -280,8 +269,13 @@ function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
       return;
     }
     if (initial.endless && index >= questions.length - 1) {
-      const next = createQuizQuestions(memories, 1, ALL_QUIZ_KINDS, Math.random, questions.slice(-Math.max(3, memories.length)));
-      setQuestions((current) => [...current, ...next]);
+      pendingSave.current = true;
+      try {
+        const next = await nextPersonalQuestion((question as SavedQuestion).sessionId, memories);
+        setQuestions((current) => [...current, next]);
+        setSaveError(null);
+      } catch (error) { setSaveError(error instanceof Error ? error.message : "問題を読み込めませんでした。"); return; }
+      finally { pendingSave.current = false; }
     }
     setIndex((current) => current + 1);
     setSelected(null);
@@ -301,7 +295,7 @@ function QuizSession({ initial, memories, onComplete, onResults, onClose }: {
 
       {!initial.endless && <div className="quiz-progress" aria-hidden="true"><span style={{ width: `${(index + (answered ? 1 : 0)) / questions.length * 100}%` }} /></div>}
 
-      <QuizQuestionCard question={question} selectedChoiceId={selected} answered={answered} onSelect={setSelected} />
+      <QuizQuestionCard question={saveError ? { ...question, prompt: saveError } : question} selectedChoiceId={selected} answered={answered} onSelect={setSelected} />
 
       {!answered ? (
         <button type="button" className="quiz-primary-button" onClick={confirm} disabled={!selected}>答えを確認</button>
@@ -354,7 +348,8 @@ function QuizHistory({ entries, onBack }: { entries: QuizHistoryEntry[]; onBack:
 
 export default function QuizPage() {
   const { memories, isLoading, error, refreshMemories } = useMemories();
-  const { recordActivity } = useProfileLevel();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const pendingSave = useRef(false);
   const setBackgroundMusicMode = useBackgroundMusic();
   const [photoCount, setPhotoCount] = useState(DEFAULT_DIRECTION_COUNT);
   const [captionCount, setCaptionCount] = useState(DEFAULT_DIRECTION_COUNT);
@@ -367,7 +362,7 @@ export default function QuizPage() {
   useEffect(() => {
     setPhotoCount(readCount(PHOTO_TO_CAPTION_COUNT_KEY));
     setCaptionCount(readCount(CAPTION_TO_PHOTO_COUNT_KEY));
-    setHistory(readHistory());
+    void loadPersonalQuizHistory().then(setHistory).catch((error: Error) => setSaveError(error.message));
   }, []);
 
   const musicMode: BackgroundMusicMode = !active || quizStage === "results"
@@ -392,39 +387,33 @@ export default function QuizPage() {
 
   const finishCountdown = useCallback(() => setQuizStage("playing"), []);
 
-  const start = (mode: "quick" | "endless", count: number) => {
-    const questionCount = mode === "endless" ? 1 : count;
-    const questions = createQuizQuestions(memories, questionCount, ALL_QUIZ_KINDS);
-    if (questions.length) {
-      if (mode === "quick") recordActivity("randomQuizChallenges");
-      beginCountdown({ mode, questions, endless: mode === "endless" });
-    }
+  const start = async (mode: "quick" | "endless", count: number) => {
+    if (pendingSave.current) return;
+    pendingSave.current = true;
+    try {
+      const questions = await startPersonalQuiz(mode, mode === "endless" ? 1 : count, memories);
+      if (questions.length) beginCountdown({ mode, questions, endless: mode === "endless" });
+      setSaveError(null);
+    } catch (error) { setSaveError(error instanceof Error ? error.message : "クイズを開始できませんでした。"); }
+    finally { pendingSave.current = false; }
   };
-
-  const startMixed = () => {
-    const questions = createMixedQuizQuestions(memories, photoCount, captionCount);
-    if (questions.length) {
+  const startMixed = async () => {
+    if (pendingSave.current) return;
+    pendingSave.current = true;
+    try {
+      const questions = await startPersonalQuiz("mixed", photoCount + captionCount, memories, undefined, photoCount);
       setShowMixedSetup(false);
       beginCountdown({ mode: "mixed", questions, endless: false });
-    }
+      setSaveError(null);
+    } catch (error) { setSaveError(error instanceof Error ? error.message : "クイズを開始できませんでした。"); }
+    finally { pendingSave.current = false; }
   };
-
-  const saveResult = useCallback((mode: QuizMode, answers: QuizAnswer[]) => {
-    const entry: QuizHistoryEntry = {
-      id: `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`,
-      mode,
-      completedAt: new Date().toISOString(),
-      answers: answers.map(toHistoryQuestion),
-    };
-    setHistory((current) => {
-      const next = [entry, ...current].slice(0, 30);
-      try { setBrowserSessionItem(localStorage, HISTORY_KEY, JSON.stringify(next)); } catch { /* Keep history for this visit. */ }
-      return next;
-    });
+  const saveResult = useCallback(() => {
+    void loadPersonalQuizHistory().then(setHistory).catch((error: Error) => setSaveError(error.message));
   }, []);
 
   if (isLoading) return <div className="page-pad"><p role="status" className="quiz-loading">思い出を読み込んでいます…</p></div>;
-  if (error) return <div className="page-pad"><div role="alert" className="quiz-load-error">{error}<button type="button" onClick={() => void refreshMemories()}>再読み込み</button></div></div>;
+  if (error || saveError) return <div className="page-pad"><div role="alert" className="quiz-load-error">{error || saveError}<button type="button" onClick={() => { setSaveError(null); void refreshMemories(); }}>再読み込み</button></div></div>;
 
   return (
     <div className="page-pad quiz-page">

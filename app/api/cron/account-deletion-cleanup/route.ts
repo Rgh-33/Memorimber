@@ -1,4 +1,5 @@
 import { processPendingAccountDeletionJobs, processRetainedMemoryCleanupQueue } from "@/lib/supabase/account-deletion-runner";
+import { processGroupIconCleanup } from "@/lib/supabase/group-icon-cleanup";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +13,12 @@ export async function GET(request: Request) {
 
   try {
     const admin = createAdminClient();
-    const [jobs, retainedMemories] = await Promise.all([
+    const [jobs, retainedMemories, groupIcons] = await Promise.all([
       processPendingAccountDeletionJobs(admin),
       processRetainedMemoryCleanupQueue(admin),
+      processGroupIconCleanup(admin),
     ]);
-    return Response.json({ ok: true, jobs, retainedMemories });
+    return Response.json({ ok: true, jobs, retainedMemories, groupIcons });
   } catch {
     return Response.json({ ok: false, error: "Cleanup could not be completed." }, { status: 500 });
   }

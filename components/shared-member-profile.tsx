@@ -1,65 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
 import { ProfileLevelOverview } from "@/components/profile-level-overview";
 import { ProfileRecordGrid } from "@/components/profile-record-grid";
 import { SharedMemberAvatar } from "@/components/shared-member-identity";
-import { useMemories } from "@/lib/memories-context";
-import {
-  PROFILE_LEVEL_REQUIREMENTS,
-  createEmptyLevelActivityStats,
-  createEmptyProfileActivityStats,
-  getProfileLevelProgress,
-  type ProfileActivityStats,
-} from "@/lib/profile-data";
-import { useProfileLevel } from "@/lib/profile-level-context";
-import { useProfile } from "@/lib/profile-context";
-import type { SharedAlbumMember } from "@/lib/supabase/shared-albums";
+import { profileProgressView } from "@/lib/profile-progress";
+import type { GroupProfile } from "@/lib/supabase/group-profiles";
 
-function previewLevelProgress(level: number) {
-  const achievedLevel = Math.max(1, Math.min(20, Math.trunc(level)));
-  const currentRequirement = PROFILE_LEVEL_REQUIREMENTS.find((requirement) => requirement.level === achievedLevel);
-  return getProfileLevelProgress({
-    uploadedPhotos: currentRequirement?.cumulativePhotosRequired ?? 0,
-    ...createEmptyLevelActivityStats(),
-  }, {}, achievedLevel);
-}
-
-export function SharedMemberProfile({
-  member,
-  currentUserId,
-}: {
-  member: SharedAlbumMember;
-  currentUserId: string;
-}) {
-  const isCurrentUser = member.userId === currentUserId;
-  const { nickname } = useProfile();
-  const { memories } = useMemories();
-  const { activityTotals, levelProgress: ownLevelProgress } = useProfileLevel();
-  const displayName = isCurrentUser ? nickname : member.displayName;
-  const memberLevelProgress = useMemo(() => previewLevelProgress(member.level ?? 1), [member.level]);
-  const levelProgress = isCurrentUser ? ownLevelProgress : memberLevelProgress;
-  const stats = useMemo<ProfileActivityStats>(() => {
-    if (!isCurrentUser) return createEmptyProfileActivityStats();
-    return {
-      uploadedPhotos: memories.length,
-      harvestedFruits: activityTotals.harvestedFruits,
-      correctQuizAnswers: activityTotals.correctQuizAnswers,
-      activeMonths: new Set(memories.map((memory) => memory.date.slice(0, 7))).size,
-      flownPetals: activityTotals.flownPetals,
-      revivedFadedMemories: activityTotals.revivedFadedMemories,
-      wordRecallReveals: activityTotals.wordRecallReveals,
-      goldenFruits: activityTotals.goldenFruits,
-      joinedGroups: activityTotals.joinedGroups,
-      createdGroups: activityTotals.createdGroups,
-      connectedPeople: activityTotals.connectedPeople,
-      sharedQuizChallenges: activityTotals.sharedQuizChallenges,
-      sharedQuizWins: activityTotals.sharedQuizWins,
-      endlessQuizQuestions: activityTotals.endlessQuizQuestions,
-      sharedMemories: activityTotals.sharedMemories,
-      designedMemories: memories.filter((memory) => Boolean(memory.albumAppearance)).length,
-    };
-  }, [activityTotals, isCurrentUser, memories]);
+export function SharedMemberProfile({ member }: { member: GroupProfile; currentUserId: string }) {
+  const isCurrentUser = false;
+  const displayName = member.displayName;
+  const { stats, levelProgress } = profileProgressView(member.progress);
 
   return (
     <>

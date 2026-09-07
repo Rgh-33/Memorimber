@@ -111,15 +111,15 @@ test("activity completed before its level becomes active is excluded", () => {
   assert.equal(resolveProfileLevelAdvancement(stats(88, { harvestedFruits: 104 }), atNine.level, atNine.baselines).level, 10);
 });
 
-test("frontend milestones are wired to their successful user actions", () => {
+test("milestones use transactional persistence and only client observations use client events", () => {
   const source = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-  assert.match(source("components/fruit-quiz-dialog.tsx"), /recordActivity\("fruitQuizCorrectAnswers"[\s\S]*recordActivity\("harvestedFruits"|recordActivity\("harvestedFruits"[\s\S]*recordActivity\("fruitQuizCorrectAnswers"/);
-  assert.match(source("components/fruit-quiz-dialog.tsx"), /if \(golden\) recordActivity\("goldenFruits"/);
-  assert.match(source("app/quiz/page.tsx"), /mode === "quick"\) recordActivity\("randomQuizChallenges"/);
-  assert.match(source("components/memory-recall-dialog.tsx"), /recordActivity\("revivedFadedMemories"/);
-  assert.match(source("components/memory-detail-actions.tsx"), /if \(letter\.trim\(\)\) recordActivity\("savedAlbumLetters"/);
-  assert.match(source("components/shared-quiz-room.tsx"), /participants\.some[\s\S]*recordActivity\("sharedQuizChallenges"[\s\S]*participants\.length >= 2[\s\S]*recordActivity\("friendQuizSessions"/);
+  assert.match(source("components/fruit-quiz-dialog.tsx"), /usePersistedMemoryQuestion\("fruit"/);
+  assert.match(source("app/quiz/page.tsx"), /await answerPersonalQuiz/);
+  assert.match(source("components/memory-recall-dialog.tsx"), /await restorePetal/);
+  assert.match(source("lib/profile-level-context.tsx"), /metric !== "printAttempts" && metric !== "wordRecallReveals"/);
   assert.match(source("app/album/page.tsx"), /recordActivity\("printAttempts"\)/);
   assert.match(source("app/memory/[id]/page.tsx"), /recordActivity\("printAttempts"\)/);
-  assert.match(source("app/shared-groups/[groupId]/page.tsx"), /ProfileLevelActivityMarker metric="createdGroups"/);
+  assert.doesNotMatch(source("lib/profile-level-context.tsx"), /localStorage|sessionStorage/);
+  const sql = source("supabase/migrations/20260907021000_verified_profile_activity_sources.sql");
+  for (const metric of ["harvestedFruits", "flownPetals", "goldenFruits", "fruitQuizCorrectAnswers", "correctQuizAnswers", "savedAlbumLetters", "createdGroups", "sharedMemories", "revivedFadedMemories"]) assert.ok(sql.includes(metric));
 });

@@ -2,10 +2,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
-import { SharedQuizRoom } from "@/components/shared-quiz-room";
-import { hydrateSharedQuizQuestions, SHARED_QUIZ_QUESTION_COUNT } from "@/lib/shared-quiz";
+import { SharedQuizRoomData } from "@/components/shared-quiz-room-data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getSharedAlbum, isUuid, loadSharedAlbumMemories } from "@/lib/supabase/shared-albums";
+import { getSharedAlbum, isUuid } from "@/lib/supabase/shared-albums";
 import {
   getSharedQuizSession,
   listSharedQuizParticipants,
@@ -57,44 +56,31 @@ export default async function SharedQuizPage({ params, searchParams }: PageProps
     const answersPromise = session.status === "active"
       ? loadOwnSharedQuizAnswers(client, sessionId, user.id)
       : Promise.resolve([]);
-    const memoriesPromise = session.status === "active"
-      ? loadSharedAlbumMemories(client, groupId)
-      : Promise.resolve([]);
     const standingsPromise = session.status === "completed"
       ? listSharedQuizStandings(client, sessionId)
       : Promise.resolve([]);
-    const [participants, initialAnswers, memories, standings] = await Promise.all([
+    const [participants, initialAnswers, standings] = await Promise.all([
       participantsPromise,
       answersPromise,
-      memoriesPromise,
       standingsPromise,
     ]);
-    const questions = session.status === "active"
-      ? hydrateSharedQuizQuestions(session.questions, memories)
-      : [];
-    const questionError = session.status === "active" && questions.length !== SHARED_QUIZ_QUESTION_COUNT
-      ? "問題の写真を読み込めませんでした。通信状態を確認して再読み込みしてください。"
-      : null;
-
     return (
       <div className="page-pad shared-quiz-page">
         <AppHeader />
         <Link href={`/shared-groups/${groupId}`} className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-ink/55 hover:text-coral"><ArrowLeft size={15} />{album.name}へ戻る</Link>
-        {questionError ? <p role="alert" className="auth-notice auth-notice--error mt-7">{questionError}</p> : (
-          <SharedQuizRoom
+          <SharedQuizRoomData
             groupId={groupId}
             groupName={album.name}
             userId={user.id}
             session={session}
             participants={participants}
-            questions={questions}
+            questions={[]}
             initialAnswers={initialAnswers}
             standings={standings}
             serverNow={Date.now()}
             actionError={actionError}
             isOwner={album.ownerId === user.id}
           />
-        )}
       </div>
     );
   } catch (error) {

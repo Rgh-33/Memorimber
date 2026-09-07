@@ -201,11 +201,11 @@ test("shared group pages expose the required navigation and read-only detail", (
   const list = readFileSync(new URL("../app/shared-groups/page.tsx", import.meta.url), "utf8");
   const createButton = readFileSync(new URL("../components/shared-group-create-button.tsx", import.meta.url), "utf8");
   const addButton = readFileSync(new URL("../components/shared-add-button.tsx", import.meta.url), "utf8");
-  const detail = readFileSync(new URL("../app/shared-groups/[groupId]/page.tsx", import.meta.url), "utf8");
+  const detail = readFileSync(new URL("../components/shared-group-detail.tsx", import.meta.url), "utf8");
   const controls = readFileSync(new URL("../components/shared-group-controls.tsx", import.meta.url), "utf8");
   const dialog = readFileSync(new URL("../components/shared-group-dialog.tsx", import.meta.url), "utf8");
   const backLink = readFileSync(new URL("../components/app-back-link.tsx", import.meta.url), "utf8");
-  const memory = readFileSync(new URL("../app/shared-groups/[groupId]/memories/[memoryId]/page.tsx", import.meta.url), "utf8");
+  const memory = readFileSync(new URL("../components/shared-memory-detail.tsx", import.meta.url), "utf8");
   assert.match(nav, /href: "\/shared-groups", label: "共有"/);
   assert.doesNotMatch(nav, /href: "\/more", label: "その他"/);
   assert.match(header, /href="\/more"/);
@@ -213,7 +213,7 @@ test("shared group pages expose the required navigation and read-only detail", (
   assert.match(list, /参加中のグループ/);
   assert.doesNotMatch(list, /\{albums\.length\}件/);
   assert.match(list, /joined-groups-title[\s\S]*SharedGroupCreateButton/);
-  assert.match(list, /listSharedAlbumMembers/);
+  assert.match(list, /getGroupProfiles/);
   assert.match(list, /membersByAlbumId/);
   assert.match(list, /aria-label=\{`メンバー:/);
   assert.match(createButton, /SharedAddButton/);
@@ -240,7 +240,7 @@ test("shared group pages expose the required navigation and read-only detail", (
 
 test("shared group settings and thumbnails expose the compact presentation controls", () => {
   const list = readFileSync(new URL("../app/shared-groups/page.tsx", import.meta.url), "utf8");
-  const detail = readFileSync(new URL("../app/shared-groups/[groupId]/page.tsx", import.meta.url), "utf8");
+  const detail = readFileSync(new URL("../components/shared-group-detail.tsx", import.meta.url), "utf8");
   const controls = readFileSync(new URL("../components/shared-group-controls.tsx", import.meta.url), "utf8");
   const createButton = readFileSync(new URL("../components/shared-group-create-button.tsx", import.meta.url), "utf8");
   const groupIcon = readFileSync(new URL("../components/shared-group-icon.tsx", import.meta.url), "utf8");
@@ -261,8 +261,8 @@ test("shared group settings and thumbnails expose the compact presentation contr
   assert.match(controls, /size="profile"/);
   assert.match(controls, /aria-label="グループ画像を変更"/);
   assert.match(controls, /type="file" name="icon" accept=\{SHARED_GROUP_ICON_ACCEPT\}/);
-  assert.match(controls, /createSharedGroupIconDataUrl\(file\)/);
-  assert.match(controls, /updatePresentation\(\{ iconDataUrl \}\)/);
+  assert.match(controls, /await uploadIcon\(file\)/);
+  assert.match(presentation, /method: "POST", body/);
   assert.doesNotMatch(controls, /fetch\(/);
   assert.match(controls, /action=\{submitAction\(renameSharedGroupAction\)\}/);
   assert.match(controls, /name="name"[\s\S]*aria-label="グループ名を編集"/);
@@ -275,8 +275,8 @@ test("shared group settings and thumbnails expose the compact presentation contr
   assert.match(controls, /className=\{`border-t border-line pt-5 \$\{isOwner \? "" : "opacity-60"\}`\}/);
   assert.match(controls, /panel\.kind === "display" \? \(/);
   assert.match(controls, /fieldset disabled=\{busy \|\| !isOwner\}/);
-  assert.match(presentation, /window\.sessionStorage/);
-  assert.match(presentation, /setBrowserSessionItem/);
+  assert.doesNotMatch(presentation, /localStorage|sessionStorage/);
+  assert.match(presentation, /await refreshGroup/);
   assert.match(presentation, /showCaption: false/);
   assert.match(presentation, /showDate: false/);
   assert.match(presentation, /quizMode: "random"/);
@@ -341,4 +341,19 @@ test("shared members use profile icons, owner crowns, levels, and a read-only pr
   assert.match(profile, /<ProfileLevelOverview levelProgress=\{levelProgress\}/);
   assert.match(profile, /<ProfileRecordGrid stats=\{stats\}/);
   assert.doesNotMatch(profile, /Camera|Pencil|setNickname|setAvatarFile/);
+});
+
+test("shared thumbnail URLs are reused until expiry and remain isolated per cache", async () => {
+  const { client, signedPathCalls } = loaderHarness({ denySecondPath: false });
+  const firstUserGroup = new Map();
+  const first = await loadSharedAlbumMemoryEntries(client, ALBUM_ID, firstUserGroup);
+  await loadSharedAlbumMemoryEntries(client, ALBUM_ID, firstUserGroup);
+  assert.equal(signedPathCalls.length, 1, "valid URLs must not be regenerated");
+  const [path, value] = firstUserGroup.entries().next().value;
+  firstUserGroup.set(path, { ...value, expiresAt: 0 });
+  await loadSharedAlbumMemoryEntries(client, ALBUM_ID, firstUserGroup);
+  assert.deepEqual(signedPathCalls[1], [path], "renew only the expired path");
+  await loadSharedAlbumMemoryEntries(client, ALBUM_ID, new Map());
+  assert.equal(signedPathCalls.length, 3, "another scope cannot reuse the first scope's URLs");
+  assert.ok(first.entries[0].memory.thumbnailUrl);
 });

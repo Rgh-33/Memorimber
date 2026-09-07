@@ -32,7 +32,7 @@ test("a new migration version repairs databases that skipped shared thumbnail ac
 test("shared lists sign only display images and details load one original", () => {
   assert.match(sharedLoader, /memory\.thumbnail_path \?\? memory\.image_path/);
   assert.match(sharedLoader, /loadSharedAlbumMemoryDetail/);
-  assert.match(sharedLoader, /signMemoryPaths\(client, \[memory\.image_path\]\)/);
-  assert.match(sharedDetailPage, /loadSharedAlbumMemoryDetail\(client, groupId, memoryId\)/);
+  assert.match(sharedLoader, /signMemoryPaths\(client, \[memory\.image_path\], cache\)/);
+  assert.match(sharedDetailPage, /<SharedMemoryDetail album=\{album\} memoryId=\{memoryId\}/);
   assert.doesNotMatch(sharedDetailPage, /loadSharedAlbumMemoryEntries/);
 });
