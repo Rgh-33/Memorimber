@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { setBrowserSessionItem } from "@/lib/browser-session-data";
-
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { getGroupCache, getEmptyGroupCache, refreshGroup, subscribeGroupCache, watchGroup } from "@/lib/shared-group-cache";
 export const MAX_SHARED_GROUP_ICON_BYTES = 5 * 1024 * 1024;
 export const SHARED_GROUP_ICON_ACCEPT = "image/jpeg,image/png,image/webp";
 
@@ -29,79 +28,22 @@ const DEFAULT_PRESENTATION: SharedGroupPresentation = {
   quizCaptionToPhotoCount: 5,
   quizSecondsPerQuestion: 5,
 };
-const STORAGE_PREFIX = "memorimber-shared-group-presentation-v1:";
-const PRESENTATION_EVENT = "memorimber:shared-group-presentation";
-const DATA_IMAGE_PATTERN = /^data:image\/(?:jpeg|png|webp);base64,/;
-
-type PresentationEventDetail = {
-  groupId: string;
-  presentation: SharedGroupPresentation;
-};
-
-function storageKey(groupId: string) {
-  return `${STORAGE_PREFIX}${groupId}`;
-}
-
-function normalizePresentation(value: unknown): SharedGroupPresentation {
-  if (!value || typeof value !== "object") return { ...DEFAULT_PRESENTATION };
-  const candidate = value as Partial<SharedGroupPresentation>;
-  const count = (input: unknown, fallback: number) => Number.isInteger(input) && Number(input) >= 0 && Number(input) <= 10
-    ? Number(input)
-    : fallback;
-  const seconds = candidate.quizSecondsPerQuestion;
-  return {
-    iconDataUrl: typeof candidate.iconDataUrl === "string" && DATA_IMAGE_PATTERN.test(candidate.iconDataUrl)
-      ? candidate.iconDataUrl
-      : null,
-    showCaption: candidate.showCaption === true,
-    showDate: candidate.showDate === true,
-    quizMode: candidate.quizMode === "custom" ? "custom" : "random",
-    balanceQuizContributors: candidate.balanceQuizContributors === true,
-    quizMonthCount: count(candidate.quizMonthCount, DEFAULT_PRESENTATION.quizMonthCount),
-    quizPhotoToCaptionCount: count(candidate.quizPhotoToCaptionCount, DEFAULT_PRESENTATION.quizPhotoToCaptionCount),
-    quizCaptionToPhotoCount: count(candidate.quizCaptionToPhotoCount, DEFAULT_PRESENTATION.quizCaptionToPhotoCount),
-    quizSecondsPerQuestion: seconds === 3 || seconds === 10 ? seconds : 5,
-  };
-}
-
-function readPresentation(groupId: string) {
-  try {
-    const saved = window.sessionStorage.getItem(storageKey(groupId));
-    return saved ? normalizePresentation(JSON.parse(saved)) : { ...DEFAULT_PRESENTATION };
-  } catch {
-    return { ...DEFAULT_PRESENTATION };
-  }
-}
 
 export function useSharedGroupPresentation(groupId: string) {
-  const [presentation, setPresentation] = useState<SharedGroupPresentation>({ ...DEFAULT_PRESENTATION });
-
-  useEffect(() => {
-    setPresentation(readPresentation(groupId));
-    const receive = (event: Event) => {
-      const detail = (event as CustomEvent<PresentationEventDetail>).detail;
-      if (detail?.groupId === groupId) setPresentation(normalizePresentation(detail.presentation));
-    };
-    window.addEventListener(PRESENTATION_EVENT, receive);
-    return () => window.removeEventListener(PRESENTATION_EVENT, receive);
+  const cached = useSyncExternalStore(subscribeGroupCache, () => getGroupCache(groupId), getEmptyGroupCache);
+  useEffect(() => watchGroup(groupId, false), [groupId]);
+  const updatePresentation = useCallback(async (patch: Partial<SharedGroupPresentation>) => {
+    const response = await fetch(`/api/shared-groups/${groupId}/presentation`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    if (!response.ok) throw new Error("表示設定を反映できませんでした。");
+    await refreshGroup(groupId, false, true);
   }, [groupId]);
-
-  const updatePresentation = useCallback((patch: Partial<SharedGroupPresentation>) => {
-    const next = normalizePresentation({ ...readPresentation(groupId), ...patch });
-    let persisted = false;
-    try {
-      persisted = setBrowserSessionItem(window.sessionStorage, storageKey(groupId), JSON.stringify(next));
-    } catch {
-      // The current screen can still preview the setting when browser storage is unavailable.
-    }
-    setPresentation(next);
-    window.dispatchEvent(new CustomEvent<PresentationEventDetail>(PRESENTATION_EVENT, {
-      detail: { groupId, presentation: next },
-    }));
-    return persisted;
+  const uploadIcon = useCallback(async (file: File) => {
+    const body = new FormData(); body.set("icon", file);
+    const response = await fetch(`/api/shared-groups/${groupId}/presentation`, { method: "POST", body });
+    if (!response.ok) throw new Error("グループ画像を反映できませんでした。");
+    await refreshGroup(groupId, false, true);
   }, [groupId]);
-
-  return { presentation, updatePresentation };
+  return { presentation: cached.presentation ?? DEFAULT_PRESENTATION, updatePresentation, uploadIcon, error: cached.error };
 }
 
 export function validateSharedGroupIcon(file: File) {

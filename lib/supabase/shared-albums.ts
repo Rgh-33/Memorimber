@@ -1,3 +1,4 @@
+import type { SignedUrlCache } from "../shared-group-cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAlbumAppearance } from "../album-appearance.ts";
 import type { Memory } from "../types";
@@ -232,10 +233,14 @@ export async function listOwnMemoriesForSharing(
   return choices.map(({ path, ...choice }) => ({ ...choice, displayUrl: urls.get(path) ?? "" }));
 }
 
-async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[]) {
+async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[], cache?: SignedUrlCache) {
   const urls = new Map<string, string>();
   let warning: string | null = null;
-  const paths = [...new Set(requestedPaths)];
+  const paths = [...new Set(requestedPaths)].filter((path) => {
+    const stored = cache?.get(path);
+    if (stored && stored.expiresAt > Date.now() + 60000) { urls.set(path, stored.url); return false; }
+    return true;
+  });
   const pageSize = 100;
   for (let offset = 0; offset < paths.length; offset += pageSize) {
     const pagePaths = paths.slice(offset, offset + pageSize);
@@ -244,13 +249,16 @@ async function signMemoryPaths(client: SupabaseClient, requestedPaths: string[])
         .createSignedUrls(pagePaths, MEMORY_IMAGE_URL_LIFETIME);
       if (error) throw error;
       for (const item of data ?? []) {
-        if (item.path && item.signedUrl && !item.error) urls.set(item.path, item.signedUrl);
+        if (item.path && item.signedUrl && !item.error) {
+          urls.set(item.path, item.signedUrl);
+          cache?.set(item.path, { url: item.signedUrl, expiresAt: Date.now() + MEMORY_IMAGE_URL_LIFETIME * 1000 });
+        }
       }
     } catch {
       warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
     }
   }
-  if (urls.size !== paths.length) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
+  if (urls.size !== new Set(requestedPaths).size) warning = "一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。";
   return { urls, warning };
 }
 
@@ -273,6 +281,7 @@ function toSharedMemoryEntry(
 export async function loadSharedAlbumMemoryEntries(
   client: SupabaseClient,
   albumId: string,
+  cache?: SignedUrlCache,
 ): Promise<SharedAlbumMemoryResult> {
   const id = requireUuid(albumId, "グループ");
   const rows: SharedMemoryRow[] = [];
@@ -294,7 +303,7 @@ export async function loadSharedAlbumMemoryEntries(
     return memory ? [{ row, memory }] : [];
   });
   const displayPaths = normalized.map(({ memory }) => memory.thumbnail_path ?? memory.image_path);
-  const { urls, warning } = await signMemoryPaths(client, displayPaths);
+  const { urls, warning } = await signMemoryPaths(client, displayPaths, cache);
   return {
     entries: normalized.map(({ row, memory }) => memory.thumbnail_path
       ? toSharedMemoryEntry(row, memory, "", urls.get(memory.thumbnail_path))
@@ -308,6 +317,7 @@ export async function loadSharedAlbumMemoryDetail(
   client: SupabaseClient,
   albumId: string,
   memoryId: string,
+  cache?: SignedUrlCache,
 ): Promise<SharedAlbumMemoryDetailResult | null> {
   const { data, error } = await client.from("shared_album_memories")
     .select(SHARED_MEMORY_COLUMNS)
@@ -319,7 +329,7 @@ export async function loadSharedAlbumMemoryDetail(
   const row = data as unknown as SharedMemoryRow;
   const memory = singleMemory(row.memory);
   if (!memory) return null;
-  const { urls, warning } = await signMemoryPaths(client, [memory.image_path]);
+  const { urls, warning } = await signMemoryPaths(client, [memory.image_path], cache);
   return {
     entry: toSharedMemoryEntry(row, memory, urls.get(memory.image_path) ?? ""),
     warning,
@@ -385,4 +395,13 @@ export async function deleteSharedAlbum(client: SupabaseClient, albumId: string)
     .maybeSingle();
   if (error) throw new Error(albumError(error, "グループを削除できませんでした。"));
   if (!data) throw new Error("グループが見つからないか、削除する権限がありません。");
+}
+
+/** Refresh only expiring URLs; does not query the photo list. */
+export async function renewSharedMemoryUrls(client: SupabaseClient, result: SharedAlbumMemoryResult, cache: SignedUrlCache): Promise<SharedAlbumMemoryResult> {
+  const paths = result.entries.map(({ memory }) => memory.thumbnailPath ?? memory.imagePath ?? "").filter(Boolean);
+  const { urls, warning } = await signMemoryPaths(client, paths, cache);
+  return { entries: result.entries.map((entry) => ({ ...entry, memory: { ...entry.memory,
+    ...(entry.memory.thumbnailPath ? { thumbnailUrl: urls.get(entry.memory.thumbnailPath) } : { imageUrl: urls.get(entry.memory.imagePath ?? "") ?? "" }),
+  } })), warning };
 }

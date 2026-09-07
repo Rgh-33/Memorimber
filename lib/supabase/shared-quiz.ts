@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  SHARED_QUIZ_QUESTION_COUNT,
   SHARED_QUIZ_SECONDS_PER_QUESTION,
   parseSharedQuizPlan,
   type SharedQuizQuestionPlan,
@@ -107,12 +106,10 @@ export async function joinSharedQuiz(client: SupabaseClient, albumId: string) {
 export async function startSharedQuiz(
   client: SupabaseClient,
   sessionId: string,
-  questions: SharedQuizQuestionPlan[],
 ) {
-  if (questions.length !== SHARED_QUIZ_QUESTION_COUNT) throw new Error("10問を作成できる思い出がありません。");
   const { data, error } = await client.rpc("start_shared_quiz", {
     target_quiz_id: requireUuid(sessionId, "クイズ"),
-    quiz_questions: questions,
+    quiz_questions: null,
   });
   if (error) throw new Error(quizError(error, "クイズを開始できませんでした。"));
   const row = Array.isArray(data) ? data[0] as Record<string, unknown> | undefined : undefined;

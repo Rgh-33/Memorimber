@@ -10,7 +10,8 @@ import { SharedGroupIcon } from "@/components/shared-group-icon";
 import { SharedMemberName } from "@/components/shared-member-identity";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { listInvitationNotifications, type InvitationNotification } from "@/lib/supabase/shared-album-invitations";
-import { listSharedAlbumMembers, listSharedAlbums, type SharedAlbum, type SharedAlbumMember } from "@/lib/supabase/shared-albums";
+import { listSharedAlbums, type SharedAlbum, type SharedAlbumMember } from "@/lib/supabase/shared-albums";
+import { getGroupProfiles } from "@/lib/supabase/group-profiles";
 import { createClient } from "@/lib/supabase/server";
 import { createSharedGroupAction, respondInvitationAction } from "./actions";
 
@@ -42,9 +43,9 @@ export default async function SharedGroupsPage({ searchParams }: PageProps) {
     ]);
     if (albumResult.status === "fulfilled") {
       albums = albumResult.value;
-      const memberResults = await Promise.allSettled(albums.map((album) => listSharedAlbumMembers(client, album.id)));
+      const memberResults = await Promise.allSettled(albums.map((album) => getGroupProfiles(client, album.id, undefined, false)));
       memberResults.forEach((result, index) => {
-        if (result.status === "fulfilled") membersByAlbumId.set(albums[index].id, result.value);
+        if (result.status === "fulfilled") membersByAlbumId.set(albums[index].id, result.value ?? []);
         else loadError ??= result.reason instanceof Error ? result.reason.message : "メンバーを読み込めませんでした。";
       });
       groupSnapshotReady = memberResults.every((result) => result.status === "fulfilled");

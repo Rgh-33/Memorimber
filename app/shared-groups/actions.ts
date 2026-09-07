@@ -5,11 +5,7 @@ import { redirect } from "next/navigation";
 import { processRetainedMemoryCleanupQueue } from "@/lib/supabase/account-deletion-runner";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import {
-  createSharedQuizPlan,
-  parseSharedQuizConfig,
-  selectBalancedSharedQuizMemories,
-} from "@/lib/shared-quiz";
+
 import { inviteToSharedAlbum, respondToSharedAlbumInvitation } from "@/lib/supabase/shared-album-invitations";
 import {
   addMemoriesToSharedAlbum,
@@ -17,12 +13,11 @@ import {
   deleteSharedAlbum,
   isUuid,
   leaveSharedAlbum,
-  loadSharedAlbumMemoryEntries,
   renameSharedAlbum,
   removeMemoryFromSharedAlbum,
   removeSharedAlbumMember,
 } from "@/lib/supabase/shared-albums";
-import { joinSharedQuiz, listSharedQuizParticipants, startSharedQuiz } from "@/lib/supabase/shared-quiz";
+import { joinSharedQuiz, startSharedQuiz } from "@/lib/supabase/shared-quiz";
 import { createClient } from "@/lib/supabase/server";
 
 function noticePath(
@@ -190,30 +185,7 @@ export async function startSharedQuizAction(formData: FormData) {
   try {
     path = quizPath(groupId, sessionId);
     const client = await authenticatedClient();
-    const config = parseSharedQuizConfig({
-      mode: formData.get("quizMode"),
-      balanceContributors: formData.get("balanceQuizContributors") === "true",
-      monthCount: formData.get("quizMonthCount"),
-      photoToCaptionCount: formData.get("quizPhotoToCaptionCount"),
-      captionToPhotoCount: formData.get("quizCaptionToPhotoCount"),
-      secondsPerQuestion: Number(formData.get("quizSecondsPerQuestion")),
-    });
-    const [{ entries }, participants] = await Promise.all([
-      loadSharedAlbumMemoryEntries(client, String(groupId)),
-      listSharedQuizParticipants(client, String(sessionId)),
-    ]);
-    const memories = config.balanceContributors
-      ? selectBalancedSharedQuizMemories(
-        entries.map((entry) => ({ contributorId: entry.addedBy, memory: entry.memory })),
-        participants.map((participant) => participant.userId),
-      )
-      : entries.map((entry) => entry.memory);
-    if (memories.length === 0) throw new Error("参加者が投稿した思い出がないため、問題を作成できません。");
-    const contributorByMemory = config.balanceContributors
-      ? new Map(entries.flatMap((entry) => entry.addedBy ? [[entry.memory.id, entry.addedBy]] : []))
-      : undefined;
-    const questions = createSharedQuizPlan(memories, Math.random, config, contributorByMemory);
-    await startSharedQuiz(client, String(sessionId), questions);
+    await startSharedQuiz(client, String(sessionId));
   } catch (error) {
     failure = errorText(error, "クイズを開始できませんでした。");
   }

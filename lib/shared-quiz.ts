@@ -36,6 +36,7 @@ export type SharedQuizQuestionPlan = {
   kind: SharedQuizKind;
   choiceIds: string[];
   secondsPerQuestion: SharedQuizSeconds;
+  snapshots?: Record<string, { caption: string; date: string }>;
 };
 
 export type SharedQuizTiming =
@@ -226,7 +227,13 @@ export function parseSharedQuizPlan(value: unknown): SharedQuizQuestionPlan[] {
       ? SHARED_QUIZ_SECONDS_PER_QUESTION
       : record.secondsPerQuestion;
     if (!isSharedQuizSeconds(secondsPerQuestion)) return [];
-    return [{ memoryId: record.memoryId, kind: record.kind, choiceIds, secondsPerQuestion }];
+    const snapshots: NonNullable<SharedQuizQuestionPlan["snapshots"]> = {};
+    if (record.snapshots && typeof record.snapshots === "object") {
+      for (const [id, value] of Object.entries(record.snapshots)) {
+        if (value && typeof value === "object" && typeof value.caption === "string" && typeof value.date === "string") snapshots[id] = { caption: value.caption, date: value.date };
+      }
+    }
+    return [{ memoryId: record.memoryId, kind: record.kind, choiceIds, secondsPerQuestion, ...(Object.keys(snapshots).length ? { snapshots } : {}) }];
   });
   if (plans.length !== SHARED_QUIZ_QUESTION_COUNT) return [];
   return new Set(plans.map((plan) => plan.secondsPerQuestion)).size === 1 ? plans : [];
@@ -238,8 +245,12 @@ export function hydrateSharedQuizQuestions(
 ): MemoryQuizQuestion[] {
   const memoryById = new Map(memories.map((memory) => [memory.id, memory]));
   return plans.flatMap((plan, index): MemoryQuizQuestion[] => {
-    const memory = memoryById.get(plan.memoryId);
-    const choices = plan.choiceIds.map((id) => memoryById.get(id)).filter((item): item is Memory => Boolean(item));
+    const savedMemory = (id: string) => {
+      const current = memoryById.get(id);
+      return current ? { ...current, ...plan.snapshots?.[id] } : undefined;
+    };
+    const memory = savedMemory(plan.memoryId);
+    const choices = plan.choiceIds.map(savedMemory).filter((item): item is Memory => Boolean(item));
     if (!memory || choices.length !== plan.choiceIds.length || !getMemoryDisplayUrl(memory) || !memory.caption.trim()) return [];
 
     if (plan.kind === "month") {

@@ -26,7 +26,6 @@ import { SharedGroupDialog } from "@/components/shared-group-dialog";
 import { SharedGroupIcon } from "@/components/shared-group-icon";
 import { SharedMemberAvatar, SharedMemberName } from "@/components/shared-member-identity";
 import {
-  createSharedGroupIconDataUrl,
   SHARED_GROUP_ICON_ACCEPT,
   useSharedGroupPresentation,
   validateSharedGroupIcon,
@@ -61,7 +60,7 @@ export function SharedGroupControls({
   isOwner,
   members,
 }: SettingsProps) {
-  const { presentation, updatePresentation } = useSharedGroupPresentation(groupId);
+  const { presentation, updatePresentation, uploadIcon } = useSharedGroupPresentation(groupId);
   const [panel, setPanel] = useState<SettingsPanel | null>(null);
   const [busy, setBusy] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -112,7 +111,7 @@ export function SharedGroupControls({
     try {
       const intent = formData.get("intent");
       if (intent === "display") {
-        updatePresentation({
+        await updatePresentation({
           showCaption: formData.get("showCaption") === "on",
           showDate: formData.get("showDate") === "on",
         });
@@ -126,7 +125,7 @@ export function SharedGroupControls({
           quizMode === "custom"
           && quizMonthCount + quizPhotoToCaptionCount + quizCaptionToPhotoCount !== 10
         ) throw new Error("カスタムの問題数は合計10問にしてください。");
-        updatePresentation({
+        await updatePresentation({
           quizMode,
           balanceQuizContributors: formData.get("balanceQuizContributors") === "on",
           quizMonthCount,
@@ -158,8 +157,7 @@ export function SharedGroupControls({
     setBusy(true);
     setSettingsError(null);
     try {
-      const iconDataUrl = await createSharedGroupIconDataUrl(file);
-      updatePresentation({ iconDataUrl });
+      await uploadIcon(file);
     } catch (error) {
       setSettingsError(error instanceof Error ? error.message : "グループ画像を反映できませんでした。");
     } finally {

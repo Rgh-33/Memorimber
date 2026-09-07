@@ -1,6 +1,7 @@
 "use client";
 
-import { setBrowserSessionItem } from "@/lib/browser-session-data";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
@@ -10,7 +11,7 @@ import { MemoryPetal } from "@/components/memory-petal";
 import { FruitQuizDialog } from "@/components/fruit-quiz-dialog";
 import { MemoryRecallDialog } from "@/components/memory-recall-dialog";
 import { useHarvest } from "@/lib/harvest-context";
-import { chooseFadingMemoryId, EMPTY_MEMORY_RECALL_STATE, MEMORY_RECALL_STORAGE_KEY, readMemoryRecallState, recordMemoryReview, type MemoryRecallState } from "@/lib/memory-recall";
+import { chooseFadingMemoryId, EMPTY_MEMORY_RECALL_STATE, recordMemoryReview, type MemoryRecallState } from "@/lib/memory-recall";
 import { useProfileLevel } from "@/lib/profile-level-context";
 import type { Memory } from "@/lib/types";
 import type { MemoryTreeItem } from "@/lib/tree-data";
@@ -437,19 +438,26 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
     if (recallSelectionReady.current) return;
     if (shownWords.length === 0) return;
     recallSelectionReady.current = true;
-    let stored = EMPTY_MEMORY_RECALL_STATE;
-    try { stored = readMemoryRecallState(localStorage.getItem(MEMORY_RECALL_STORAGE_KEY)); } catch { /* In-memory selection still works. */ }
-    const featuredId = chooseFadingMemoryId(shownWords, stored, Date.now(), { ignoreAge: preview });
-    const next = { ...stored, featuredId };
-    setRecallState(next);
-    setFadingMemoryId(featuredId);
-    try { setBrowserSessionItem(localStorage, MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory selection still works. */ }
+    let active = true;
+    const load = async () => {
+      const stored: MemoryRecallState = { reviewedAt: {}, featuredId: null };
+      if (isSupabaseConfigured()) {
+        const { data, error } = await createClient().from("memory_fruits").select("memory_id,last_reviewed_at");
+        if (error) { recallSelectionReady.current = false; return; }
+        for (const row of data ?? []) if (row.last_reviewed_at) stored.reviewedAt[row.memory_id] = Date.parse(row.last_reviewed_at);
+      }
+      if (!active) return;
+      const featuredId = chooseFadingMemoryId(shownWords, stored, Date.now(), { ignoreAge: preview && !isSupabaseConfigured() });
+      setRecallState({ ...stored, featuredId });
+      setFadingMemoryId(featuredId);
+    };
+    void load();
+    return () => { active = false; recallSelectionReady.current = false; };
   }, [preview, shownWords]);
 
   const rememberInteraction = useCallback((memoryId: string) => {
     setRecallState((current) => {
       const next = recordMemoryReview(current, memoryId, Date.now());
-      try { setBrowserSessionItem(localStorage, MEMORY_RECALL_STORAGE_KEY, JSON.stringify(next)); } catch { /* In-memory tracking still works. */ }
       return next;
     });
     setFadingMemoryId((current) => current === memoryId ? null : current);
@@ -475,7 +483,7 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
       return;
     }
     rememberInteraction(memoryId);
-    recordActivity("wordRecallReveals");
+    recordActivity("wordRecallReveals", { memoryId });
     setRevealedItem(item);
   }, [fadingMemoryId, memoriesById, recordActivity, rememberInteraction]);
 

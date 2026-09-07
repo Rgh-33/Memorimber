@@ -7,8 +7,8 @@ import { Check, X } from "lucide-react";
 import { MemoryPetal } from "@/components/memory-petal";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
-import { FRUIT_QUIZ_KINDS, createMemoryQuizQuestion } from "@/lib/quiz";
-import { useProfileLevel } from "@/lib/profile-level-context";
+import { usePersistedMemoryQuestion } from "@/lib/use-persisted-memory-question";
+import { restorePetal } from "@/lib/personal-quiz";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
@@ -20,12 +20,8 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   onRemembered: () => void;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
-  const { recordActivity } = useProfileLevel();
-  const [question] = useState(() => createMemoryQuizQuestion(
-    memory,
-    memories,
-    FRUIT_QUIZ_KINDS[Math.floor(Math.random() * FRUIT_QUIZ_KINDS.length)],
-  ));
+  const { question, error: quizError, ready: quizReady, answer, setError } = usePersistedMemoryQuestion("recall", memory, memories);
+  const restoring = useRef(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
   const isCorrect = selected === question.correctChoiceId;
@@ -42,16 +38,16 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
     };
   }, [onClose]);
 
-  const releasePetal = () => {
-    recordActivity("revivedFadedMemories", { eventId: question.id });
-    onRemembered();
-    onClose();
+  const releasePetal = async () => {
+    if (restoring.current || !answered) return;
+    restoring.current = true;
+    try { await restorePetal(question.id); onRemembered(); onClose(); }
+    catch (error) { setError(error instanceof Error ? error.message : "花びらを戻せませんでした。"); }
+    finally { restoring.current = false; }
   };
-
-  const confirmAnswer = () => {
+  const confirmAnswer = async () => {
     if (!selected || answered) return;
-    if (selected === question.correctChoiceId) recordActivity("correctQuizAnswers");
-    setAnswered(true);
+    if (await answer(selected)) setAnswered(true);
   };
 
   return (
@@ -65,12 +61,12 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
         <button ref={closeButton} type="button" className="fruit-quiz-close" onClick={onClose} aria-label="思い出しクイズを閉じる"><X size={18} /></button>
         <p className="fruit-quiz-eyebrow">{answered ? "MEMORY RETURNED" : "FADING MEMORY"}</p>
         <h2 id="memory-recall-title">{answered ? (isCorrect ? "覚えてたね" : "失いかけてたね") : "消えかけた思い出"}</h2>
-        <p className="fruit-quiz-lead">{answered ? "前と同じ言葉が花びらに戻ります。" : "クイズに答えて、この思い出をもう一度つなぎとめよう。"}</p>
+        <p className="fruit-quiz-lead">{quizError ?? (answered ? "前と同じ言葉が花びらに戻ります。" : "クイズに答えて、この思い出をもう一度つなぎとめよう。")}</p>
 
         {!answered ? (
           <div className="fruit-quiz-question-step">
-            <QuizQuestionCard question={question} selectedChoiceId={selected} answered={false} onSelect={setSelected} />
-            <button type="button" className="quiz-primary-button" onClick={confirmAnswer} disabled={!selected}>答えを確認</button>
+            <QuizQuestionCard question={quizError ? { ...question, prompt: quizError } : question} selectedChoiceId={selected} answered={false} onSelect={setSelected} />
+            <button type="button" className="quiz-primary-button" onClick={confirmAnswer} disabled={!selected || !quizReady}>答えを確認</button>
           </div>
         ) : (
           <div className="fruit-quiz-word-step">
