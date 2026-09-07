@@ -1,3 +1,4 @@
+import { createSecureUuid } from "../secure-uuid.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAlbumAppearance, type AlbumAppearance } from "../album-appearance.ts";
 import { createMemoryThumbnail, MEMORY_THUMBNAIL_FILE_SUFFIX, type GeneratedMemoryThumbnail } from "../memory-thumbnail.ts";
@@ -96,20 +97,8 @@ export class MemorySaveError extends Error {
 }
 
 function createMemoryId() {
-  if (typeof crypto !== "undefined") {
-    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-
-    // randomUUID requires a secure context: localhost works, but an iPhone
-    // opening http://192.168.x.x may not expose it. getRandomValues remains
-    // available there and supplies the same cryptographic randomness.
-    if (typeof crypto.getRandomValues === "function") {
-      const bytes = crypto.getRandomValues(new Uint8Array(16));
-      bytes[6] = (bytes[6] & 0x0f) | 0x40; // UUID version 4.
-      bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC UUID variant (10xx).
-      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-    }
-  }
+  const id = createSecureUuid();
+  if (id) return id;
 
   // Do not substitute timestamps or Math.random for a secure identifier.
   throw new MemorySaveError("このブラウザでは安全な保存用IDを生成できません。ブラウザを更新するか、HTTPSで開き直してください。");

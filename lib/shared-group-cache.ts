@@ -99,6 +99,8 @@ export async function refreshGroup(groupId: string, needPhotos = false, recheckA
   try { await promise; } finally { if (epoch === generation) pending.delete(key); }
 }
 // Realtime is only an invalidation signal; payload data never enters the cache.
+// Channel names only need uniqueness within this module, not secure UUIDs.
+let channelSequence = 0;
 const watches = new Map<string, { count: number; photoUsers: number; stop: () => void }>();
 export function watchGroup(groupId: string, needPhotos: boolean) {
   if (!isSupabaseConfigured()) return () => {};
@@ -106,7 +108,7 @@ export function watchGroup(groupId: string, needPhotos: boolean) {
   if (!watch) {
     const client = createClient();
     const refresh = () => { void refreshGroup(groupId, (watches.get(groupId)?.photoUsers ?? 0) > 0, true); };
-    const channel = client.channel(`group-cache:${groupId}:${crypto.randomUUID()}`)
+    const channel = client.channel(`group-cache:${groupId}:${++channelSequence}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "shared_group_versions", filter: `group_id=eq.${groupId}` }, refresh)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profile_progress" }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "profile_identity_versions" }, refresh)

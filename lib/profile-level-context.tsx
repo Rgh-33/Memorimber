@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMemories } from "@/lib/memories-context";
+import { createSecureUuid } from "@/lib/secure-uuid";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { profileProgressView, type ProfileProgressSnapshot } from "@/lib/profile-progress";
@@ -64,7 +65,8 @@ export function ProfileLevelProvider({ children }: { children: ReactNode }) {
     // Only inherently client-observed events use this endpoint.
     if (metric !== "printAttempts" && metric !== "wordRecallReveals") { void refresh(); return; }
     if (!isSupabaseConfigured()) return;
-    const source = options?.eventId ?? crypto.randomUUID();
+    const source = options?.eventId ?? createSecureUuid();
+    if (!source) { setError("記録を保存できませんでした。時間をおいて再度お試しください。"); return; }
     void createClient().rpc("record_profile_client_event", { p_type: metric, p_source: source, p_memory: options?.memoryId ?? null }).then(({ data, error: failure }) => {
       if (failure) setError("記録を保存できませんでした。時間をおいて再度お試しください。");
       else { setSnapshot(data as ProfileProgressSnapshot); setError(null); }

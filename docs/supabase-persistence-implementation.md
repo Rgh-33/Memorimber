@@ -352,3 +352,26 @@ Realtime payloadは状態へ取り込まず、version再確認の通知として
 - `git diff --check`：問題なし。TSX・CSS・package.json・lockfileは変更なし。buildによるnext-env.d.tsの生成差分は元に戻しました。
 - 開始時の全28 migrationのハッシュと比較し、変更は未適用の `070210` のみ。新規migrationなし、version重複なし、適用済みの21本は変更なし。
 - DBへの適用、DBテスト、npm test、E2E・ブラウザテストは未実行。SQL適用の成立性は依存定義とソースのレビューまでで、実DBでの成立を確認した意味ではありません。
+
+
+## Safariの共有タブ：randomUUID未提供環境への対応
+
+共有タブを開いた際の `crypto.randomUUID is not a function` は、`watchGroup` がRealtimeの購読名を作るときにAPIを無条件に呼んでいた箇所に対応します。実機のURL・Safariバージョンは未確認です。
+
+- `lib/shared-group-cache.ts`：購読名のUUIDをモジュール内の連番へ変更。購読の共有・解除・作り直しを維持し、crypto APIに依存せず共有タブを開けるようにしました。この連番をDBのイベント識別子や認証には使いません。
+- `lib/secure-uuid.ts`：写真保存に既存のUUID代替生成処理を共通化。randomUUIDがあれば使用し、なければgetRandomValuesでUUID v4を生成。安全な乱数源がなければnullを返し、Math.randomや日時で代用しません。
+- `lib/supabase/memories.ts`：既存のUUID生成を共通関数へ接続。安全なIDを生成できない場合のMemorySaveErrorは維持。
+- `lib/profile-level-context.tsx`：印刷・花びらの記録にも共通関数を使用。生成不能時は既存のエラー領域に反映し、イベントを送信しません。文言・レイアウト・操作は変更していません。
+- `tests/secure-uuid.test.mjs`、`tests/shared-group-cache-compatibility.test.mjs`：API欠落時の代替生成と、cryptoがない状態での購読・共有・解除を確認する単体テストを追加。実行していません。Safari実機の検証ではありません。
+
+ローカル確認：修正版でSafariを再読み込みし、共有タブ→グループ→戻るを繰り返して例外が出ないことを確認してください。印刷/PDF・花びら操作の記録、写真保存も同じ環境で確認してください。DB/migrationの変更・適用はありません。
+
+
+### Chromeで「アカウント削除用のサーバー設定が完了していません」「グループを読み込めませんでした」となる場合
+
+調査時のローカル.env.localには公開URL・公開キーだけがあり、SUPABASE_SECRET_KEYは未設定でした。グループのメンバープロフィール取得がcreateAdminClientを共用しており、この未設定チェックの既存文言が表示されます。SafariのrandomUUID例外とは独立した設定不足です。
+
+同じSupabaseプロジェクトのサーバー用キーをローカル.env.localの `SUPABASE_SECRET_KEY` に設定し、開発サーバーを再起動してください。チャットへの貼り付け・NEXT_PUBLIC_付き変数への保存・Gitへのコミットはしません。.env.exampleの用途説明も更新しました。Codexは実際のキーを追加・推測・取得していません。設定後の取得成功は未確認です。
+
+
+今回のUUID修正後も `npm run lint`、`npm run build` とbuild内のTypeScriptチェックは終了コード0で成功しました。追加単体テスト・Safari/Chrome実機操作・DBテストは未実行です。migration差分はありません。UIのclassName・markupを変更せず、既存エラー領域と識別子生成の内部処理だけに接続しました。
