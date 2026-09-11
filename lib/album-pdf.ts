@@ -22,6 +22,16 @@ export function getAlbumPdfFilename(date: string) {
   return `memorimber-${safeDate}-l-size.pdf`;
 }
 
+export function getAlbumPngFilename(date: string) {
+  return getAlbumPdfFilename(date).replace(/\.pdf$/, ".png");
+}
+
+export function getMonthlyAlbumFilename(month: string, page?: number) {
+  const safeMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : "monthly";
+  return page === undefined ? `memorimber-${safeMonth}-l-size.pdf`
+    : `memorimber-${safeMonth}-${page === 0 ? "cover" : `page-${page + 1}`}.png`;
+}
+
 function isIOSWebKit() {
   const userAgent = navigator.userAgent;
   return /AppleWebKit/i.test(userAgent)
@@ -52,7 +62,7 @@ async function waitForAlbumAssets(element: HTMLElement) {
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
-export async function createAlbumPdf(element: HTMLElement, orientation: AlbumOrientation) {
+export async function renderAlbumPng(element: HTMLElement, orientation: AlbumOrientation) {
   await waitForAlbumAssets(element);
 
   const bounds = element.getBoundingClientRect();
@@ -79,16 +89,32 @@ export async function createAlbumPdf(element: HTMLElement, orientation: AlbumOri
   // cache once and using the second render avoids putting that blank page into
   // the PDF while keeping the exact same DOM and computed styles.
   if (isIOSWebKit()) await toPng(element, options);
-  const pngDataUrl = await toPng(element, options);
+  return toPng(element, options);
+}
 
+export async function createAlbumPng(element: HTMLElement, orientation: AlbumOrientation) {
+  const dataUrl = await renderAlbumPng(element, orientation);
+  return (await fetch(dataUrl)).blob();
+}
+
+export async function createAlbumPdf(element: HTMLElement, orientation: AlbumOrientation) {
+  return createAlbumPagesPdf([element], orientation);
+}
+
+export async function createAlbumPagesPdf(elements: HTMLElement[], orientation: AlbumOrientation) {
+  if (!elements.length) throw new Error("出力するアルバム紙面がありません。");
   const { PDFDocument } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
   pdf.setTitle("Memorinber memory page");
   pdf.setCreator("Memorinber");
   const pageSize = getAlbumPdfPageSize(orientation);
-  const page = pdf.addPage([pageSize.width, pageSize.height]);
-  const image = await pdf.embedPng(pngDataUrl);
-  page.drawImage(image, { x: 0, y: 0, width: pageSize.width, height: pageSize.height });
+  // Render sequentially to avoid holding every page's canvas in memory on iOS.
+  for (const element of elements) {
+    const pngDataUrl = await renderAlbumPng(element, orientation);
+    const page = pdf.addPage([pageSize.width, pageSize.height]);
+    const image = await pdf.embedPng(pngDataUrl);
+    page.drawImage(image, { x: 0, y: 0, width: pageSize.width, height: pageSize.height });
+  }
   const bytes = await pdf.save({ useObjectStreams: false });
   return new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { MemoryPhoto } from "@/components/memory-photo";
+import { MonthlyAlbumCaption } from "@/components/monthly-album-caption";
 import type { AlbumAppearance } from "@/lib/album-appearance";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 
@@ -12,7 +13,7 @@ function BotanicalSprig({ className }: { className: string }) {
 }
 
 function MonthlyAlbumPaper({ appearance, children, label }: { appearance: AlbumAppearance; children: ReactNode; label: string }) {
-  return <article aria-label={label} className={`monthly-paper album-font-${appearance.font} album-text-${appearance.textColor} album-background-${appearance.background} album-pattern-${appearance.pattern}`}>
+  return <article aria-label={label} className={`monthly-paper monthly-paper--${appearance.orientation} album-font-${appearance.font} album-text-${appearance.textColor} album-background-${appearance.background} album-pattern-${appearance.pattern}`}>
     <div className="monthly-paper-border" />
     <BotanicalSprig className="monthly-sprig monthly-sprig-top" />
     <BotanicalSprig className="monthly-sprig monthly-sprig-bottom" />
@@ -27,7 +28,7 @@ export function MonthlyAlbumCoverPage({ month, appearance, memory, imageUrls }: 
     <div className="monthly-cover">
       <header><p className="monthly-paper-date">{month.slice(0, 4)}年{Number(month.slice(5))}月</p><h2>{title}</h2><p className="monthly-script">My Memories</p></header>
       <div className="monthly-photo-mount monthly-cover-photo"><MemoryPhoto src={imageUrls?.get(memory.id) ?? getMemoryDisplayUrl(memory)} alt={memory.caption} /></div>
-      <p className="monthly-cover-caption">{memory.caption}</p>
+      <MonthlyAlbumCaption className="monthly-cover-caption" text={memory.caption} />
       <p className="monthly-cover-signature">小さな日々を、一冊に。<span>MEMORIMBER</span></p>
     </div>
   </MonthlyAlbumPaper>;
@@ -39,7 +40,7 @@ export function MonthlyAlbumMemoriesPage({ month, appearance, memories, pageNumb
       <header><h2>{month.slice(0, 4)}年{Number(month.slice(5))}月の思い出</h2><p className="monthly-script">My Memories</p></header>
       <div className="monthly-photo-grid">{memories.map((memory) => <figure key={memory.id}>
         <div className="monthly-photo-mount"><MemoryPhoto src={imageUrls?.get(memory.id) ?? getMemoryDisplayUrl(memory)} alt={memory.caption} /></div>
-        <figcaption><p>{memory.caption}</p><time dateTime={memory.date}>{Number(memory.date.slice(5, 7))}.{Number(memory.date.slice(8))}</time></figcaption>
+        <figcaption><MonthlyAlbumCaption text={memory.caption} /><time dateTime={memory.date}>{Number(memory.date.slice(5, 7))}.{Number(memory.date.slice(8))}</time></figcaption>
       </figure>)}</div>
       <span className="monthly-paper-number">{pageNumber}</span>
     </div>
