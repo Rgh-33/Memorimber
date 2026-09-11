@@ -22,7 +22,7 @@ test("preview controls stay on the tree screen and become fixed only while previ
 });
 
 test("the active preview toolbar sits compactly above the existing footer", () => {
-  assert.match(css, /\.konoha-preview-slot--fixed\s*\{[^}]*height:\s*104px;/s);
+  assert.match(css, /\.konoha-preview-slot--fixed\s*\{[^}]*height:\s*180px;/s);
   assert.match(css, /\.konoha-preview--fixed\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*40;[^}]*bottom:\s*90px;/s);
   assert.match(css, /\.konoha-preview--fixed\s*\{[^}]*width:\s*min\(calc\(100% - 24px\), 406px\);/s);
   assert.match(css, /grid-template-columns:\s*36px minmax\(82px, 1fr\) 36px 36px;/);
@@ -30,8 +30,10 @@ test("the active preview toolbar sits compactly above the existing footer", () =
   assert.match(css, /\.konoha-preview--fixed \.konoha-preview-actions button\s*\{[^}]*min-height:\s*36px;/s);
 });
 
-test("route changes declare the app's smooth scrolling behavior", () => {
-  assert.match(layout, /<html[^>]*data-scroll-behavior="smooth"/);
+test("route changes use immediate scrolling without a second smooth animation", () => {
+  const globalCss = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.doesNotMatch(layout, /<html[^>]*data-scroll-behavior="smooth"/);
+  assert.match(globalCss, /html\s*\{[^}]*scroll-behavior:\s*auto;/s);
 });
 
 test("tree preview starts from the same state during SSR and browser hydration", () => {

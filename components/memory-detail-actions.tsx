@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { blurActiveEditable } from "@/lib/blur-active-editable";
 import { AlertTriangle, Save, Trash2, X } from "lucide-react";
 import { useProcessing } from "@/lib/processing-context";
 import { useProfileLevel } from "@/lib/profile-level-context";
@@ -49,6 +50,7 @@ export function MemoryDetailActions({
   const handleUpdate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy) return;
+    blurActiveEditable();
     setBusy("update");
     setError(null);
     startProcessing();
@@ -66,6 +68,7 @@ export function MemoryDetailActions({
         thumbnailUrl: memory.thumbnailUrl,
       });
       if (letter.trim()) recordActivity("savedAlbumLetters");
+      blurActiveEditable();
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "思い出を更新できませんでした。");

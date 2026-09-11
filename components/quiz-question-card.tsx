@@ -2,7 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { Check, Grid3X3, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ImageOff, X } from "lucide-react";
 import type { MemoryQuizQuestion } from "@/lib/quiz";
 import { getMemoryDisplayUrl } from "@/lib/types";
 
@@ -12,10 +13,20 @@ function MosaicPhoto({ src, alt, revealed = false, compact = false }: {
   revealed?: boolean;
   compact?: boolean;
 }) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">(src ? "loading" : "error");
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    // Cached images may finish before hydration attaches the load handler.
+    const image = imageRef.current;
+    if (image?.complete) setStatus(image.naturalWidth > 0 ? "loaded" : "error");
+  }, []);
+
   return (
-    <div className={`quiz-mosaic-photo ${compact ? "quiz-mosaic-photo--compact" : ""}`} data-revealed={revealed || undefined}>
-      <img src={src} alt={alt} />
-      {!revealed && <span className="quiz-mosaic-mark" aria-hidden="true"><Grid3X3 /></span>}
+    <div className={`quiz-mosaic-photo ${compact ? "quiz-mosaic-photo--compact" : ""}`} data-revealed={revealed || undefined} data-status={status} aria-busy={status === "loading"}>
+      {src && <img ref={imageRef} src={src} alt={status === "loaded" ? alt : ""} onLoad={() => setStatus("loaded")} onError={() => setStatus("error")} />}
+      {status === "loading" && <span className="quiz-photo-loading" role="status"><span className="quiz-photo-status-label">読み込み中…</span></span>}
+      {status === "error" && <span className="quiz-photo-error" role="status"><ImageOff size={22} aria-hidden="true" /><span>写真を読み込めませんでした</span></span>}
     </div>
   );
 }
@@ -35,6 +46,7 @@ export function QuizQuestionCard({ question, selectedChoiceId, answered, onSelec
 
       {question.kind !== "caption-to-photo" && (
         <MosaicPhoto
+          key={`${question.id}:${getMemoryDisplayUrl(question.memory)}`}
           src={getMemoryDisplayUrl(question.memory)}
           alt={answered ? question.memory.caption : "モザイクのかかったクイズ写真"}
           revealed={answered}
@@ -61,6 +73,7 @@ export function QuizQuestionCard({ question, selectedChoiceId, answered, onSelec
               {choice.imageUrl ? (
                 <>
                   <MosaicPhoto
+                    key={choice.imageUrl}
                     src={choice.imageUrl}
                     alt={answered ? `写真の選択肢${index + 1}` : `モザイク写真の選択肢${index + 1}`}
                     compact

@@ -426,7 +426,7 @@ html[data-mode="dark"] .konoha-tree-moon { display: block; opacity: .56; }
 .konoha-scene .memory-floating-word[data-gesture="armed"] .memory-floating-word-label,
 .konoha-scene .memory-floating-word[data-gesture="success"] .memory-floating-word-label { opacity: var(--word-current-opacity); }
 .konoha-scene .memory-word-particle { display: none; }
-.konoha-preview-slot--fixed { height: 104px; }
+.konoha-preview-slot--fixed { height: 180px; }
 .konoha-preview { max-width: 300px; margin: 6px auto 0; padding-top: 12px; border-top: 1px solid rgb(var(--line-rgb) / .65); color: rgb(var(--ink-rgb) / .55); font-size: 11px; }
 .konoha-preview--fixed {
   position: fixed;

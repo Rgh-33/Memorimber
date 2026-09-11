@@ -64,7 +64,10 @@ test("daily cleanup cron is protected and secrets remain server-only", () => {
   const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
   const envExample = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
   const admin = readFileSync(new URL("../lib/supabase/admin.ts", import.meta.url), "utf8");
-  assert.deepEqual(config.crons, [{ path: "/api/cron/account-deletion-cleanup", schedule: "0 18 * * *" }]);
+  assert.deepEqual(config.crons, [
+    { path: "/api/cron/account-deletion-cleanup", schedule: "0 18 * * *" },
+    { path: "/api/cron/memory-reminders", schedule: "0 11 * * *" },
+  ]);
   assert.match(route, /authorization[^\n]*Bearer \$\{cronSecret\}/);
   assert.match(route, /status: 401/);
   assert.match(envExample, /^SUPABASE_SECRET_KEY=$/m);

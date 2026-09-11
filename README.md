@@ -448,3 +448,26 @@ READMEは現在のサービス全体像を説明するための文書です。�
 Memorimberでは、単に写真を保存するだけではなく、**残した記録をもう一度思い出すきっかけへ変えること**を重視しています。
 
 大きな行事だけでなく、何気ない一日も「自分が過ごした時間」として残せるサービスを目指しています。
+
+## PWA・思い出の通知（コンテスト版）
+
+通知専用 `/sw.js` と `public/pwa/` のテーマ別Manifestを使用します。Next.jsのMetadataから初期Manifestを指定し、起動後は選択中のテーマに対応するManifest・アイコン・テーマ色へ切り替わります。以前の `/manifest.webmanifest` は標準テーマへリダイレクトします。画像キャッシュ・オフライン投稿はありません。通常機能は通知設定がなくても利用できます。
+
+管理者が行うセットアップ（CodexではDB適用・env登録をしません）：
+
+1. 新規migration `20260911000000_memory_push_notifications.sql` を確認して適用してください。既存migrationは変更不要です。subscriptionに所有者RLSとAuth削除cascade、日次履歴に `(user_id, notification_date)` の一意制約を追加します。履歴はブラウザ非公開です。
+2. 手元で `npx web-push generate-vapid-keys` を実行し、鍵ペアを安全に保存してください。生成結果をコミットしないでください。
+3. Vercelの対象環境に `NEXT_PUBLIC_VAPID_PUBLIC_KEY`（公開鍵）、`VAPID_PRIVATE_KEY`（秘密鍵）、`VAPID_SUBJECT`（連絡可能な `mailto:` メールアドレスまたはHTTPS URL）を登録し、再デプロイしてください。既存の `SUPABASE_SECRET_KEY` と `CRON_SECRET` もProductionに必要です。秘密鍵・Supabase Secretには `NEXT_PUBLIC_` を付けません。
+4. HTTPSで開き、設定 > その他 > 思い出の通知から有効化します。iPhoneは対応するiOS（16.4以降）のSafariで共有 > ホーム画面に追加し、追加したアプリから起動して通知を許可してください。拒否済みの場合は端末・ブラウザ設定で変更します。
+
+既存cleanup Cronは維持し、`/api/cron/memory-reminders` に `0 11 * * *`（毎日20:00 JST頃）を追加しています。Vercel CronはProductionのみで動作し、プランにより時刻が前後します。認証は既存と同じ `Authorization: Bearer CRON_SECRET`。管理clientは通知workerと既存の管理処理だけで使用し、投稿・共有・クイズ・プロフィール・subscription設定はユーザー認証で動作します。
+
+収穫は既存 `buildPersistedTreeItems` と同じ当月アップロード・永続ripen/harvest判定です。過去のこの頃は `memory_date` の1〜3年前±7日（2/29の非うるう年は2/28基準）。両種の候補がある日はユーザー・JST日付で種別を交互に、写真も決定的に選びます。候補なしの日は送信しません。複数端末には同じ1種類を送ります。
+
+日次枠を**送信前**に一意確保し、同日retry・並行実行でも再送しません。外部Push送信との原子的確定はできないため、二重通知防止を優先し、タイムアウト・worker停止日は届かない場合があります（同日の自動再送なし）。`sent_at` はPushサービス受付成功時刻で、端末での表示保証ではありません。TTLは1時間。404/410のみsubscriptionを削除し、一時エラーは残します。ログアウトでは端末とアカウントの全subscriptionを解除し、DB解除失敗時は残留を防ぐためログアウト完了前に再試行を表示します。
+
+デモは木のプレビューON > 日付変更 > 「通知をテスト」。保存済みの過去写真と既存プレビューTreeの収穫判定から、Service Workerでローカル通知を表示します。VAPID・subscription・日次履歴は不要です。サンプル写真は過去写真候補にしません。候補なしの場合は説明だけ表示します。
+
+最短の実機確認：iPhoneで投稿画面 → 一言・日付入力（自動ズームなし／pinch zoom可）→ タグ「文化祭」をEnter追加 → 投稿 → ホームと下部ナビ → slow networkでクイズの読込・reveal・画像エラー → プレビューの日付変更・通知テスト → ホーム画面からPWA起動・通知有効化／無効化・ログアウト。自動テストはOS通知の配信や実機Safariキーボード動作を保証しません。
+
+参考：[Next.js PWA](https://nextjs.org/docs/app/guides/progressive-web-apps)、[Vercel Cron](https://vercel.com/docs/cron-jobs/manage-cron-jobs)。

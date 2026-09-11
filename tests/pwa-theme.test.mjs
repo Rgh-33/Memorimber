@@ -12,6 +12,7 @@ test("install metadata follows the selected app theme and color mode", () => {
   assert.match(component, /icon-\$\{variant\}-180\.png/);
   assert.match(component, /BACKGROUND_COLORS\[colorMode\]/);
   assert.match(layout, /manifest-light-blue-light\.webmanifest/);
+  assert.match(layout, /<PwaRegistration\s*\/>/);
 });
 
 test("every app theme has light and dark sprout install icons", () => {

@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { useTree } from "@/lib/tree-context";
+import { PreviewNotificationButton } from "./preview-notification-button";
 
 export function TreePreviewControls() {
   const tree = useTree();
@@ -30,6 +31,7 @@ export function TreePreviewControls() {
             <button type="button" onClick={tree.upload} aria-label="プレビューに1枚アップロード">1枚追加</button>
             <button type="button" onClick={tree.uploadGolden} aria-label="プレビューに1枚追加して新しく収穫可能になる実を金にする">1枚追加(金)</button>
           </div>
+          <PreviewNotificationButton />
         </fieldset>
       </div>
     </div>
