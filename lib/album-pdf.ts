@@ -62,7 +62,31 @@ async function waitForAlbumAssets(element: HTMLElement) {
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
-export async function renderAlbumPng(element: HTMLElement, orientation: AlbumOrientation) {
+export type AlbumExportPage = { element: HTMLElement; imageCount: number };
+
+async function verifyEmbeddedImages(element: HTMLElement, expectedCount: number) {
+  const images = Array.from(element.querySelectorAll("img"));
+  const validImages = () => images.length === expectedCount && expectedCount > 0
+    && element.querySelectorAll("img").length === expectedCount
+    && images.every((image) => element.contains(image) && /^data:image\//.test(image.src)
+      && !image.srcset && (!image.currentSrc || /^data:image\//.test(image.currentSrc)));
+  const message = "印刷用の写真を描画できませんでした。写真が欠けた状態では保存できません。もう一度お試しください。";
+  if (!validImages()) throw new Error(message);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.all(images.map((image) => image.decode())),
+      new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error(message)), 15000); }),
+    ]);
+    if (!validImages() || images.some((image) => !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0)) {
+      throw new Error(message);
+    }
+  } catch { throw new Error(message); }
+  finally { if (timeout) clearTimeout(timeout); }
+}
+
+export async function renderAlbumPng(element: HTMLElement, orientation: AlbumOrientation, imageCount?: number) {
+  if (imageCount !== undefined) await verifyEmbeddedImages(element, imageCount);
   await waitForAlbumAssets(element);
 
   const bounds = element.getBoundingClientRect();
@@ -85,6 +109,9 @@ export async function renderAlbumPng(element: HTMLElement, orientation: AlbumOri
     filter: (node: HTMLElement) => !node.classList?.contains("print-hide"),
   };
 
+  // Monthly export must be self-contained at the foreignObject boundary.
+  if (imageCount !== undefined) await verifyEmbeddedImages(element, imageCount);
+
   // WebKit on iOS can return a blank first foreignObject raster. Warming the
   // cache once and using the second render avoids putting that blank page into
   // the PDF while keeping the exact same DOM and computed styles.
@@ -92,8 +119,8 @@ export async function renderAlbumPng(element: HTMLElement, orientation: AlbumOri
   return toPng(element, options);
 }
 
-export async function createAlbumPng(element: HTMLElement, orientation: AlbumOrientation) {
-  const dataUrl = await renderAlbumPng(element, orientation);
+export async function createAlbumPng(element: HTMLElement, orientation: AlbumOrientation, imageCount?: number) {
+  const dataUrl = await renderAlbumPng(element, orientation, imageCount);
   return (await fetch(dataUrl)).blob();
 }
 
@@ -101,20 +128,21 @@ export async function createAlbumPdf(element: HTMLElement, orientation: AlbumOri
   return createAlbumPagesPdf([element], orientation);
 }
 
-export async function createAlbumPagesPdf(elements: HTMLElement[], orientation: AlbumOrientation) {
-  if (!elements.length) throw new Error("出力するアルバム紙面がありません。");
+export async function createAlbumPagesPdf(elements: Iterable<HTMLElement> | AsyncIterable<AlbumExportPage>, orientation: AlbumOrientation) {
   const { PDFDocument } = await import("pdf-lib");
   const pdf = await PDFDocument.create();
   pdf.setTitle("Memorinber memory page");
   pdf.setCreator("Memorinber");
   const pageSize = getAlbumPdfPageSize(orientation);
   // Render sequentially to avoid holding every page's canvas in memory on iOS.
-  for (const element of elements) {
-    const pngDataUrl = await renderAlbumPng(element, orientation);
+  for await (const source of elements) {
+    const { element, imageCount } = "element" in source ? source : { element: source, imageCount: undefined };
+    const pngDataUrl = await renderAlbumPng(element, orientation, imageCount);
     const page = pdf.addPage([pageSize.width, pageSize.height]);
     const image = await pdf.embedPng(pngDataUrl);
     page.drawImage(image, { x: 0, y: 0, width: pageSize.width, height: pageSize.height });
   }
+  if (!pdf.getPageCount()) throw new Error("出力するアルバム紙面がありません。");
   const bytes = await pdf.save({ useObjectStreams: false });
   return new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
 }

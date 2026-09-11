@@ -33,7 +33,7 @@ test("monthly L-size pages keep six photos and a one-line caption", () => {
   assert.doesNotMatch(monthlyCss, /text-overflow: ellipsis|line-clamp/);
   assert.match(monthly, /memories\.slice\(\(index - 1\) \* 6, index \* 6\)/);
   assert.match(monthly, /createAlbumPagesPdf\(pages, appearance\.orientation\)/);
-  assert.match(monthly, /createAlbumPng\(page, appearance\.orientation\)/);
+  assert.match(monthly, /createAlbumPng\(page, appearance\.orientation, imageCount\)/);
   assert.doesNotMatch(monthly, /window\.print/);
   assert.doesNotMatch(monthlyCss, /@page|@media print|A4/);
 });
