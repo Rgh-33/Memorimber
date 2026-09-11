@@ -32,8 +32,10 @@ export function chooseFadingMemoryId(
   options: { ignoreAge?: boolean; random?: () => number } = {},
 ) {
   const eligible = petals.filter((petal) => {
-    if (options.ignoreAge) return true;
     const memoryId = petal.memoryId ?? petal.id;
+    // Preview starts with a hidden word, but a restored word gets the normal
+    // seven-day grace period instead of immediately hiding again.
+    if (options.ignoreAge && state.reviewedAt[memoryId] === undefined) return true;
     const harvestedAt = Date.parse(petal.harvestedAt ?? "");
     const lastRemembered = Math.max(Number.isFinite(harvestedAt) ? harvestedAt : now, state.reviewedAt[memoryId] ?? 0);
     return now - lastRemembered >= MEMORY_RECALL_STALE_MS;

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createMemoryQuizQuestion } from "@/lib/quiz";
-import { answerPersonalQuiz, startPersonalQuiz, type SavedQuestion } from "@/lib/personal-quiz";
+import { answerPersonalQuiz, restorePetal, startPersonalQuiz, type SavedQuestion } from "@/lib/personal-quiz";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isUuid } from "@/lib/supabase/shared-albums";
 import type { Memory } from "@/lib/types";
@@ -42,5 +42,10 @@ export function usePersistedMemoryQuestion(mode: "fruit" | "recall", memory: Mem
     catch (cause) { setError(cause instanceof Error ? cause.message : "回答を保存できませんでした。"); return false; }
     finally { busy.current = false; }
   };
-  return { question, error, ready, answer, setError };
+  const restore = async () => {
+    // Local preview questions have neither a UUID nor a persisted answer.
+    // Use the same persistence decision as question creation and answering.
+    if (persistQuestion) await restorePetal(question.id);
+  };
+  return { question, error, ready, answer, restore, setError };
 }

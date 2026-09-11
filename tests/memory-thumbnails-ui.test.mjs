@@ -26,7 +26,7 @@ test("detail and high-quality output keep using explicit original URLs", () => {
   const detail = read("../app/memory/[id]/page.tsx");
   const albumSettings = read("../app/memory/[id]/album-settings/page.tsx");
   const book = read("../components/memory-book-page.tsx");
-  const album = read("../app/album/page.tsx");
+  const album = read("../components/monthly-album-print-preview.tsx");
   assert.match(detail, /loadMemory\(createClient\(\), params\.id\)/);
   assert.match(albumSettings, /loadMemory\(createClient\(\), params\.id\)/);
   assert.match(book, /src=\{memory\.imageUrl\}/);

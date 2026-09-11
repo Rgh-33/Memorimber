@@ -3,15 +3,13 @@
 import { setBrowserSessionItem } from "@/lib/browser-session-data";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
 import { MemoryCard } from "@/components/memory-card";
 import { PageHeading } from "@/components/page-heading";
 import { getAlbumGridSlotCount } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
-import { useProfileLevel } from "@/lib/profile-level-context";
-import { createClient } from "@/lib/supabase/client";
-import { loadMemoryOriginalUrls } from "@/lib/supabase/memories";
 
 const ALBUM_RETURN_POSITION_KEY = "memorimber-album-return-position-v1";
 
@@ -37,16 +35,13 @@ function scrollAlbumImmediately(scroll: () => void) {
 
 export default function AlbumPage() {
   const { memories: allMemories, getMonthMemories, isLoading, error, warning, isDemo, refreshMemories } = useMemories();
-  const { recordActivity } = useProfileLevel();
+  const router = useRouter();
   const [currentMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [scrollRestoreReady, setScrollRestoreReady] = useState(false);
-  const [printImageUrls, setPrintImageUrls] = useState<Map<string, string> | null>(null);
-  const [printPreparing, setPrintPreparing] = useState(false);
-  const [printError, setPrintError] = useState<string | null>(null);
   const memoryGridRef = useRef<HTMLElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const didInitialScroll = useRef(false);
@@ -110,54 +105,6 @@ export default function AlbumPage() {
     };
   }, [isLoading, scrollRestoreReady, selectedMonth]);
 
-  useEffect(() => {
-    setPrintImageUrls(null);
-  }, [selectedMonth]);
-
-  useEffect(() => {
-    const clearPrintImages = () => setPrintImageUrls(null);
-    window.addEventListener("afterprint", clearPrintImages);
-    return () => window.removeEventListener("afterprint", clearPrintImages);
-  }, []);
-
-  const handlePrint = async () => {
-    if (printPreparing) return;
-    recordActivity("printAttempts");
-    setPrintPreparing(true);
-    setPrintError(null);
-    try {
-      const originals = isDemo
-        ? new Map(memories.map((memory) => [memory.id, memory.imageUrl]))
-        : await loadMemoryOriginalUrls(createClient(), memories);
-      setPrintImageUrls(originals);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
-        let timeout: ReturnType<typeof setTimeout> | undefined;
-        await Promise.race([
-          promise,
-          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
-        ]);
-        if (timeout) clearTimeout(timeout);
-      };
-      const images = Array.from(memoryGridRef.current?.querySelectorAll("img") ?? []);
-      await Promise.all(images.map(async (image) => {
-        if (!image.complete) {
-          await waitAtMost(new Promise<void>((resolve) => {
-            image.addEventListener("load", () => resolve(), { once: true });
-            image.addEventListener("error", () => resolve(), { once: true });
-          }));
-        }
-        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
-      }));
-      window.print();
-    } catch (cause) {
-      setPrintImageUrls(null);
-      setPrintError(cause instanceof Error ? cause.message : "印刷用の元画像を読み込めませんでした。");
-    } finally {
-      setPrintPreparing(false);
-    }
-  };
-
   const rememberAlbumPosition = () => {
     try {
       setBrowserSessionItem(sessionStorage, ALBUM_RETURN_POSITION_KEY, JSON.stringify({ month: selectedMonth, scrollY: window.scrollY }));
@@ -182,7 +129,7 @@ export default function AlbumPage() {
           <div className="grid grid-cols-3 gap-2.5">
             {placeholders}
             {memories.map((memory) => <div key={memory.id} onClickCapture={rememberAlbumPosition}>
-              <MemoryCard memory={memory} dateOnly imageUrl={printImageUrls?.get(memory.id)} />
+              <MemoryCard memory={memory} dateOnly />
             </div>)}
           </div>
         ) : (
@@ -193,8 +140,7 @@ export default function AlbumPage() {
         )}
       </section>
 
-      <button type="button" onClick={() => void handlePrint()} disabled={printPreparing || memories.length === 0} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper disabled:cursor-wait disabled:opacity-55 print-hide"><Printer size={18} /> {printPreparing ? "元画像を準備中…" : `${Number(selectedMonth.slice(5))}月をプリントする`}</button>
-      {printError && <p role="alert" className="mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700 print-hide">{printError}</p>}
+      <button type="button" onClick={() => { rememberAlbumPosition(); router.push(`/album/print-preview?month=${selectedMonth}`); }} disabled={isLoading || Boolean(error) || memories.length === 0} className="mt-5 flex w-full items-center justify-center gap-3 rounded-lg border border-coral/65 bg-ivory px-4 py-3 text-sm font-medium tracking-[0.04em] text-ink transition hover:bg-paper disabled:opacity-55 print-hide"><Printer size={18} /> {Number(selectedMonth.slice(5))}月をプリントする</button>
 
       <div ref={bottomRef} className="album-month-switcher print-hide">
         <div className="mx-auto flex max-w-[270px] items-center justify-between">

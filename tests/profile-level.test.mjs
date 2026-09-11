@@ -115,9 +115,9 @@ test("milestones use transactional persistence and only client observations use 
   const source = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   assert.match(source("components/fruit-quiz-dialog.tsx"), /usePersistedMemoryQuestion\("fruit"/);
   assert.match(source("app/quiz/page.tsx"), /await answerPersonalQuiz/);
-  assert.match(source("components/memory-recall-dialog.tsx"), /await restorePetal/);
+  assert.match(source("lib/use-persisted-memory-question.ts"), /if \(persistQuestion\) await restorePetal/);
   assert.match(source("lib/profile-level-context.tsx"), /metric !== "printAttempts" && metric !== "wordRecallReveals"/);
-  assert.match(source("app/album/page.tsx"), /recordActivity\("printAttempts"\)/);
+  assert.match(source("components/monthly-album-print-preview.tsx"), /recordActivity\("printAttempts"\)/);
   assert.match(source("app/memory/[id]/page.tsx"), /recordActivity\("printAttempts"\)/);
   assert.doesNotMatch(source("lib/profile-level-context.tsx"), /localStorage|sessionStorage/);
   const sql = source("supabase/migrations/20260907021000_verified_profile_activity_sources.sql");
