@@ -8,6 +8,7 @@ import { allowBrowserSessionWrites, clearBrowserSessionData, isPublicAuthPath, S
 import { clearSharedGroupCache } from "@/lib/shared-group-cache";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { unsubscribeLocalPush } from "@/lib/push-client";
 
 const LogoutContext = createContext<(() => void) | null>(null);
 const STORAGE_ERROR = "端末内の履歴を削除できませんでした。ブラウザのストレージ設定を確認して再試行してください。";
@@ -61,6 +62,9 @@ export function SessionBoundary({ children }: { children: ReactNode }) {
     notify("started");
     const cleared = clear();
     try {
+      // The server also removes all subscriptions; local cleanup stops this
+      // device even when the subsequent server logout needs a retry.
+      await unsubscribeLocalPush().catch(() => { /* Server deletion is authoritative. */ });
       const result = await logout();
       if (result.error) {
         setError(result.error);

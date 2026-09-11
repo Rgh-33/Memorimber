@@ -57,6 +57,15 @@ export async function logout() {
   if (!isSupabaseConfigured()) return { error: null };
   try {
     const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError && userError.name !== "AuthSessionMissingError") throw userError;
+    if (user) {
+      const { error: pushError } = await supabase.from("push_subscriptions").delete().eq("user_id", user.id);
+      // Before the notification migration is applied, no subscriptions can exist.
+      if (pushError && !["42P01", "PGRST205"].includes(pushError.code)) {
+        return { error: "通知を解除できないためログアウトを完了できません。通信状態を確認して再試行してください。" };
+      }
+    }
     const { error } = await supabase.auth.signOut();
     if (error) return { error: "ログアウトできませんでした。通信状態を確認して再試行してください。" };
     return { error: null };

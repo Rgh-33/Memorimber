@@ -19,7 +19,7 @@ test("preview controls stay on the tree screen and become fixed only while previ
 });
 
 test("the active preview toolbar sits compactly above the existing footer", () => {
-  assert.match(css, /\.konoha-preview-slot--fixed\s*\{[^}]*height:\s*104px;/s);
+  assert.match(css, /\.konoha-preview-slot--fixed\s*\{[^}]*height:\s*152px;/s);
   assert.match(css, /\.konoha-preview--fixed\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*40;[^}]*bottom:\s*90px;/s);
   assert.match(css, /\.konoha-preview--fixed\s*\{[^}]*width:\s*min\(calc\(100% - 24px\), 406px\);/s);
   assert.match(css, /grid-template-columns:\s*auto 36px minmax\(82px, 1fr\) 36px 36px;/);

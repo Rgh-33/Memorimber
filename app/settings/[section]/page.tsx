@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { Moon, Sun, Trees } from "lucide-react";
 import { AlbumSettingsPanel } from "@/components/album-settings-panel";
 import { SettingsHeader } from "@/components/settings-header";
+import { MemoryNotificationSettings } from "@/components/memory-notification-settings";
 import { AUDIO_VOLUME_LEVELS } from "@/lib/audio-volume";
 import { SAMPLE_MEMORIES } from "@/lib/data";
 import { APP_COLOR_MODES, APP_THEMES, usePreferences } from "@/lib/preferences-context";
@@ -214,7 +215,8 @@ export default function SettingDetailPage() {
         />
       )}
 
-      {section !== "style" && section !== "sound" && section !== "tree" && section !== "album" && (
+      {section === "more" && <MemoryNotificationSettings />}
+      {section !== "style" && section !== "sound" && section !== "tree" && section !== "album" && section !== "more" && (
         <section className="settings-card mt-7">
           <p className="rounded-xl border border-dashed border-line bg-paper/60 px-4 py-8 text-center text-sm leading-7 text-ink/55">
             「{label}」の項目はまだ設定されていません。
