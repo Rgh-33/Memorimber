@@ -10,6 +10,7 @@ import { PageHeading } from "@/components/page-heading";
 import { getAlbumGridSlotCount } from "@/lib/album-grid";
 import { ALBUM_MONTHS } from "@/lib/data";
 import { useMemories } from "@/lib/memories-context";
+import { usePreviewState } from "@/lib/preview-state";
 
 const ALBUM_RETURN_POSITION_KEY = "memorimber-album-return-position-v1";
 
@@ -35,12 +36,14 @@ function scrollAlbumImmediately(scroll: () => void) {
 
 export default function AlbumPage() {
   const { memories: allMemories, getMonthMemories, isLoading, error, warning, isDemo, refreshMemories } = useMemories();
+  const preview = usePreviewState();
   const router = useRouter();
   const [currentMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState(() => preview.active ? preview.currentDate.slice(0, 7) : currentMonth);
+  useEffect(() => { if (preview.active) setSelectedMonth(preview.currentDate.slice(0, 7)); }, [preview.active, preview.currentDate]);
   const [scrollRestoreReady, setScrollRestoreReady] = useState(false);
   const memoryGridRef = useRef<HTMLElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -123,7 +126,7 @@ export default function AlbumPage() {
       <PageHeading eyebrow="MONTHLY ALBUM" title="月間アルバム" />
 
       <section ref={memoryGridRef} className="album-page-memory-slot mt-5">
-        {isDemo && <p className="mb-3 text-center text-xs text-ink/55">サンプルの思い出を表示しています</p>}
+        {(isDemo || preview.active) && <p className="mb-3 text-center text-xs text-ink/55">プレビュー用の思い出を表示しています</p>}
         {warning && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">{warning}<button type="button" onClick={() => void refreshMemories()} className="ml-2 text-coral underline">再読み込み</button></p>}
         {isLoading ? <p role="status" className="py-12 text-center text-sm text-ink/65">思い出を読み込んでいます…</p> : error ? <div role="alert" className="rounded-xl border border-line p-4 text-sm leading-6 text-ink">{error}<button type="button" onClick={() => void refreshMemories()} className="mt-2 block text-coral underline">再読み込み</button></div> : memories.length > 0 ? (
           <div className="grid grid-cols-3 gap-2.5">

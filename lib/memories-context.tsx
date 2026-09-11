@@ -8,6 +8,7 @@ import { addMemoryToCache, removeMemoryFromCache, updateMemoryInCache } from "./
 import { createClient } from "./supabase/client";
 import { isSupabaseConfigured } from "./supabase/config";
 import { loadMemories, MEMORY_IMAGE_URL_LIFETIME } from "./supabase/memories";
+import { usePreviewState } from "./preview-state";
 
 type MemoriesContextValue = {
   memories: Memory[];
@@ -29,6 +30,7 @@ const MemoriesContext = createContext<MemoriesContextValue | null>(null);
 
 export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   const isDemo = !isSupabaseConfigured();
+  const preview = usePreviewState();
   const [memories, setMemories] = useState<Memory[]>(isDemo ? SAMPLE_MEMORIES : []);
   const [isLoading, setIsLoading] = useState(!isDemo);
   const [error, setError] = useState<string | null>(null);
@@ -67,20 +69,23 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addMemory = useCallback((memory: Memory) => {
+    if (preview.active) { preview.updateMemory(memory); return; }
     prepareLocalChange();
     setMemories((current) => addMemoryToCache(current, memory));
     if (!getMemoryDisplayUrl(memory)) setWarning("一部の写真を読み込めませんでした。時間をおいて再読み込みしてください。");
-  }, [prepareLocalChange]);
+  }, [prepareLocalChange, preview]);
 
   const updateMemory = useCallback((memory: Memory) => {
+    if (preview.active) { preview.updateMemory(memory); return; }
     prepareLocalChange();
     setMemories((current) => updateMemoryInCache(current, memory));
-  }, [prepareLocalChange]);
+  }, [prepareLocalChange, preview]);
 
   const removeMemory = useCallback((id: string) => {
+    if (preview.active) { preview.removeMemory(id); return; }
     prepareLocalChange();
     setMemories((current) => removeMemoryFromCache(current, id));
-  }, [prepareLocalChange]);
+  }, [prepareLocalChange, preview]);
 
   useEffect(() => {
     if (isDemo) return;
@@ -134,16 +139,18 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
   }, [isDemo, refreshMemories]);
 
   const value = useMemo<MemoriesContextValue>(
-    () => ({
-      memories,
+    () => {
+      const visibleMemories = preview.active ? preview.memories : memories;
+      return ({
+      memories: visibleMemories,
       isLoading, error, warning, isDemo, refreshMemories, addMemory, updateMemory, removeMemory,
       // Tree/quiz integration is a separate issue: existing prototype links
       // still resolve their sample IDs without mixing samples into the album.
-      getMemory: (id) => memories.find((memory) => memory.id === id) ?? SAMPLE_MEMORIES.find((memory) => memory.id === id),
+      getMemory: (id) => visibleMemories.find((memory) => memory.id === id) ?? SAMPLE_MEMORIES.find((memory) => memory.id === id),
       getMonthMemories: (monthKey) =>
-        orderAlbumMemories(memories.filter((memory) => getMonthKey(memory.date) === monthKey)),
+        orderAlbumMemories(visibleMemories.filter((memory) => getMonthKey(memory.date) === monthKey)),
       getRelatedMemories: (memory) =>
-        (SAMPLE_MEMORIES.some((sample) => sample.id === memory.id) ? SAMPLE_MEMORIES : memories)
+        (preview.active ? visibleMemories : SAMPLE_MEMORIES.some((sample) => sample.id === memory.id) ? SAMPLE_MEMORIES : visibleMemories)
           .filter((candidate) => candidate.id !== memory.id)
           .map((candidate) => ({
             candidate,
@@ -157,9 +164,9 @@ export function MemoriesProvider({ children }: { children: React.ReactNode }) {
           .slice(0, 3)
           .map(({ candidate }) => candidate),
       // This menu action must never delete persisted photos or database rows.
-      resetDemo: () => { if (isDemo) setMemories(SAMPLE_MEMORIES); },
-    }),
-    [memories, isLoading, error, warning, isDemo, refreshMemories, addMemory, updateMemory, removeMemory],
+      resetDemo: () => { if (preview.active) preview.reset(); else if (isDemo) setMemories(SAMPLE_MEMORIES); },
+    }); },
+    [memories, preview, isLoading, error, warning, isDemo, refreshMemories, addMemory, updateMemory, removeMemory],
   );
 
   return <MemoriesContext.Provider value={value}>{children}</MemoriesContext.Provider>;
