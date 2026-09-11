@@ -1,6 +1,7 @@
 "use client";
 
 import { setBrowserSessionItem } from "@/lib/browser-session-data";
+import { blurActiveEditable } from "@/lib/blur-active-editable";
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -44,6 +45,9 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const [date, setDate] = useState(today);
   const [people, setPeople] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const composingTag = useRef(false);
   const [errors, setErrors] = useState<{ image?: string; caption?: string }>({});
   const [stage, setStage] = useState<MemorySaveStage | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -96,8 +100,19 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setter((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]));
   };
 
+  const addTag = () => {
+    const tag = tagInput.trim();
+    if (!tag) return;
+    if (!TAGS.includes(tag)) {
+      setCustomTags((current) => current.includes(tag) ? current : [...current, tag]);
+    }
+    setTags((current) => current.includes(tag) ? current : [...current, tag]);
+    setTagInput("");
+  };
+
   const onSaved = (memory: Memory) => {
     if (!mounted.current) return;
+    blurActiveEditable();
     setSaveError(null);
     clearPending();
     setImage(null);
@@ -107,6 +122,8 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setDate(today());
     setPeople([]);
     setTags([]);
+    setCustomTags([]);
+    setTagInput("");
     setErrors({});
     formRef.current?.reset();
     addMemory(memory);
@@ -148,6 +165,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setErrors(nextErrors);
     if (nextErrors.image || nextErrors.caption || !image) return;
 
+    blurActiveEditable();
     submittingRef.current = true;
     setSaveError(null);
     setStage("thumbnail");
@@ -267,10 +285,28 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
             <span className="flex items-center gap-1 text-[11px] text-ink/45">{tags.length ? `${tags.length}件` : "選択する"}<ChevronRight size={15} className="transition group-open:rotate-90" /></span>
           </summary>
           <div className="flex flex-wrap gap-2 bg-paper/60 px-3 pb-3 pt-1">
-            {TAGS.map((tag) => {
+            {[...TAGS, ...customTags].map((tag) => {
               const selected = tags.includes(tag);
-              return <button key={tag} type="button" onClick={() => toggle(tag, setTags)} className={`rounded-full border px-3 py-1.5 text-[11px] transition ${selected ? "border-coral bg-coral text-white" : "border-line bg-ivory text-ink/65"}`}>{selected && <Check size={11} className="mr-1 inline" />}{tag}</button>;
+              return <button key={tag} type="button" aria-pressed={selected} onClick={() => toggle(tag, setTags)} className={`max-w-full break-all rounded-full border px-3 py-1.5 text-[11px] transition ${selected ? "border-coral bg-coral text-white" : "border-line bg-ivory text-ink/65"}`}>{selected && <Check size={11} className="mr-1 inline" />}{tag}</button>;
             })}
+            <div className="flex w-full min-w-0 gap-2 pt-1">
+              <input
+                type="text"
+                aria-label="新しいタグ"
+                placeholder="新しいタグ（例：文化祭）"
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+                onCompositionStart={() => { composingTag.current = true; }}
+                onCompositionEnd={() => { composingTag.current = false; }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  if (!composingTag.current && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) addTag();
+                }}
+                className="min-w-0 flex-1 rounded-lg border border-line bg-ivory px-3 py-2 text-sm outline-none placeholder:text-ink/40 focus:border-coral"
+              />
+              <button type="button" onClick={addTag} disabled={!tagInput.trim()} className="shrink-0 rounded-lg bg-coral px-3 py-2 text-xs font-medium text-white disabled:opacity-40">追加</button>
+            </div>
           </div>
         </details>
       </div>

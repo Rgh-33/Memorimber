@@ -337,7 +337,9 @@ test("shared members use profile icons, owner crowns, levels, and a read-only pr
   assert.match(list, /<SharedMemberName/);
   assert.match(quiz, /<SharedMemberName/g);
   assert.match(route, /<AppBackLink href=\{`\/shared-groups\/\$\{groupId\}`\}/);
-  assert.match(route, /listSharedAlbumMembers/);
+  assert.match(route, /getGroupProfiles\(client, groupId, userId\)/);
+  assert.match(route, /client\.auth\.getUser\(\)/);
+  assert.match(route, /if \(!member\) notFound\(\)/);
   assert.match(profile, /<ProfileLevelOverview levelProgress=\{levelProgress\}/);
   assert.match(profile, /<ProfileRecordGrid stats=\{stats\}/);
   assert.doesNotMatch(profile, /Camera|Pencil|setNickname|setAvatarFile/);
