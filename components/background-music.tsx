@@ -73,14 +73,15 @@ export function useBackgroundMusic() {
 }
 
 export function BackgroundMusic({ children }: { children: ReactNode }) {
-  const { bgmVolume, preferencesReady } = usePreferences();
+  const { bgmVolume, soundEffectVolume, preferencesReady } = usePreferences();
   const audioContextRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const activeTrackRef = useRef<ActiveTrack | null>(null);
   const buffersRef = useRef(new Map<string, AudioBuffer>());
   const bufferPromisesRef = useRef(new Map<string, Promise<AudioBuffer>>());
   const iosMediaUnlockRef = useRef<HTMLAudioElement | null>(null);
-  const desiredGainRef = useRef(bgmGainForLevel(bgmVolume));
+  const desiredBgmGainRef = useRef(bgmGainForLevel(bgmVolume));
+  const desiredSoundEffectGainRef = useRef(bgmGainForLevel(soundEffectVolume));
   const playbackModeRef = useRef<BackgroundMusicMode>("default");
   const switchPlaybackRef = useRef<(mode: BackgroundMusicMode) => Promise<void>>(async () => {});
 
@@ -114,7 +115,9 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
         if (!AudioContextConstructor) return null;
         context = new AudioContextConstructor({ latencyHint: "playback" });
         masterGain = context.createGain();
-        masterGain.gain.value = desiredGainRef.current;
+        masterGain.gain.value = playbackModeRef.current === "harvest"
+          ? desiredSoundEffectGainRef.current
+          : desiredBgmGainRef.current;
         masterGain.connect(context.destination);
         audioContextRef.current = context;
         masterGainRef.current = masterGain;
@@ -158,6 +161,14 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       if (!graph) return;
       const { context, masterGain } = graph;
       if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => {});
+
+      const now = context.currentTime;
+      const masterGainTarget = mode === "harvest"
+        ? desiredSoundEffectGainRef.current
+        : desiredBgmGainRef.current;
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(masterGainTarget, now + 0.12);
 
       if (mode === "countdown" || mode === "harvest") {
         fadeOutActiveTrack(context);
@@ -205,7 +216,6 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
         trackGain.disconnect();
       }, { once: true });
 
-      const now = context.currentTime;
       const trackGainTarget = mode === "quiz"
         ? QUIZ_RELATIVE_GAIN
         : mode === "harvest"
@@ -292,8 +302,11 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const nextGain = bgmGainForLevel(bgmVolume);
-    desiredGainRef.current = nextGain;
+    desiredBgmGainRef.current = bgmGainForLevel(bgmVolume);
+    desiredSoundEffectGainRef.current = bgmGainForLevel(soundEffectVolume);
+    const nextGain = playbackModeRef.current === "harvest"
+      ? desiredSoundEffectGainRef.current
+      : desiredBgmGainRef.current;
     const context = audioContextRef.current;
     const masterGain = masterGainRef.current;
     if (context && masterGain) {
@@ -303,7 +316,7 @@ export function BackgroundMusic({ children }: { children: ReactNode }) {
       masterGain.gain.linearRampToValueAtTime(nextGain, now + 0.12);
     }
     if (preferencesReady && nextGain > 0) void switchPlaybackRef.current(playbackModeRef.current);
-  }, [bgmVolume, preferencesReady]);
+  }, [bgmVolume, preferencesReady, soundEffectVolume]);
 
   return <BackgroundMusicContext.Provider value={setBackgroundMusicMode}>{children}</BackgroundMusicContext.Provider>;
 }

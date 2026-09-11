@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, Info, LogOut, Menu, MoreHorizontal, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
+import { Bell, Eye, Info, LogOut, Menu, MoreHorizontal, RotateCcw, Settings, Sparkles, UserCog, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/session-boundary";
 import { BrandHomeLink } from "@/components/brand-home-link";
@@ -10,6 +10,7 @@ import { useMemories } from "@/lib/memories-context";
 import { useProfile } from "@/lib/profile-context";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useNotifications } from "@/lib/notifications-context";
+import { useTree } from "@/lib/tree-context";
 
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -17,6 +18,7 @@ export function AppHeader() {
   const { resetDemo } = useMemories();
   const { avatarDataUrl, nickname } = useProfile();
   const { unreadCount } = useNotifications();
+  const tree = useTree();
   useBodyScrollLock(menuOpen);
 
   useEffect(() => {
@@ -104,6 +106,17 @@ export function AppHeader() {
                 <Info size={17} />
                 <span>このプロトタイプについて</span>
               </Link>
+              <label className="app-side-menu-item app-side-menu-preview">
+                <Eye size={17} />
+                <span>プレビュー</span>
+                <input
+                  type="checkbox"
+                  checked={tree.preview}
+                  disabled={!tree.ready}
+                  onChange={(event) => tree.setPreview(event.target.checked)}
+                  aria-label={`プレビューを${tree.preview ? "オフ" : "オン"}にする`}
+                />
+              </label>
               <Link href="/more" onClick={() => setMenuOpen(false)} className="app-side-menu-item">
                 <MoreHorizontal size={17} />
                 <span>その他</span>

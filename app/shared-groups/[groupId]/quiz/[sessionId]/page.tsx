@@ -1,6 +1,5 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
+import { AppBackLink } from "@/components/app-back-link";
 import { AppHeader } from "@/components/app-header";
 import { SharedQuizRoomData } from "@/components/shared-quiz-room-data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -44,7 +43,7 @@ export default async function SharedQuizPage({ params, searchParams }: PageProps
     return (
       <div className="page-pad shared-quiz-page">
         <AppHeader />
-        <Link href={`/shared-groups/${groupId}`} className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-ink/55 hover:text-coral"><ArrowLeft size={15} />グループへ戻る</Link>
+        <AppBackLink href={`/shared-groups/${groupId}`} label="グループへ戻る" />
         <p role="alert" className="auth-notice auth-notice--error mt-7">{error instanceof Error ? error.message : "クイズを読み込めませんでした。"}</p>
       </div>
     );
@@ -67,7 +66,7 @@ export default async function SharedQuizPage({ params, searchParams }: PageProps
     return (
       <div className="page-pad shared-quiz-page">
         <AppHeader />
-        <Link href={`/shared-groups/${groupId}`} className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-ink/55 hover:text-coral"><ArrowLeft size={15} />{album.name}へ戻る</Link>
+        <AppBackLink href={`/shared-groups/${groupId}`} label={`${album.name}へ戻る`} />
           <SharedQuizRoomData
             groupId={groupId}
             groupName={album.name}
@@ -87,7 +86,7 @@ export default async function SharedQuizPage({ params, searchParams }: PageProps
     return (
       <div className="page-pad shared-quiz-page">
         <AppHeader />
-        <Link href={`/shared-groups/${groupId}`} className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-ink/55 hover:text-coral"><ArrowLeft size={15} />{album.name}へ戻る</Link>
+        <AppBackLink href={`/shared-groups/${groupId}`} label={`${album.name}へ戻る`} />
         <p role="alert" className="auth-notice auth-notice--error mt-7">{error instanceof Error ? error.message : "クイズを読み込めませんでした。"}</p>
       </div>
     );

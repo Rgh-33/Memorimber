@@ -66,7 +66,7 @@ export function FruitQuizDialog({ memory, memories, golden = false, onClose }: {
         <p className="fruit-quiz-lead">{answered ? "見つけた思い出に、あなたの言葉を添えてください。" : "三択に答えて、木の実の記憶をひらこう。"}</p>
 
         {!answered ? (
-          <div className="fruit-quiz-question-step">
+          <div className="fruit-quiz-question-step fruit-quiz-question-step--gentle">
             <QuizQuestionCard question={question} selectedChoiceId={selected} answered={false} onSelect={setSelected} />
             <button type="button" className="quiz-primary-button" onClick={confirmAnswer} disabled={!selected || !quizReady}>答えを確認</button>
           </div>

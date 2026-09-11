@@ -1,6 +1,6 @@
 # コンテスト提出前の実装・確認記録
 
-作業ブランチは `feature/issue-110-UI-adjust`。mainのmerge/rebase/cherry-pick、Issue #118、既存migrationの変更はしていません。
+作業ブランチは `feature/issue-110-UI-adjust`。初回実装後、ユーザーの追加依頼によりmain（`e16ab83`）をマージしました。テーマ別PWAメタ情報・プレビュー操作欄と通知機能を統合しています。Issue #118、既存migrationの変更はしていません。
 
 ## 実装
 
@@ -10,7 +10,7 @@
 | スクロール | 投稿処理開始前・成功後・編集保存時にeditableをblur。全体のsmooth scrollをautoへ変更し、投稿後は既存router.replaceのスクロール1回に任せる。アルバムの既存スクロール復元とBottomNavのfixedは維持。visualViewport補正や新たなscrollIntoViewは追加していない。 |
 | クイズ画像 | 画像ごとのloading/loaded/errorを管理。URL変更時はkeyで状態初期化し、キャッシュ画像はcomplete/naturalWidthでも確認。方眼上の光をCSSで左上→右下に流し、reduced-motionでは停止。中央Grid3X3削除、既存blurと回答後revealを維持。エラーは小さなplaceholder。 |
 | 自由タグ | 固定候補に入力・追加ボタンを追加。trim、空文字拒否、固定候補を含む重複排除、選択解除、Enterのsubmit防止、IME変換確定Enterの除外。選択値は既存tags配列に入り、保存成功時に入力もreset。タグ用DB変更なし。 |
-| PWA | Next標準manifest、standalone、日本語、start_url `/`。既存ヘッダーのSproutを使った192/512px PNG。通知専用Service Workerにはpush/notificationclickのみ（fetch cacheなし）。 |
+| PWA | Next Metadataからmainのテーマ別Manifestを指定。standalone、日本語、start_url `/`。Sproutアイコンと通知専用Service Workerを維持（fetch cacheなし）。旧 `/manifest.webmanifest` は互換リダイレクトとして保持。 |
 | 通知設定 | 設定 > その他に未設定/有効/拒否/非対応を表示。許可要求はボタンクリック時のみ。有効化でsubscribeと認証済みDB保存、無効化でDB削除と端末unsubscribe。拒否時の再promptなし。 |
 | 通知候補 | 実TreeのbuildPersistedTreeItemsを再利用した収穫候補と、memory_dateの1〜3年前±7日。両方あればユーザーとJST日付により種別を交互に選択。写真も決定的に選択。候補なしの日は送らない。本文にcaption/画像URLなし。 |
 | Previewテスト | ON時だけボタン表示。保存済みの実memoryとpreview Tree.itemsを同じ候補選択関数へ渡し、SW.showNotification。VAPID・PushSubscription・Cron・日次履歴を使わない。サンプル写真を過去写真候補にしない。 |
@@ -34,9 +34,10 @@
 ## 確認結果と未確認範囲
 
 - checkpoint `8b4f3bf`：255テスト、lint、build、diff --check成功。
-- 最終自動テスト：`npm test` 274件成功、失敗0。候補境界、うるう日、同日retry/並行claim、他人のmemory除外、失効endpoint、部分失敗、subscribe/unsubscribe、拒否、保存失敗時解除、Preview、same-originを含む。
-- `npm run lint`：成功。独立typecheckスクリプトはなく、buildの型チェックを使用。
-- `npm run build`：最終成功（型チェック・本番生成を含む）。削除済みfixtureの生成型参照を除去して再実行済み。検証専用routeは含まれません。
+- main統合途中の自動テスト：`npm test` 277件成功、失敗0。候補境界、うるう日、同日retry/並行claim、他人のmemory除外、失効endpoint、部分失敗、subscribe/unsubscribe、拒否、保存失敗時解除、Preview、same-origin、テーマ別PWAを含む。
+- `npm run lint`：main統合途中の構成で成功。独立typecheckスクリプトはなく、buildの型チェックを使用。
+- `npm run build`：main統合途中の構成で成功（型チェック・本番生成を含む）。検証専用routeは含まれません。
+- 最終調整ではManifestの二重登録を避けるため、mainのテーマ別ManifestをMetadataから指定する方式に統一し、旧URLへの互換リダイレクトを追加しました。以後はユーザーの「コードレビューだけ」の依頼に従い、テスト・lint・build・ブラウザ確認を再実行していません。最終構成の動作確認済みとは扱いません。
 - `git diff --check`：成功。
 - ブラウザ確認：390px幅の投稿フォーム全入力16px、ズーム禁止metaなし、fixedナビ、自由タグtrim/空文字/重複/選択解除/Enter非送信。クイズ主画像・3写真選択肢のloading→loaded→reveal、errorでloader終了、サイズ維持、reduced-motion停止。Manifest・SW登録・未認証Cron401・通知設定UIを確認。
 - ブラウザ検証はローカル・DB未接続の画面と検証用fixtureで実施。fixtureは除去済み。本番DBへの投稿や実配信成功は主張しません。
@@ -53,7 +54,7 @@
 | 区分 | ファイル |
 | --- | --- |
 | フォーム・画像 | app/globals.css、app/quiz.css、components/memory-form.tsx、components/memory-detail-actions.tsx、components/quiz-question-card.tsx、lib/blur-active-editable.ts |
-| PWA・UI | app/layout.tsx、app/manifest.ts、app/konoha.css、app/settings/[section]/page.tsx、components/memory-notification-settings.tsx、components/preview-notification-button.tsx、components/pwa-registration.tsx、components/tree-preview-controls.tsx |
+| PWA・UI | app/layout.tsx、app/manifest.webmanifest/route.ts、app/konoha.css、app/settings/[section]/page.tsx、components/memory-notification-settings.tsx、components/preview-notification-button.tsx、components/pwa-registration.tsx、components/tree-preview-controls.tsx（初回のapp/manifest.tsはmain統合時にテーマ別Manifestへ移行） |
 | 配信・設定 | lib/memory-reminders.ts、lib/memory-reminder-runner.ts、lib/push-client.ts、lib/push-subscription.ts、app/api/push-subscriptions/route.ts、app/api/cron/memory-reminders/route.ts |
 | ログアウト | app/auth/actions.ts、components/session-boundary.tsx |
 | 配信基盤 | public/sw.js、public/pwa/icon-192.png、public/pwa/icon-512.png、scripts/generate-pwa-icons.mjs、middleware.ts、next.config.mjs、vercel.json |

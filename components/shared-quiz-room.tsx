@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Check, Clock3, LoaderCircle, Medal, Trophy, UsersRound } from "lucide-react";
+import { useBackgroundMusic, type BackgroundMusicMode } from "@/components/background-music";
 import { joinSharedQuizAction, startSharedQuizAction } from "@/app/shared-groups/actions";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { SharedGroupSubmitButton } from "@/components/shared-group-submit-button";
@@ -101,11 +102,21 @@ function QuizLobby({ groupId, userId, session, participants, actionError, isOwne
 }
 
 function QuizCountdown({ countdown, participants }: { countdown: number; participants: SharedQuizParticipant[] }) {
+  if (countdown > 3) {
+    return (
+      <section className="quiz-countdown shared-quiz-countdown" role="status" aria-live="polite">
+        <p>GET READY</p>
+        <LoaderCircle size={42} className="animate-spin text-coral" aria-hidden="true" />
+        <h1>参加者を同期中</h1>
+      </section>
+    );
+  }
   return (
-    <section className="shared-quiz-countdown" aria-live="assertive">
-      <div className="shared-quiz-countdown-number" key={countdown}>{countdown}</div>
+    <section className="quiz-countdown shared-quiz-countdown" role="status" aria-live="assertive" aria-atomic="true">
+      <p>GET READY</p>
+      <div className="quiz-countdown-number" key={countdown}>{countdown}</div>
       <h1>まもなくスタート</h1>
-      <p>{participants.length}人で10問に挑戦します</p>
+      <span className="shared-quiz-countdown-participants">{participants.length}人で10問に挑戦します</span>
     </section>
   );
 }
@@ -152,6 +163,7 @@ export function SharedQuizRoom(props: Props) {
   const { groupId, groupName, userId, session, participants, questions, initialAnswers, standings, serverNow, actionError, isOwner } = props;
   const router = useRouter();
   const { recordActivity } = useProfileLevel();
+  const setBackgroundMusicMode = useBackgroundMusic();
   const [now, setNow] = useState(serverNow);
   const [answers, setAnswers] = useState(initialAnswers);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
@@ -189,7 +201,16 @@ export function SharedQuizRoom(props: Props) {
   const timing = session.startedAt
     ? getSharedQuizTiming(session.startedAt, now, session.questions.length, secondsPerQuestion)
     : null;
+  const musicMode: BackgroundMusicMode = session.status !== "active" || !timing || timing.phase === "finished"
+    ? "default"
+    : timing.phase === "countdown" ? "countdown" : "quiz";
   const answerByIndex = useMemo(() => new Map(answers.map((answer) => [answer.questionIndex, answer])), [answers]);
+
+  useEffect(() => {
+    setBackgroundMusicMode(musicMode);
+  }, [musicMode, setBackgroundMusicMode]);
+
+  useEffect(() => () => setBackgroundMusicMode("default"), [setBackgroundMusicMode]);
 
   const selectAnswer = useCallback(async (questionIndex: number, choiceId: string) => {
     if (submitting.current.has(questionIndex) || answerByIndex.has(questionIndex)) return;

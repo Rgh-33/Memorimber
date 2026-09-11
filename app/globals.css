@@ -1135,6 +1135,10 @@ html[data-mode="dark"][data-accent="orange"] .bg-coral {
   line-height: 1.45;
 }
 
+.app-side-menu-preview { cursor: pointer; }
+.app-side-menu-preview input { width: 16px; height: 16px; flex: 0 0 auto; margin-left: auto; accent-color: var(--accent); cursor: pointer; }
+.app-side-menu-preview:has(input:disabled) { cursor: wait; opacity: 0.45; }
+
 .app-side-menu-divider {
   height: 1px;
   margin: 8px 12px;

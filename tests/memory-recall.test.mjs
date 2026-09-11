@@ -18,6 +18,13 @@ test("preview can feature a fresh petal immediately", () => {
   assert.equal(chooseFadingMemoryId([fresh], { reviewedAt: {}, featuredId: null }, now, { ignoreAge: true }), "fresh");
 });
 
+test("preview fruit quizzes stay local instead of sending temporary IDs to Supabase", () => {
+  const hook = readFileSync(new URL("../lib/use-persisted-memory-question.ts", import.meta.url), "utf8");
+  assert.match(hook, /persistQuestion = isSupabaseConfigured\(\) && isUuid\(memory\.id\)/);
+  assert.match(hook, /if \(!persistQuestion\) \{[\s\S]*setReady\(true\)[\s\S]*return/);
+  assert.match(hook, /if \(!persistQuestion\) \{[\s\S]*setError\(null\);[\s\S]*return true/);
+});
+
 test("shaking a petal postpones fading and clears its featured state", () => {
   const before = { reviewedAt: {}, featuredId: "old" };
   const reviewed = recordMemoryReview(before, "old", now);
