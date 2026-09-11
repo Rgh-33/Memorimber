@@ -389,7 +389,7 @@ function FloatingWord({
   );
 }
 
-export function MemoryTree({ items, petals, memories, count, totalCount, month, mode, preview, onUploadAnimationComplete }: {
+export function MemoryTree({ items, petals, memories, count, totalCount, month, mode, preview, previewDate, previewRecall, onPreviewReview, onUploadAnimationComplete }: {
   items: MemoryTreeItem[];
   petals: HarvestedTreeItem[];
   memories: Memory[];
@@ -398,6 +398,9 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
   month: string;
   mode: TreeDisplayMode;
   preview: boolean;
+  previewDate: string;
+  previewRecall: MemoryRecallState;
+  onPreviewReview: (memoryId: string) => void;
   onUploadAnimationComplete: (memoryId: string) => void;
 }) {
   const harvest = useHarvest();
@@ -440,28 +443,30 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
     recallSelectionReady.current = true;
     let active = true;
     const load = async () => {
-      const stored: MemoryRecallState = { reviewedAt: {}, featuredId: null };
-      if (isSupabaseConfigured()) {
+      const stored: MemoryRecallState = preview ? previewRecall : { reviewedAt: {}, featuredId: null };
+      if (!preview && isSupabaseConfigured()) {
         const { data, error } = await createClient().from("memory_fruits").select("memory_id,last_reviewed_at");
         if (error) { recallSelectionReady.current = false; return; }
         for (const row of data ?? []) if (row.last_reviewed_at) stored.reviewedAt[row.memory_id] = Date.parse(row.last_reviewed_at);
       }
       if (!active) return;
-      const featuredId = chooseFadingMemoryId(shownWords, stored, Date.now(), { ignoreAge: preview && !isSupabaseConfigured() });
+      const recallNow = preview ? new Date(`${previewDate}T12:00:00`).getTime() : Date.now();
+      const featuredId = chooseFadingMemoryId(shownWords, stored, recallNow, { ignoreAge: preview });
       setRecallState({ ...stored, featuredId });
       setFadingMemoryId(featuredId);
     };
     void load();
     return () => { active = false; recallSelectionReady.current = false; };
-  }, [preview, shownWords]);
+  }, [preview, previewDate, previewRecall, shownWords]);
 
   const rememberInteraction = useCallback((memoryId: string) => {
+    if (preview) onPreviewReview(memoryId);
     setRecallState((current) => {
-      const next = recordMemoryReview(current, memoryId, Date.now());
+      const next = recordMemoryReview(current, memoryId, preview ? new Date(`${previewDate}T12:00:00`).getTime() : Date.now());
       return next;
     });
     setFadingMemoryId((current) => current === memoryId ? null : current);
-  }, []);
+  }, [preview, previewDate, onPreviewReview]);
 
   const restoreFadingMemory = useCallback((memoryId: string) => {
     rememberInteraction(memoryId);
@@ -483,9 +488,9 @@ export function MemoryTree({ items, petals, memories, count, totalCount, month, 
       return;
     }
     rememberInteraction(memoryId);
-    recordActivity("wordRecallReveals", { memoryId });
+    if (!preview) recordActivity("wordRecallReveals", { memoryId });
     setRevealedItem(item);
-  }, [fadingMemoryId, memoriesById, recordActivity, rememberInteraction]);
+  }, [fadingMemoryId, memoriesById, preview, recordActivity, rememberInteraction]);
 
   useEffect(() => {
     if (!revealedItem) return;

@@ -8,7 +8,6 @@ import { MemoryPetal } from "@/components/memory-petal";
 import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { formatJapaneseDate } from "@/lib/data";
 import { usePersistedMemoryQuestion } from "@/lib/use-persisted-memory-question";
-import { restorePetal } from "@/lib/personal-quiz";
 import { getMemoryDisplayUrl, type Memory } from "@/lib/types";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
@@ -20,7 +19,7 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   onRemembered: () => void;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
-  const { question, error: quizError, ready: quizReady, answer, setError } = usePersistedMemoryQuestion("recall", memory, memories);
+  const { question, error: quizError, ready: quizReady, answer, restore, setError } = usePersistedMemoryQuestion("recall", memory, memories);
   const restoring = useRef(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
@@ -41,7 +40,7 @@ export function MemoryRecallDialog({ memory, memories, word, onClose, onRemember
   const releasePetal = async () => {
     if (restoring.current || !answered) return;
     restoring.current = true;
-    try { await restorePetal(question.id); onRemembered(); onClose(); }
+    try { await restore(); onRemembered(); onClose(); }
     catch (error) { setError(error instanceof Error ? error.message : "花びらを戻せませんでした。"); }
     finally { restoring.current = false; }
   };

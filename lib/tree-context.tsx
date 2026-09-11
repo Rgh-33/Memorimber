@@ -11,10 +11,11 @@ import { completeMemoryHarvest, loadMemoryFruits, type MemoryFruits } from "./su
 import { advanceDate, applyUploadPresentation, buildPersistedPetals, buildPersistedTreeItems, buildPetals, buildTreeItems, getHarvestWordForMemory, localDate, monthlyQueue, recordHarvest, tokyoDate, type Harvests } from "./tree-growth";
 import { getTreeVisibleCount, placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
+import { EMPTY_MEMORY_RECALL_STATE, readMemoryRecallState, recordMemoryReview, type MemoryRecallState } from "./memory-recall";
 
-type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; previewGoldenIds: string[]; serial: number; slots: Record<string, (string | null)[]> };
+type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; previewRecall: MemoryRecallState; previewGoldenIds: string[]; serial: number; slots: Record<string, (string | null)[]> };
 const TREE_ARRIVAL_STORAGE_KEY = "memorimber-pending-tree-arrival-v1";
-const emptyState = (preview: boolean): TreeState => ({ preview, date: `${localDate().slice(0, 7)}-01`, uploads: [], previewHarvests: {}, previewGoldenIds: [], serial: 0, slots: {} });
+const emptyState = (preview: boolean): TreeState => ({ preview, date: `${localDate().slice(0, 7)}-01`, uploads: [], previewHarvests: {}, previewRecall: EMPTY_MEMORY_RECALL_STATE, previewGoldenIds: [], serial: 0, slots: {} });
 
 function readState(raw: string | null, preview: boolean): TreeState {
   const fallback = emptyState(preview);
@@ -33,6 +34,7 @@ function readState(raw: string | null, preview: boolean): TreeState {
         && typeof item.createdAt === "string" && Number.isFinite(Date.parse(item.createdAt)) && typeof item.date === "string"
         && typeof item.caption === "string" && typeof item.imageUrl === "string" && Array.isArray(item.people) && Array.isArray(item.tags)),
       previewHarvests: harvests(value.previewHarvests),
+      previewRecall: readMemoryRecallState(JSON.stringify(value.previewRecall ?? null)),
       previewGoldenIds: goldenIds(value.previewGoldenIds),
       // Older saved previews have no placements. Preserve their photos/words
       // and allocate positions on first use instead of resetting the preview.
@@ -192,10 +194,18 @@ function useTreeState() {
     queueUploadArrival(memory.id);
   };
 
+  const rememberPreviewMemory = useCallback((memoryId: string) => {
+    setState((current) => {
+      if (!current.preview || !current.previewHarvests[memoryId]) return current;
+      return { ...current, previewRecall: recordMemoryReview(current.previewRecall, memoryId, new Date(`${current.date}T12:00:00`).getTime()) };
+    });
+  }, []);
+
   return {
     ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
     date, preview: state.preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source,
     count, totalCount, harvestWordFor,
+    previewRecall: state.previewRecall, rememberPreviewMemory,
     arrivingUploadId,
     queueUploadArrival,
     completeUploadArrival,
