@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { getAlbumPdfFilename, getAlbumPdfPageSize, L_PHOTO_PAPER_MM } from "../lib/album-pdf.ts";
+import { getAlbumPdfFilename, getAlbumPngFilename, getMonthlyAlbumFilename, getAlbumPdfPageSize, L_PHOTO_PAPER_MM } from "../lib/album-pdf.ts";
 
 const memoryPage = readFileSync(new URL("../app/memory/[id]/page.tsx", import.meta.url), "utf8");
 const pdfSource = readFileSync(new URL("../lib/album-pdf.ts", import.meta.url), "utf8");
@@ -22,15 +22,16 @@ test("album PDF uses exact Japanese L-size dimensions without margins", () => {
   assert.match(pdfSource, /page\.drawImage\(image, \{ x: 0, y: 0, width: pageSize\.width, height: pageSize\.height \}\)/);
 });
 
-test("iOS can use a rendered PDF while browsers with reliable print support keep the traditional path", () => {
+test("PDF and PNG share the iOS-safe renderer without browser printing", () => {
   assert.match(pdfSource, /iPhone\|iPad\|iPod/);
   assert.match(pdfSource, /if \(isIOSWebKit\(\)\) await toPng\(element, options\);/);
   assert.match(memoryPage, /createAlbumPdf\(page, resolvedAppearance\.orientation\)/);
   assert.match(memoryPage, /navigator\.share\(shareData\)/);
   assert.match(memoryPage, /共有して印刷/);
-  assert.match(memoryPage, /window\.print\(\)/);
-  assert.match(memoryPage, /PDFで印刷/);
-  assert.match(memoryPage, /通常印刷/);
+  assert.doesNotMatch(memoryPage, /window\.print|handleBrowserPrint|通常印刷/);
+  assert.match(memoryPage, /PDFで保存/);
+  assert.match(memoryPage, /画像で保存/);
+  assert.match(memoryPage, /createAlbumPng\(page, resolvedAppearance\.orientation\)/);
   assert.match(memoryPage, /PDFができました。iPhoneでは「共有して印刷」から「プリント」を選択してください。/);
   assert.match(memoryPage, /onClick=\{handleCancelPdf\}[^>]*>キャンセル<\/button>/);
   assert.equal(getAlbumPdfFilename("2026-09-03"), "memorimber-2026-09-03-l-size.pdf");
@@ -40,7 +41,7 @@ test("iOS can use a rendered PDF while browsers with reliable print support keep
 test("album actions and generated PDF controls stay below the paper and above memory navigation", () => {
   const paperIndex = memoryPage.indexOf("memory-book-page-shell");
   const appearanceIndex = memoryPage.lastIndexOf("> 見た目");
-  const pdfActionIndex = memoryPage.indexOf('"PDFで印刷"');
+  const pdfActionIndex = memoryPage.indexOf('"PDFで保存"');
   const pdfResultIndex = memoryPage.indexOf("PDFができました。");
   const navigationIndex = memoryPage.indexOf('<nav aria-label="前後の思い出"');
 
@@ -48,4 +49,14 @@ test("album actions and generated PDF controls stay below the paper and above me
   assert.ok(appearanceIndex < pdfActionIndex);
   assert.ok(pdfActionIndex < pdfResultIndex);
   assert.ok(pdfResultIndex < navigationIndex);
+});
+
+
+test("PNG and monthly PDF filenames identify the memory and current page", () => {
+  assert.equal(getAlbumPngFilename("2026-09-06"), "memorimber-2026-09-06-l-size.png");
+  assert.equal(getAlbumPngFilename("invalid"), "memorimber-memory-l-size.png");
+  assert.equal(getMonthlyAlbumFilename("2026-09"), "memorimber-2026-09-l-size.pdf");
+  assert.equal(getMonthlyAlbumFilename("2026-09", 0), "memorimber-2026-09-cover.png");
+  assert.equal(getMonthlyAlbumFilename("2026-09", 1), "memorimber-2026-09-page-2.png");
+  assert.equal(getMonthlyAlbumFilename("../unsafe", 1), "memorimber-monthly-page-2.png");
 });

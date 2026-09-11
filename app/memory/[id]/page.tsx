@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Printer, Settings2, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Printer, ImageDown, Settings2, Trash2 } from "lucide-react";
+import { AlbumDownloadResult, useAlbumDownload } from "@/components/album-download-result";
 import { MemoryBookPage } from "@/components/memory-book-page";
 import { MemoryCard } from "@/components/memory-card";
 import { MemoryDetailActions } from "@/components/memory-detail-actions";
 import { SAMPLE_MEMORIES } from "@/lib/data";
-import { createAlbumPdf, getAlbumPdfFilename } from "@/lib/album-pdf";
+import { createAlbumPdf, createAlbumPng, getAlbumPngFilename, getAlbumPdfFilename } from "@/lib/album-pdf";
 import { resolveAlbumAppearance } from "@/lib/album-appearance";
 import { useMemories } from "@/lib/memories-context";
 import { usePreferences } from "@/lib/preferences-context";
@@ -20,25 +21,6 @@ import { useTree } from "@/lib/tree-context";
 import type { Memory } from "@/lib/types";
 
 type LoadState = "idle" | "loading" | "loaded" | "not-found" | "error";
-
-const ALBUM_PRINT_PAGE_STYLE_ID = "memory-album-print-page-size";
-
-function applyAlbumPrintPageSize(orientation: "portrait" | "landscape") {
-  const [width, height] = orientation === "landscape" ? [127, 89] : [89, 127];
-  let style = document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID) as HTMLStyleElement | null;
-
-  if (!style) {
-    style = document.createElement("style");
-    style.id = ALBUM_PRINT_PAGE_STYLE_ID;
-    style.media = "print";
-    document.head.appendChild(style);
-  }
-
-  // An unnamed page rule is supported more consistently than CSS named pages,
-  // especially by Safari and Firefox print preview.
-  style.textContent = `@page { size: ${width}mm ${height}mm; margin: 0; }`;
-  document.documentElement.dataset.albumPrintOrientation = orientation;
-}
 
 function compareMemories(a: Memory, b: Memory) {
   return a.date.localeCompare(b.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id.localeCompare(b.id);
@@ -74,12 +56,15 @@ export default function MemoryDetailPage() {
   const [actionMode, setActionMode] = useState<"edit" | "delete" | null>(null);
   const [draftMemory, setDraftMemory] = useState<Memory | null>(null);
   const [printPreparing, setPrintPreparing] = useState(false);
-  const [browserPrintPreparing, setBrowserPrintPreparing] = useState(false);
+  const [imagePreparing, setImagePreparing] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const pdfUrlRef = useRef<string | null>(null);
   const printPageRef = useRef<HTMLDivElement>(null);
+  const imageDownload = useAlbumDownload();
+  const clearImage = imageDownload.clear;
+  useEffect(() => { clearImage(); }, [params.id, clearImage]);
 
   const fetchDetail = useCallback(async (showLoading = true) => {
     const version = ++requestVersion.current;
@@ -162,16 +147,6 @@ export default function MemoryDetailPage() {
   const accountAppearanceRequired = Boolean(renderedMemory && !renderedMemory.albumAppearance && configured);
   const resolvedAppearance = resolveAlbumAppearance(renderedMemory?.albumAppearance, accountAlbumAppearance);
 
-  useEffect(() => {
-    if (accountAppearanceRequired && !albumAppearanceReady) return;
-    applyAlbumPrintPageSize(resolvedAppearance.orientation);
-
-    return () => {
-      document.getElementById(ALBUM_PRINT_PAGE_STYLE_ID)?.remove();
-      delete document.documentElement.dataset.albumPrintOrientation;
-    };
-  }, [accountAppearanceRequired, albumAppearanceReady, resolvedAppearance.orientation]);
-
   if (loadState === "idle" || loadState === "loading") {
     return <div className="page-pad"><div className="mt-16 rounded-2xl border border-line bg-paper p-6 text-center text-sm leading-6"><p role="status">思い出を読み込んでいます…</p></div></div>;
   }
@@ -222,7 +197,7 @@ export default function MemoryDetailPage() {
   };
 
   const handlePrint = async () => {
-    if (printPreparing) return;
+    if (printPreparing || imagePreparing) return;
     recordActivity("printAttempts");
     setPrintPreparing(true);
     setPrintError(null);
@@ -269,37 +244,18 @@ export default function MemoryDetailPage() {
     setPrintPreparing(false);
   };
 
-  const handleBrowserPrint = async () => {
-    if (browserPrintPreparing) return;
-    recordActivity("printAttempts");
-    setBrowserPrintPreparing(true);
+  const handleSaveImage = async () => {
+    if (imagePreparing || printPreparing) return;
+    setImagePreparing(true);
     setPrintError(null);
     try {
-      applyAlbumPrintPageSize(resolvedAppearance.orientation);
-      const waitAtMost = async (promise: Promise<unknown>, milliseconds = 5000) => {
-        let timeout: ReturnType<typeof setTimeout> | undefined;
-        await Promise.race([
-          promise,
-          new Promise<void>((resolve) => { timeout = setTimeout(resolve, milliseconds); }),
-        ]);
-        if (timeout) clearTimeout(timeout);
-      };
-      if (document.fonts) await waitAtMost(document.fonts.ready);
-      const images = Array.from(printPageRef.current?.querySelectorAll("img") ?? []);
-      await Promise.all(images.map(async (image) => {
-        if (!image.complete) {
-          await waitAtMost(new Promise<void>((resolve) => {
-            image.addEventListener("load", () => resolve(), { once: true });
-            image.addEventListener("error", () => resolve(), { once: true });
-          }));
-        }
-        if (image.naturalWidth > 0) await image.decode().catch(() => undefined);
-      }));
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      window.print();
-    } finally {
-      setBrowserPrintPreparing(false);
-    }
+      const page = printPageRef.current?.querySelector<HTMLElement>(".memory-book-page");
+      if (!page) throw new Error("アルバム紙面を見つけられませんでした。");
+      const blob = await createAlbumPng(page, resolvedAppearance.orientation);
+      imageDownload.save(blob, getAlbumPngFilename(memory.date));
+    } catch (cause) {
+      setPrintError(cause instanceof Error ? cause.message : "画像を作成できませんでした。もう一度お試しください。");
+    } finally { setImagePreparing(false); }
   };
 
   const harvestWord = tree.harvestWordFor(memory.id);
@@ -356,11 +312,11 @@ export default function MemoryDetailPage() {
         <Link href={`/memory/${memory.id}/album-settings`} className="flex items-center gap-2 rounded-full border border-line bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2" aria-label="この思い出でアルバムの見た目を設定する">
           <Settings2 size={16} className="text-coral" aria-hidden="true" /> 見た目
         </Link>
-        <button type="button" onClick={() => void handlePrint()} disabled={printPreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をPDFにして印刷する">
-          <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "PDF作成中…" : "PDFで印刷"}
+        <button type="button" onClick={() => void handlePrint()} disabled={printPreparing || imagePreparing} className="flex items-center gap-2 rounded-full border border-coral/45 bg-ivory px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-paper hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をPDFで保存する">
+          <Printer size={16} className="text-coral" aria-hidden="true" /> {printPreparing ? "PDF作成中…" : "PDFで保存"}
         </button>
-        <button type="button" onClick={() => void handleBrowserPrint()} disabled={browserPrintPreparing} className="flex items-center gap-2 rounded-full border border-line bg-paper px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-ivory hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="ブラウザの印刷画面を開く">
-          <Printer size={16} className="text-ink/55" aria-hidden="true" /> {browserPrintPreparing ? "準備中…" : "通常印刷"}
+        <button type="button" onClick={() => void handleSaveImage()} disabled={imagePreparing || printPreparing} className="flex items-center gap-2 rounded-full border border-line bg-paper px-3.5 py-2.5 text-xs font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-coral/45 hover:bg-ivory hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/40 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-55" aria-label="この思い出をPNG画像で保存する">
+          <ImageDown size={16} className="text-coral" aria-hidden="true" /> {imagePreparing ? "画像作成中…" : "画像で保存"}
         </button>
       </div>
 
@@ -375,6 +331,7 @@ export default function MemoryDetailPage() {
           </span>
         </div>
       )}
+      <AlbumDownloadResult result={imageDownload.result} />
       {printError && <p role="alert" className="print-hide mt-3 rounded-xl border border-red-300/60 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700">{printError}</p>}
 
       <nav aria-label="前後の思い出" className="print-hide mt-4 flex items-center justify-between border-t border-line pt-4 text-xs text-ink">
