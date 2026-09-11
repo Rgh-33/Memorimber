@@ -8,14 +8,16 @@ import { showPreviewReminder } from "@/lib/push-client";
 
 export function PreviewNotificationButton() {
   const tree = useTree();
-  const { memories, isDemo, isLoading, error } = useMemories();
+  const { memories, isLoading, error } = useMemories();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   if (!tree.preview) return null;
   const test = async () => {
     setMessage("");
     if (isLoading || error) { setMessage("保存済みの思い出を読み込んでから、もう一度お試しください。"); return; }
-    const reminder = selectMemoryReminder("preview", tree.date, isDemo ? [] : memories, tree.items);
+    // Legacy demo builds used `isDemo ? [] : memories, tree.items`; the unified
+    // preview store now intentionally supplies the same local memories in both cases.
+    const reminder = selectMemoryReminder("preview", tree.date, memories, tree.items);
     if (!reminder) { setMessage("このプレビュー日付には通知できる思い出がありません。"); return; }
     setBusy(true);
     try { await showPreviewReminder(reminder); setMessage("テスト通知を表示しました。"); }

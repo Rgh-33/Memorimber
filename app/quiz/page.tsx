@@ -8,7 +8,7 @@ import { QuizQuestionCard } from "@/components/quiz-question-card";
 import { PageHeading } from "@/components/page-heading";
 import { useBackgroundMusic, type BackgroundMusicMode } from "@/components/background-music";
 import { useMemories } from "@/lib/memories-context";
-import { startPersonalQuiz, answerPersonalQuiz, nextPersonalQuestion, loadPersonalQuizHistory, type SavedQuestion } from "@/lib/personal-quiz";
+import { startPersonalQuiz, answerPersonalQuiz, nextPersonalQuestion, loadPersonalQuizHistory, saveLocalQuizResult, type SavedQuestion } from "@/lib/personal-quiz";
 import {
   QUIZ_KIND_LABELS,
   QUIZ_MODE_LABELS,
@@ -18,6 +18,7 @@ import {
   type QuizMode,
   type MemoryQuizQuestion,
 } from "@/lib/quiz";
+import { usePreviewState } from "@/lib/preview-state";
 
 const PHOTO_TO_CAPTION_COUNT_KEY = "memorimber-quiz-photo-to-caption-count";
 const CAPTION_TO_PHOTO_COUNT_KEY = "memorimber-quiz-caption-to-photo-count";
@@ -347,6 +348,7 @@ function QuizHistory({ entries, onBack }: { entries: QuizHistoryEntry[]; onBack:
 }
 
 export default function QuizPage() {
+  const preview = usePreviewState();
   const { memories, isLoading, error, refreshMemories } = useMemories();
   const [saveError, setSaveError] = useState<string | null>(null);
   const pendingSave = useRef(false);
@@ -362,8 +364,8 @@ export default function QuizPage() {
   useEffect(() => {
     setPhotoCount(readCount(PHOTO_TO_CAPTION_COUNT_KEY));
     setCaptionCount(readCount(CAPTION_TO_PHOTO_COUNT_KEY));
-    void loadPersonalQuizHistory().then(setHistory).catch((error: Error) => setSaveError(error.message));
-  }, []);
+    void loadPersonalQuizHistory(preview.active).then(setHistory).catch((error: Error) => setSaveError(error.message));
+  }, [preview.active]);
 
   const musicMode: BackgroundMusicMode = !active || quizStage === "results"
     ? "default"
@@ -408,9 +410,10 @@ export default function QuizPage() {
     } catch (error) { setSaveError(error instanceof Error ? error.message : "クイズを開始できませんでした。"); }
     finally { pendingSave.current = false; }
   };
-  const saveResult = useCallback(() => {
-    void loadPersonalQuizHistory().then(setHistory).catch((error: Error) => setSaveError(error.message));
-  }, []);
+  const saveResult = useCallback((mode: QuizMode, answers: QuizAnswer[]) => {
+    saveLocalQuizResult(mode, answers);
+    void loadPersonalQuizHistory(preview.active).then(setHistory).catch((error: Error) => setSaveError(error.message));
+  }, [preview.active]);
 
   if (isLoading) return <div className="page-pad"><p role="status" className="quiz-loading">思い出を読み込んでいます…</p></div>;
   if (error || saveError) return <div className="page-pad"><div role="alert" className="quiz-load-error">{error || saveError}<button type="button" onClick={() => { setSaveError(null); void refreshMemories(); }}>再読み込み</button></div></div>;
