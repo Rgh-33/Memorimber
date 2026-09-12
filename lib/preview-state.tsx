@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { SAMPLE_MEMORIES } from "./data";
+import { PREVIEW_SAMPLE_MEMORIES, restorePreviewPhoto } from "./preview-photos";
 import type { Memory } from "./types";
 
 const STORAGE_KEY = "memorimber-preview-state-v2";
@@ -24,12 +24,12 @@ function initialMemories(date: string): Memory[] {
   // already demonstrates the existing seven-later-uploads ripening rule.
   const days = [1, 2, 3, 4, 5, 6, 7, 8];
   const current = days.map((day, index) => ({
-    ...SAMPLE_MEMORIES[index % SAMPLE_MEMORIES.length],
+    ...PREVIEW_SAMPLE_MEMORIES[index],
     id: `preview-sample-${index + 1}`,
     date: `${year}-${month}-${String(day).padStart(2, "0")}`,
     createdAt: `${year}-${month}-${String(day).padStart(2, "0")}T12:00:00.000`,
   }));
-  const anniversary = SAMPLE_MEMORIES.slice(0, 2).map((memory, index) => ({
+  const anniversary = PREVIEW_SAMPLE_MEMORIES.slice(-2).map((memory, index) => ({
     ...memory,
     id: `preview-anniversary-${index + 1}`,
     date: `${Number(year) - index - 1}-${month}-${String(Math.max(1, Number(date.slice(8)) - index)).padStart(2, "0")}`,
@@ -55,7 +55,7 @@ function restore(): PreviewState {
       || !/^\d{4}-\d{2}-\d{2}$/.test(value.currentDate) || !Array.isArray(value.memories)) return fallback;
     const memories = value.memories.filter((memory): memory is Memory => Boolean(memory && typeof memory.id === "string"
       && typeof memory.date === "string" && typeof memory.imageUrl === "string" && typeof memory.caption === "string"
-      && Array.isArray(memory.people) && Array.isArray(memory.tags)));
+      && Array.isArray(memory.people) && Array.isArray(memory.tags))).map(restorePreviewPhoto);
     // An empty list is intentional after the user resets the preview. Do not
     // silently restore the sample photos on the next navigation or reload.
     return { active: value.active, currentDate: value.currentDate, memories, serial: Number.isSafeInteger(value.serial) ? value.serial! : 0 };

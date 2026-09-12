@@ -3,7 +3,7 @@
 import { setBrowserSessionItem } from "@/lib/browser-session-data";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { SAMPLE_MEMORIES } from "./data";
+import { PREVIEW_SAMPLE_MEMORIES } from "./preview-photos";
 import { useMemories } from "./memories-context";
 import { usePreferences } from "./preferences-context";
 import { createClient } from "./supabase/client";
@@ -179,7 +179,7 @@ function useTreeState() {
 
   const uploadPreview = (forceGolden = false) => {
     const serial = previewState.serial + 1;
-    const sample = SAMPLE_MEMORIES[(serial - 1) % SAMPLE_MEMORIES.length];
+    const sample = PREVIEW_SAMPLE_MEMORIES[(serial - 1) % PREVIEW_SAMPLE_MEMORIES.length];
     const lastUploadTime = Math.max(0, ...source.filter((entry) => entry.createdAt?.slice(0, 10) === date)
       .map((entry) => Date.parse(entry.createdAt!)));
     const time = Math.max(new Date(`${date}T12:00:00`).getTime(), lastUploadTime + 1);
