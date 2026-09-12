@@ -40,3 +40,8 @@ test("tree preview starts from the same state during SSR and browser hydration",
   assert.match(treeContext, /useState<TreeState>\(\(\) => emptyState\(false\)\)/);
   assert.match(treeContext, /setState\(readState\(raw, isDemo\)\)/);
 });
+
+test("golden preview uploads use the active preview date", () => {
+  assert.match(treeContext, /buildTreeItems\(uploads, date, state\.previewHarvests\)/);
+  assert.doesNotMatch(treeContext, /buildTreeItems\(uploads, state\.date, state\.previewHarvests\)/);
+});

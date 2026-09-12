@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getMemoryImageType, loadMemoryPreview, MEMORY_IMAGE_ACCEPT, MemorySaveError, PENDING_MEMORY_STORAGE_KEY, readPendingMemoryUpload, recoverMemorySave, saveMemory, type MemorySaveStage, type PendingMemoryUpload } from "@/lib/supabase/memories";
 import type { Memory } from "@/lib/types";
+import { usePreviewState } from "@/lib/preview-state";
 
 const PEOPLE = ["友達", "家族", "クラスのみんな", "部活の仲間"];
 const TAGS = ["放課後", "帰り道", "教室", "行事", "昼休み", "8月"];
@@ -33,6 +34,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const { addMemory } = useMemories();
   const { startProcessing, stopProcessing } = useProcessing();
   const tree = useTree();
+  const preview = usePreviewState();
   const configured = isSupabaseConfigured();
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
@@ -42,7 +44,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
   const [imageUrl, setImageUrl] = useState("");
   const [previewFailed, setPreviewFailed] = useState(false);
   const [caption, setCaption] = useState("");
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(() => preview.active ? preview.currentDate : today());
   const [people, setPeople] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [customTags, setCustomTags] = useState<string[]>([]);
@@ -119,7 +121,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     thumbnailPromiseRef.current = Promise.resolve(null);
     setImageUrl("");
     setCaption("");
-    setDate(today());
+    setDate(preview.active ? preview.currentDate : today());
     setPeople([]);
     setTags([]);
     setCustomTags([]);
@@ -157,7 +159,7 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (submittingRef.current || pending || !configured) return;
+    if (submittingRef.current || pending || (!configured && !preview.active)) return;
     const nextErrors = {
       image: image ? undefined : "写真を1枚選んでください",
       caption: caption.trim() ? undefined : "一言を入力してください",
@@ -171,6 +173,18 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
     setStage("thumbnail");
     startProcessing();
     try {
+      if (preview.active) {
+        setStage("thumbnail");
+        const imageData = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("写真をブラウザ内に読み込めませんでした。"));
+          reader.readAsDataURL(image);
+        });
+        const saved = preview.addMemory({ imageUrl: imageData, caption: caption.trim(), date, people, tags, createdAt: `${date}T12:00:00.000` });
+        onSaved(saved);
+        return;
+      }
       const thumbnail = await thumbnailPromiseRef.current;
       if (!mounted.current) return;
       const saved = await saveMemory(createClient(), { image, thumbnail, caption, date, people, tags }, setStage, rememberPending);
@@ -212,8 +226,8 @@ export function MemoryForm({ compact = false }: { compact?: boolean }) {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} aria-busy={busy} className={`rounded-[22px] border border-line bg-ivory p-3 shadow-card ${compact ? "" : "mt-5"}`}>
-      {!configured && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">Supabaseの接続設定後、ログインすると投稿できます。この画面での一時保存は行いません。</p>}
-      <fieldset disabled={busy || Boolean(pending) || !configured} className="min-w-0 disabled:opacity-60">
+      {preview.active ? <p role="status" className="mb-3 text-xs leading-5 text-ink/70">プレビューモード：写真と思い出はこのタブ内だけに保存されます。</p> : !configured && <p role="status" className="mb-3 text-xs leading-5 text-ink/70">メニューからプレビューをオンにすると、Supabaseなしで投稿を試せます。</p>}
+      <fieldset disabled={busy || Boolean(pending) || (!configured && !preview.active)} className="min-w-0 disabled:opacity-60">
       <div className="mb-2 flex items-center gap-2 px-1 pb-1">
         <Sprout size={21} className="text-coral" strokeWidth={1.7} />
         <p className="font-sans text-base tracking-[0.08em] text-ink">今日の思い出を残す</p>

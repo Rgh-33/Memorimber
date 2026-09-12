@@ -124,7 +124,8 @@ export function AppHeader() {
               <button
                 type="button"
                 onClick={() => {
-                  resetDemo();
+                  if (tree.preview) tree.reset();
+                  else resetDemo();
                   setMenuOpen(false);
                 }}
                 className="app-side-menu-item"
