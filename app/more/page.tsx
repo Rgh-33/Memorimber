@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { ChevronRight, Info, RotateCcw, Settings, Sparkles } from "lucide-react";
 import { useMemories } from "@/lib/memories-context";
+import { useTree } from "@/lib/tree-context";
 
 export default function MorePage() {
+  const tree = useTree();
   const { resetDemo } = useMemories();
 
   return (
@@ -21,7 +23,7 @@ export default function MorePage() {
       <div className="mt-5 overflow-hidden rounded-xl border border-line bg-ivory">
         <Link href="/post" className="flex items-center justify-between border-b border-line p-4"><span className="flex items-center gap-3 text-sm font-medium"><Sparkles size={18} className="text-coral" /> 新しい思い出を残す</span><ChevronRight size={17} className="text-ink/35" /></Link>
         <div className="flex items-center justify-between border-b border-line p-4"><span className="flex items-center gap-3 text-sm font-medium"><Info size={18} className="text-coral" /> このプロトタイプについて</span><span className="text-[11px] text-ink/40">デモ版</span></div>
-        <button type="button" onClick={resetDemo} className="flex w-full items-center justify-between border-b border-line p-4 text-left"><span className="flex items-center gap-3 text-sm font-medium"><RotateCcw size={18} className="text-coral" /> デモデータを初期化</span><span className="text-[11px] text-ink/40">一時状態のみ</span></button>
+        <button type="button" onClick={() => tree.preview ? tree.reset() : resetDemo()} className="flex w-full items-center justify-between border-b border-line p-4 text-left"><span className="flex items-center gap-3 text-sm font-medium"><RotateCcw size={18} className="text-coral" /> デモデータを初期化</span><span className="text-[11px] text-ink/40">一時状態のみ</span></button>
         <Link href="/settings" className="flex items-center justify-between p-4"><span className="flex items-center gap-3 text-sm font-medium"><Settings size={18} className="text-coral" /> 設定</span><ChevronRight size={17} className="text-ink/35" /></Link>
       </div>
     </div>

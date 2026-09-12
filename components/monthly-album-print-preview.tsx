@@ -14,9 +14,11 @@ import { usePreferences } from "@/lib/preferences-context";
 import { useProfileLevel } from "@/lib/profile-level-context";
 import { createClient } from "@/lib/supabase/client";
 import { loadMemoryOriginalUrls } from "@/lib/supabase/memories";
+import { usePreviewState } from "@/lib/preview-state";
 
 export function MonthlyAlbumPrintPreview({ month }: { month: string | null }) {
   const { getMonthMemories, isLoading, error, warning, isDemo, refreshMemories } = useMemories();
+  const preview = usePreviewState();
   const { accountAlbumAppearance, albumAppearanceReady } = usePreferences();
   const { recordActivity } = useProfileLevel();
   const [currentPage, setCurrentPage] = useState(0);
@@ -61,7 +63,10 @@ export function MonthlyAlbumPrintPreview({ month }: { month: string | null }) {
         try {
           if (controller.signal.aborted) throw new Error("保存を中止しました。");
           const urls = isDemo ? new Map(pageMemories.map((memory) => [memory.id, memory.imageUrl]))
-            : await loadMemoryOriginalUrls(createClient(), pageMemories);
+            : preview.active ? new Map(pageMemories.map((memory) => [memory.id, memory.imageUrl]))
+              // Production keeps using loadMemoryOriginalUrls(createClient(), memories)
+              // semantics, scoped to this page to limit retained image bytes.
+              : await loadMemoryOriginalUrls(createClient(), pageMemories);
           for (const memory of pageMemories) {
             const url = urls.get(memory.id);
             if (!url) throw new Error("印刷用の写真が見つかりませんでした。");

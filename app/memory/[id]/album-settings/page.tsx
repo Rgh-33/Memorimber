@@ -25,16 +25,17 @@ export default function MemoryAlbumSettingsPage() {
   const tree = useTree();
   const cachedMemory = getMemory(params.id);
   const [loadedMemory, setLoadedMemory] = useState<Memory | null>(null);
-  const [memoryLoading, setMemoryLoading] = useState(!isDemo);
+  const localPreview = tree.preview;
+  const [memoryLoading, setMemoryLoading] = useState(!isDemo && !localPreview);
   const [memoryError, setMemoryError] = useState<string | null>(null);
-  const memory = isDemo ? cachedMemory : loadedMemory ?? undefined;
+  const memory = isDemo || localPreview ? cachedMemory : loadedMemory ?? undefined;
   const [individualAppearance, setIndividualAppearance] = useState<AlbumAppearance | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const inheritedAppearanceUnavailable = !memory?.albumAppearance && !albumAppearanceReady;
 
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || localPreview) { setMemoryLoading(false); return; }
     let active = true;
     setMemoryLoading(true);
     setMemoryError(null);
@@ -50,7 +51,7 @@ export default function MemoryAlbumSettingsPage() {
       if (active) setMemoryLoading(false);
     });
     return () => { active = false; };
-  }, [isDemo, params.id]);
+  }, [isDemo, localPreview, params.id]);
 
   useEffect(() => {
     setIndividualAppearance(memory?.albumAppearance ?? null);
@@ -63,6 +64,11 @@ export default function MemoryAlbumSettingsPage() {
     setSaving(true);
     setSaveError(null);
     try {
+      if (localPreview) {
+        updateCachedMemory({ ...memory, albumAppearance: next });
+        setSaving(false);
+        return;
+      }
       const saved = await updateMemoryAlbumAppearance(createClient(), memory.id, next);
       setIndividualAppearance(saved);
       setLoadedMemory((current) => current ? { ...current, albumAppearance: saved } : current);
@@ -85,10 +91,10 @@ export default function MemoryAlbumSettingsPage() {
         <p className="mt-2 text-xs leading-6 text-ink/50">今見ている思い出で、印刷の仕上がりを試せます。</p>
       </section>
 
-      {(isDemo ? isLoading : memoryLoading) && !memory ? (
+      {(isDemo || localPreview ? isLoading : memoryLoading) && !memory ? (
         <p role="status" className="mt-12 text-center text-sm text-ink/55">思い出を読み込んでいます…</p>
-      ) : (isDemo ? error : memoryError) && !memory ? (
-        <p role="alert" className="mt-12 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{isDemo ? error : memoryError}</p>
+      ) : (isDemo || localPreview ? error : memoryError) && !memory ? (
+        <p role="alert" className="mt-12 rounded-xl border border-line p-4 text-sm leading-6 text-ink">{isDemo || localPreview ? error : memoryError}</p>
       ) : memory ? (
         <AlbumSettingsPanel
           memory={memory}

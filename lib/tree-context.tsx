@@ -12,6 +12,7 @@ import { advanceDate, applyUploadPresentation, buildPersistedPetals, buildPersis
 import { getTreeVisibleCount, placeTreeItems, TREE_NODE_CAPACITY } from "./tree-branches";
 import type { Memory } from "./types";
 import { EMPTY_MEMORY_RECALL_STATE, readMemoryRecallState, recordMemoryReview, type MemoryRecallState } from "./memory-recall";
+import { usePreviewState } from "./preview-state";
 
 type TreeState = { preview: boolean; date: string; uploads: Memory[]; previewHarvests: Harvests; previewRecall: MemoryRecallState; previewGoldenIds: string[]; serial: number; slots: Record<string, (string | null)[]> };
 const TREE_ARRIVAL_STORAGE_KEY = "memorimber-pending-tree-arrival-v1";
@@ -46,6 +47,7 @@ function readState(raw: string | null, preview: boolean): TreeState {
 
 function useTreeState() {
   const { memories, isDemo, isLoading } = useMemories();
+  const previewState = usePreviewState();
   const { treeMode, preferencesReady } = usePreferences();
   const [now, setNow] = useState(() => Date.now());
   // SSR and the first browser render must not depend on environment-derived
@@ -121,29 +123,30 @@ function useTreeState() {
     void refreshFruits();
   }, [isDemo, isLoading, refreshFruits]);
 
-  const date = state.preview ? state.date : tokyoDate(new Date(now));
-  const source = state.preview ? state.uploads : memories;
+  const preview = previewState.active;
+  const date = preview ? previewState.currentDate : tokyoDate(new Date(now));
+  const source = preview ? previewState.memories : memories;
   const ready = preferencesReady && loadedKey === storageKey && !isLoading
-    && (state.preview || isDemo || (!fruitsLoading && !fruitError));
+    && (preview || isDemo || (!fruitsLoading && !fruitError));
   const items = useMemo(() => {
     if (!ready) return [];
-    const rawItems = state.preview
+    const rawItems = preview
       ? buildTreeItems(source, date, state.previewHarvests, new Set(state.previewGoldenIds))
       : buildPersistedTreeItems(source, date, fruits);
     return applyUploadPresentation(rawItems, arrivingUploadId);
-  }, [ready, state.preview, state.previewHarvests, state.previewGoldenIds, source, date, fruits, arrivingUploadId]);
+  }, [ready, preview, state.previewHarvests, state.previewGoldenIds, source, date, fruits, arrivingUploadId]);
   const petals = useMemo(() => {
     if (!ready) return [];
-    return state.preview
+    return preview
       ? buildPetals(source, date, state.previewHarvests)
       : buildPersistedPetals(source, date, fruits, now);
-  }, [ready, state.preview, state.previewHarvests, source, date, fruits, now]);
+  }, [ready, preview, state.previewHarvests, source, date, fruits, now]);
   const totalCount = ready ? monthlyQueue(source, date).length : 0;
   const count = getTreeVisibleCount(totalCount, treeMode);
   const harvestWordFor = useCallback((memoryId: string) => (
     getHarvestWordForMemory(memoryId, state.previewHarvests, fruits)
   ), [fruits, state.previewHarvests]);
-  const legacySlotKey = `${state.preview ? "preview" : "real"}:${date.slice(0, 7)}`;
+  const legacySlotKey = `${preview ? "preview" : "real"}:${date.slice(0, 7)}`;
   const slotKey = `${legacySlotKey}:${treeMode}`;
   const storedSlots = state.slots[slotKey] ?? state.slots[legacySlotKey];
   const placement = useMemo(() => placeTreeItems(
@@ -175,22 +178,22 @@ function useTreeState() {
   }, []);
 
   const uploadPreview = (forceGolden = false) => {
-    const serial = state.serial + 1;
+    const serial = previewState.serial + 1;
     const sample = SAMPLE_MEMORIES[(serial - 1) % SAMPLE_MEMORIES.length];
-    const lastUploadTime = Math.max(0, ...state.uploads.filter((entry) => entry.createdAt?.slice(0, 10) === state.date)
+    const lastUploadTime = Math.max(0, ...source.filter((entry) => entry.createdAt?.slice(0, 10) === date)
       .map((entry) => Date.parse(entry.createdAt!)));
-    const time = Math.max(new Date(`${state.date}T12:00:00`).getTime(), lastUploadTime + 1);
-    const createdAt = `${state.date}T${new Date(time).toTimeString().slice(0, 8)}.${String(time % 1000).padStart(3, "0")}`;
-    const memory = { ...sample, id: `konoha-preview-${String(serial).padStart(8, "0")}`, date: state.date, createdAt };
-    const uploads = [...state.uploads, memory];
+    const time = Math.max(new Date(`${date}T12:00:00`).getTime(), lastUploadTime + 1);
+    const createdAt = `${date}T${new Date(time).toTimeString().slice(0, 8)}.${String(time % 1000).padStart(3, "0")}`;
+    const memory = previewState.addMemory({ ...sample, date, createdAt });
+    const uploads = [...source, memory];
     const newlyGoldenId = forceGolden
-      ? buildTreeItems(uploads, state.date, state.previewHarvests)
+      ? buildTreeItems(uploads, date, state.previewHarvests)
         .find((item) => item.stage === "quiz-ready" && item.newlyRipened)?.id
       : undefined;
     const previewGoldenIds = newlyGoldenId && !state.previewGoldenIds.includes(newlyGoldenId)
       ? [...state.previewGoldenIds, newlyGoldenId]
       : state.previewGoldenIds;
-    setState({ ...state, preview: true, serial, uploads, previewGoldenIds });
+    setState((current) => ({ ...current, previewGoldenIds }));
     queueUploadArrival(memory.id);
   };
 
@@ -202,28 +205,27 @@ function useTreeState() {
   }, []);
 
   return {
-    ready, error: state.preview ? null : fruitError, refresh: refreshFruits,
-    date, preview: state.preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source,
+    ready, error: preview ? null : fruitError, refresh: refreshFruits,
+    date, preview, treeMode, items, visibleItems: placement.visibleItems, petals, memories: source,
     count, totalCount, harvestWordFor,
     previewRecall: state.previewRecall, rememberPreviewMemory,
     arrivingUploadId,
     queueUploadArrival,
     completeUploadArrival,
-    setPreview: (preview: boolean) => setState((current) => ({ ...current, preview })),
+    setPreview: previewState.setActive,
     setDate: (next: string) => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) setState((current) => ({ ...current, preview: true, date: next }));
+      if (/^\d{4}-\d{2}-\d{2}$/.test(next) && Number.isFinite(Date.parse(next))) previewState.setCurrentDate(next);
     },
-    advance: (days: number, months = 0) => setState((current) => ({ ...current, preview: true, date: advanceDate(current.date, days, months) })),
+    advance: (days: number, months = 0) => previewState.setCurrentDate(advanceDate(date, days, months)),
     upload: () => uploadPreview(),
     uploadGolden: () => uploadPreview(true),
-    reset: () => setState((current) => ({ ...emptyState(true),
-      slots: Object.fromEntries(Object.entries(current.slots).filter(([key]) => key.startsWith("real:"))) })),
+    reset: () => { previewState.reset(); setState((current) => ({ ...emptyState(true), slots: Object.fromEntries(Object.entries(current.slots).filter(([key]) => key.startsWith("real:"))) })); },
     harvest: async (id: string, word: string) => {
       if (!ready || !placement.visibleItems.some((item) => item.id === id && item.stage === "quiz-ready")
         || !word.trim() || [...word.trim()].length > 12) return false;
-      if (state.preview) {
+      if (preview) {
         setState((current) => ({ ...current,
-          previewHarvests: recordHarvest(current.uploads, current.date, current.previewHarvests, id, word) }));
+          previewHarvests: recordHarvest(source, date, current.previewHarvests, id, word) }));
         return true;
       }
       const harvested = await completeMemoryHarvest(createClient(), id, word);

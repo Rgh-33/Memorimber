@@ -13,6 +13,7 @@ import { TreeProvider } from "@/lib/tree-context";
 import { HarvestProvider } from "@/lib/harvest-context";
 import { NotificationsProvider } from "@/lib/notifications-context";
 import { PwaThemeMetadata } from "@/components/pwa-theme-metadata";
+import { PreviewProvider } from "@/lib/preview-state";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const publicPage = isPublicAuthPath(usePathname());
@@ -29,7 +30,7 @@ function PrivateProviders({ children }: { children: React.ReactNode }) {
         <ProcessingProvider>
           <NotificationsProvider>
             <ProfileProvider>
-              <MemoriesProvider><ProfileLevelProvider><TreeProvider><HarvestProvider>{children}</HarvestProvider></TreeProvider></ProfileLevelProvider></MemoriesProvider>
+              <PreviewProvider><MemoriesProvider><ProfileLevelProvider><TreeProvider><HarvestProvider>{children}</HarvestProvider></TreeProvider></ProfileLevelProvider></MemoriesProvider></PreviewProvider>
             </ProfileProvider>
           </NotificationsProvider>
         </ProcessingProvider>
