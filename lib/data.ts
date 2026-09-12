@@ -1,13 +1,14 @@
 import { AlbumMonth, Memory, QuizQuestion } from "./types";
 
-const photo = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1000&q=85`;
+// Bundle demo artwork so sample memories remain visible without network access.
+// Keeping distinct files also makes albums and photo quizzes easy to tell apart.
+const photo = (name: string) => `/images/demo/${name}.svg`;
 
 export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-ice-cream",
     date: "2026-08-12",
-    imageUrl: photo("photo-1511632765486-a01980e01a18"),
+    imageUrl: photo("ice-cream"),
     caption: "帰り道、みんなでアイスを食べた",
     people: ["友達"],
     tags: ["放課後", "8月"],
@@ -16,7 +17,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-classroom",
     date: "2026-08-10",
-    imageUrl: photo("photo-1523240795612-9a054b0db644"),
+    imageUrl: photo("classroom"),
     caption: "放課後の教室、他愛ない話でずっと笑った。",
     people: ["クラスのみんな"],
     tags: ["放課後", "教室"],
@@ -24,7 +25,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-sports",
     date: "2026-08-08",
-    imageUrl: photo("photo-1516627145497-ae6968895b74"),
+    imageUrl: photo("sports"),
     caption: "体育祭の練習で、少しだけ息が合った。",
     people: ["クラスのみんな"],
     tags: ["体育祭", "8月"],
@@ -32,7 +33,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-sunset",
     date: "2026-08-05",
-    imageUrl: photo("photo-1500534623283-312aade485b7"),
+    imageUrl: photo("sunset"),
     caption: "夕焼けがきれいだったから、いつもの道を撮った。",
     people: [],
     tags: ["帰り道", "8月"],
@@ -40,7 +41,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-lunch",
     date: "2026-08-02",
-    imageUrl: photo("photo-1492684223066-81342ee5ff30"),
+    imageUrl: photo("lunch"),
     caption: "お昼休みに見つけた、夏っぽい色。",
     people: ["友達"],
     tags: ["昼休み", "8月"],
@@ -48,7 +49,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-july-rain",
     date: "2026-07-24",
-    imageUrl: photo("photo-1504306665891-9f6e5d8b5d0a"),
+    imageUrl: photo("rain"),
     caption: "雨の日は、廊下の音まで覚えている。",
     people: [],
     tags: ["雨", "7月"],
@@ -56,7 +57,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-july-cafe",
     date: "2026-07-18",
-    imageUrl: photo("photo-1517248135467-4c7edcad34c4"),
+    imageUrl: photo("cafe"),
     caption: "テスト終わりの寄り道は、いつもより甘い。",
     people: ["友達"],
     tags: ["テスト", "7月"],
@@ -64,7 +65,7 @@ export const SAMPLE_MEMORIES: Memory[] = [
   {
     id: "memory-june-sky",
     date: "2026-06-30",
-    imageUrl: photo("photo-1490730141103-6cac27aaab94"),
+    imageUrl: photo("sky"),
     caption: "新しいクラスにも、少し慣れてきた。",
     people: ["クラスのみんな"],
     tags: ["空", "6月"],

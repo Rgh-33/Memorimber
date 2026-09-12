@@ -187,7 +187,7 @@ function useTreeState() {
     const memory = previewState.addMemory({ ...sample, date, createdAt });
     const uploads = [...source, memory];
     const newlyGoldenId = forceGolden
-      ? buildTreeItems(uploads, state.date, state.previewHarvests)
+      ? buildTreeItems(uploads, date, state.previewHarvests)
         .find((item) => item.stage === "quiz-ready" && item.newlyRipened)?.id
       : undefined;
     const previewGoldenIds = newlyGoldenId && !state.previewGoldenIds.includes(newlyGoldenId)

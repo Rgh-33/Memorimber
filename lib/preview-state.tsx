@@ -43,6 +43,10 @@ function freshState(active = false): PreviewState {
   return { active, currentDate, memories: initialMemories(currentDate), serial: 0 };
 }
 
+function clearedState(active: boolean): PreviewState {
+  return { active, currentDate: localDate(), memories: [], serial: 0 };
+}
+
 function restore(): PreviewState {
   const fallback = freshState(false);
   try {
@@ -52,7 +56,9 @@ function restore(): PreviewState {
     const memories = value.memories.filter((memory): memory is Memory => Boolean(memory && typeof memory.id === "string"
       && typeof memory.date === "string" && typeof memory.imageUrl === "string" && typeof memory.caption === "string"
       && Array.isArray(memory.people) && Array.isArray(memory.tags)));
-    return { active: value.active, currentDate: value.currentDate, memories: memories.length ? memories : initialMemories(value.currentDate), serial: Number.isSafeInteger(value.serial) ? value.serial! : 0 };
+    // An empty list is intentional after the user resets the preview. Do not
+    // silently restore the sample photos on the next navigation or reload.
+    return { active: value.active, currentDate: value.currentDate, memories, serial: Number.isSafeInteger(value.serial) ? value.serial! : 0 };
   } catch { return fallback; }
 }
 
@@ -90,7 +96,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     addMemory,
     updateMemory: (memory) => setState((current) => ({ ...current, memories: current.memories.map((item) => item.id === memory.id ? memory : item) })),
     removeMemory: (id) => setState((current) => ({ ...current, memories: current.memories.filter((item) => item.id !== id) })),
-    reset: () => setState((current) => freshState(current.active)),
+    reset: () => setState((current) => clearedState(current.active)),
   }), [addMemory, ready, state]);
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }
