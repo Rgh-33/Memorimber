@@ -1,15 +1,15 @@
 import Link from "next/link";
-import { ChevronRight, CircleHelp, Images, ImagePlus, MoreHorizontal, Music2, Palette, TreePine } from "lucide-react";
+import { Bell, ChevronRight, CircleHelp, Images, ImagePlus, Music2, Palette, TreePine } from "lucide-react";
 import { SettingsHeader } from "@/components/settings-header";
 
 const settingsSections = [
   { href: "/settings/style", label: "スタイル", description: "明るさとテーマカラーを変更", icon: Palette },
   { href: "/settings/sound", label: "サウンド", description: "BGMと効果音の音量", icon: Music2 },
+  { href: "/settings/notifications", label: "通知", description: "思い出の通知・受信設定", icon: Bell },
   { href: "/settings/tree", label: "木", description: "思い出の木の設定", icon: TreePine },
   { href: "/settings/album", label: "アルバム", description: "フォント・レイアウト・色・模様", icon: Images },
   { href: "/settings/quiz", label: "クイズ", description: "クイズの設定", icon: CircleHelp },
   { href: "/settings/post", label: "写真の追加", description: "投稿画面の設定", icon: ImagePlus },
-  { href: "/settings/more", label: "その他", description: "その他の設定", icon: MoreHorizontal },
 ] as const;
 
 export default function SettingsPage() {

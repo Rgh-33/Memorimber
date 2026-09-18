@@ -4,12 +4,13 @@ import type { MemoryFruits } from "./supabase/memory-fruits";
 import { buildPersistedTreeItems } from "./tree-growth.ts";
 import { reminderPayload, selectMemoryReminder } from "./memory-reminders.ts";
 import { parsePushSubscription, type SavedPushSubscription } from "./push-subscription.ts";
+import { parseNotificationPreferences, receivesRemindersOn } from "./notification-preferences.ts";
 
-type SubscriptionRow = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+type SubscriptionRow = { id: string; user_id: string };
 export type PushSender = (subscription: SavedPushSubscription, payload: string) => Promise<unknown>;
 
 export async function deliverUserReminder(client: SupabaseClient, userId: string, date: string, subscriptions: SubscriptionRow[], send: PushSender) {
-  // Idempotency guard also avoids reloading private data on a retry.
+  // Honor legacy user/day claims when rolling out per-device delivery records.
   const previous = await client.from("memory_notification_deliveries").select("user_id").eq("user_id", userId).eq("notification_date", date).maybeSingle();
   if (previous.error) throw previous.error;
   if (previous.data) return "skipped";
@@ -31,41 +32,62 @@ export async function deliverUserReminder(client: SupabaseClient, userId: string
     }
     if (rows.length < 500) break;
   }
-  const reminder = selectMemoryReminder(userId, date, memories, buildPersistedTreeItems(memories, date, fruits));
-  if (!reminder) return "empty";
-  const claim = await client.from("memory_notification_deliveries").insert({
-    user_id: userId, notification_date: date, notification_type: reminder.type, candidate_id: reminder.candidateId,
-  });
-  if (claim.error?.code === "23505") return "skipped";
-  if (claim.error) throw claim.error;
-
-  let sent = false;
+  const items = buildPersistedTreeItems(memories, date, fruits);
+  const outcomes: ("sent" | "failed" | "skipped" | "empty")[] = [];
   for (const row of subscriptions) {
-    // Re-check existence immediately before sending, to honor logout/deletion.
-    const active = await client.from("push_subscriptions").select("id").eq("id", row.id).eq("user_id", userId).maybeSingle();
-    if (active.error || !active.data) continue;
-    const subscription = parsePushSubscription({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } });
-    if (!subscription) continue;
     try {
-      await send(subscription, JSON.stringify(reminderPayload(reminder)));
-      sent = true;
-    } catch (cause) {
-      const status = cause && typeof cause === "object" && "statusCode" in cause ? cause.statusCode : null;
-      if (status === 404 || status === 410) {
-        await client.from("push_subscriptions").delete().eq("id", row.id).eq("user_id", userId);
+      // Read fresh per-device settings so a change after the initial scan is honored.
+      const active = await client.from("push_subscriptions").select("endpoint,p256dh,auth,harvest_enabled,anniversary_enabled,weekdays")
+        .eq("id", row.id).eq("user_id", userId).maybeSingle();
+      if (active.error) throw active.error;
+      if (!active.data) { outcomes.push("skipped"); continue; }
+      const preferences = parseNotificationPreferences(active.data);
+      if (!preferences) throw new Error("Invalid notification preferences");
+      if (!receivesRemindersOn(preferences, date)) { outcomes.push("skipped"); continue; }
+      const reminder = selectMemoryReminder(userId, date, memories, items, preferences);
+      if (!reminder) { outcomes.push("empty"); continue; }
+      const subscription = parsePushSubscription({ endpoint: active.data.endpoint, keys: { p256dh: active.data.p256dh, auth: active.data.auth } });
+      if (!subscription) throw new Error("Invalid push subscription");
+      const claim = await client.from("push_notification_deliveries").insert({
+        subscription_id: row.id, user_id: userId, notification_date: date,
+        notification_type: reminder.type, candidate_id: reminder.candidateId,
+      });
+      if (claim.error?.code === "23505") { outcomes.push("skipped"); continue; }
+      if (claim.error) throw claim.error;
+      // Re-check immediately before sending, to honor logout/deletion.
+      const present = await client.from("push_subscriptions").select("id").eq("id", row.id).eq("user_id", userId).maybeSingle();
+      if (present.error) throw present.error;
+      if (!present.data) { outcomes.push("skipped"); continue; }
+      let sent = false;
+      try {
+        await send(subscription, JSON.stringify(reminderPayload(reminder)));
+        sent = true;
+      } catch (cause) {
+        const status = cause && typeof cause === "object" && "statusCode" in cause ? cause.statusCode : null;
+        if (status === 404 || status === 410) {
+          const removed = await client.from("push_subscriptions").delete().eq("id", row.id).eq("user_id", userId);
+          if (removed.error) throw removed.error;
+        }
+        // Do not log endpoints, keys, payloads, or upstream error objects.
       }
-      // Do not log endpoints, keys, payloads, or upstream error objects.
+      const completed = await client.from("push_notification_deliveries")
+        .update({ status: sent ? "sent" : "failed", sent_at: sent ? new Date().toISOString() : null })
+        .eq("subscription_id", row.id).eq("notification_date", date);
+      if (completed.error) throw completed.error;
+      outcomes.push(sent ? "sent" : "failed");
+    } catch {
+      outcomes.push("failed");
     }
   }
-  const completed = await client.from("memory_notification_deliveries").update({ status: sent ? "sent" : "failed", sent_at: sent ? new Date().toISOString() : null }).eq("user_id", userId).eq("notification_date", date);
-  if (completed.error) throw completed.error;
-  return sent ? "sent" : "failed";
+  // Preserve the existing cron response: these counts describe users, not devices.
+  return outcomes.includes("sent") ? "sent" : outcomes.includes("failed") ? "failed"
+    : outcomes.includes("empty") ? "empty" : "skipped";
 }
 
 export async function runMemoryReminders(client: SupabaseClient, date: string, send: PushSender) {
   const subscriptions: SubscriptionRow[] = [];
   for (let offset = 0; ; offset += 500) {
-    const result = await client.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").order("id").range(offset, offset + 499);
+    const result = await client.from("push_subscriptions").select("id,user_id").order("id").range(offset, offset + 499);
     if (result.error) throw result.error;
     subscriptions.push(...(result.data ?? []));
     if ((result.data ?? []).length < 500) break;

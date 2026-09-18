@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { enableMemoryPush, disableMemoryPush, showPreviewReminder, unsubscribeLocalPush } from "../lib/push-client.ts";
+import { enableMemoryPush, disableMemoryPush, showPreviewReminder, unsubscribeLocalPush, removeCurrentPushForLogout } from "../lib/push-client.ts";
 
-function browser(t, { permission="default", failSave=false, failDelete=false }={}) {
+function browser(t, { permission="default", failSave=false, failDelete=false, status=503, failRead=false }={}) {
   const calls=[]; let current=null;
   const sub={endpoint:"https://fcm.googleapis.com/test",toJSON:()=>({endpoint:"https://fcm.googleapis.com/test",keys:{p256dh:"public",auth:"auth"}}),unsubscribe:async()=>{calls.push("unsubscribe");current=null;return true;}};
-  const registration={active:{},pushManager:{getSubscription:async()=>current,subscribe:async options=>{assert.equal(options.userVisibleOnly,true);calls.push("subscribe");current=sub;return sub;}},showNotification:async()=>calls.push("show"),getNotifications:async()=>[{close:()=>calls.push("close")}]};
+  const registration={active:{},pushManager:{getSubscription:async()=>{if(failRead)throw new Error("read failed");return current;},subscribe:async options=>{assert.equal(options.userVisibleOnly,true);calls.push("subscribe");current=sub;return sub;}},showNotification:async()=>calls.push("show"),getNotifications:async()=>[{close:()=>calls.push("close")}]};
   const notification={permission,requestPermission:async()=>{calls.push("permission");notification.permission="granted";return "granted";}};
   const replacements={window:{isSecureContext:true,Notification:notification},Notification:notification,navigator:{serviceWorker:{register:async()=>{calls.push("register");return registration;},getRegistration:async()=>registration}},fetch:async(url,options)=>{
     calls.push(options.method);assert.equal(url,"/api/push-subscriptions");
     const fail=options.method==="POST"?failSave:failDelete;
-    return {ok:!fail,json:async()=>fail?{error:"save failed"}:{ok:true}};
+    return {ok:!fail,status:fail?status:200,json:async()=>fail?{error:"save failed"}:{ok:true}};
   }};
   for(const [key,value] of Object.entries(replacements)) {
     const old=Object.getOwnPropertyDescriptor(globalThis,key);
@@ -36,10 +36,10 @@ test("failed persistence rolls back a newly created local subscription",async t=
   await assert.rejects(()=>enableMemoryPush("BAAA"),/save failed/);
   assert.equal(calls.at(-1),"unsubscribe");
 });
-test("failed server delete still unsubscribes the device",async t=>{
+test("failed server delete retains the local endpoint for retry",async t=>{
   const {calls,setCurrent}=browser(t,{failDelete:true});setCurrent();
   await assert.rejects(()=>disableMemoryPush(),/save failed/);
-  assert.ok(calls.includes("unsubscribe"));
+  assert.ok(!calls.includes("unsubscribe"));
 });
 test("preview notification needs no subscription or API writes",async t=>{
   const {calls}=browser(t);
@@ -50,4 +50,31 @@ test("logout clears local subscriptions and already displayed notifications",asy
   const {calls,setCurrent}=browser(t);setCurrent();
   await unsubscribeLocalPush();
   assert.deepEqual(calls,["unsubscribe","close"]);
+});
+
+test("logout removes only the current endpoint before local unsubscribe", async t => {
+  const { calls, setCurrent } = browser(t); setCurrent();
+  const endpoint = await removeCurrentPushForLogout();
+  assert.equal(endpoint, "https://fcm.googleapis.com/test");
+  assert.deepEqual(calls, ["DELETE", "unsubscribe", "close"]);
+});
+
+test("logout aborts on server removal failure and can retry using the same subscription", async t => {
+  const { calls, setCurrent } = browser(t, { failDelete: true }); setCurrent();
+  await assert.rejects(() => removeCurrentPushForLogout(), /save failed/);
+  assert.deepEqual(calls, ["DELETE"]);
+  await assert.rejects(() => removeCurrentPushForLogout(), /save failed/);
+  assert.deepEqual(calls, ["DELETE", "DELETE"]);
+});
+
+test("expired login still unsubscribes locally so logout can finish", async t => {
+  const { calls, setCurrent } = browser(t, { failDelete: true, status: 401 }); setCurrent();
+  assert.equal(await removeCurrentPushForLogout(), "https://fcm.googleapis.com/test");
+  assert.deepEqual(calls, ["DELETE", "unsubscribe", "close"]);
+});
+
+test("failure to read the current device never falls back to deleting all devices", async t => {
+  const { calls } = browser(t, { failRead: true });
+  await assert.rejects(() => removeCurrentPushForLogout(), /read failed/);
+  assert.deepEqual(calls, []);
 });
