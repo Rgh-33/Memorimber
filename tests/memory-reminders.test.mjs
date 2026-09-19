@@ -85,10 +85,14 @@ test("concurrent cron and same-day retries claim a single notification", async (
   assert.equal(tables.push_notification_deliveries[0].status,"sent");
   assert.ok(queries.some(([table,key,value]) => table === "memories" && key === "user_id" && value === "u"));
 });
-test("no candidate writes no delivery; another user's memory is never a candidate", async () => {
+test("another user's memory is never included in the daily fallback", async () => {
   const { client,tables } = database({ memories: [{ id:"other",user_id:"other",memory_date:"2025-09-11" }] });
-  assert.equal(await deliverUserReminder(client,"u",date,[subscription("s")],async () => assert.fail("no send")),"empty");
-  assert.equal(tables.push_notification_deliveries.length,0);
+  const received = [];
+  assert.equal(await deliverUserReminder(client,"u",date,[subscription("s")],async (_, payload) => received.push(JSON.parse(payload))),"sent");
+  assert.deepEqual(received, [{ title: "メモリンバー", body: "思い出を振り返る時間です。思い出の木を開いてみませんか？", href: "/" }]);
+  assert.equal(tables.push_notification_deliveries.length,1);
+  assert.equal(tables.push_notification_deliveries[0].notification_type,"daily");
+  assert.equal(tables.push_notification_deliveries[0].candidate_id,null);
 });
 test("404/410 removes only expired subscriptions; temporary errors do not block peers or retry", async () => {
   const subscriptions = [subscription("gone"),subscription("missing"),subscription("temporary"),subscription("ok"),subscription("peer","v")];
@@ -252,4 +256,67 @@ test("test expiry removes only that device while transient failures retain regis
     assert.equal(tables.push_subscriptions.length, statusCode === 503 ? 2 : 1);
     assert.ok(tables.push_subscriptions.some(row => row.id === "peer"));
   }
+});
+
+test("zero memories sends daily only to enabled devices on selected weekdays", async () => {
+  const subscriptions = [
+    subscription("daily"),
+    { ...subscription("paused"), harvest_enabled: false, anniversary_enabled: false },
+    { ...subscription("weekend"), weekdays: [0, 6] },
+    { ...subscription("no-days"), weekdays: [] },
+  ];
+  const { client, tables } = database({ subscriptions, memories: [] });
+  const received = [];
+  await runMemoryReminders(client, date, async (sub, payload) => received.push([sub.endpoint, JSON.parse(payload)]));
+  assert.equal(received.length, 1);
+  assert.equal(received[0][0], subscription("daily").endpoint);
+  assert.equal(received[0][1].href, "/");
+  assert.equal(tables.push_notification_deliveries.length, 1);
+  assert.equal(tables.push_notification_deliveries[0].notification_type, "daily");
+});
+
+test("eligible memories take priority; disabled kinds use daily rather than leaking through", async () => {
+  const subscriptions = [
+    { ...subscription("anniversary"), harvest_enabled: false },
+    { ...subscription("harvest-only"), anniversary_enabled: false },
+  ];
+  const { client, tables } = database({ subscriptions });
+  const received = new Map();
+  await runMemoryReminders(client, date, async (sub, payload) => received.set(sub.endpoint, JSON.parse(payload)));
+  assert.equal(received.get(subscription("anniversary").endpoint).href, "/memory/m");
+  assert.equal(received.get(subscription("harvest-only").endpoint).title, "メモリンバー");
+  assert.deepEqual(tables.push_notification_deliveries.map(row => row.notification_type), ["anniversary", "daily"]);
+});
+
+test("daily fallback claims once across concurrent runs, even when transport fails", async () => {
+  for (const failed of [false, true]) {
+    const { client, tables } = database({ memories: [] });
+    let calls = 0;
+    const send = async () => { calls++; if (failed) throw new Error("timeout"); };
+    await Promise.all([runMemoryReminders(client, date, send), runMemoryReminders(client, date, send)]);
+    await runMemoryReminders(client, date, send);
+    assert.equal(calls, 1);
+    assert.equal(tables.push_notification_deliveries[0].status, failed ? "failed" : "sent");
+    await runMemoryReminders(client, "2026-09-12", send);
+    assert.equal(calls, 2);
+  }
+});
+
+test("legacy history also suppresses daily fallback during migration", async () => {
+  const { client, tables } = database({ memories: [] });
+  tables.memory_notification_deliveries.push({ user_id: "u", notification_date: date, status: "sent" });
+  const result = await runMemoryReminders(client, date, async () => assert.fail("legacy duplicate"));
+  assert.equal(result.skipped, 1);
+  assert.equal(tables.push_notification_deliveries.length, 0);
+});
+
+test("a failed memory query is not treated as an empty collection", async () => {
+  const { client, tables } = database({ memories: [] });
+  const broken = { from(table) {
+    if (table === "memories") throw new Error("database unavailable");
+    return client.from(table);
+  } };
+  const result = await runMemoryReminders(broken, date, async () => assert.fail("must not send"));
+  assert.equal(result.failed, 1);
+  assert.equal(tables.push_notification_deliveries.length, 0);
 });

@@ -178,7 +178,8 @@ export function MemoryNotificationSettings() {
 
     <section className="settings-card" aria-labelledby="notification-schedule-heading">
       <h2 id="notification-schedule-heading" className="text-base font-semibold">届く時間について</h2>
-      <p className="mt-2 text-xs leading-6 text-ink/65">選んだ曜日の日本時間20時台に配信予定です。対象となる思い出がある日に、1種類だけお知らせします。対象がない日は届きません。</p>
+      <p className="mt-2 text-xs leading-6 text-ink/65">選んだ曜日の日本時間20時台に、1種類の通知を配信予定です。収穫や過去の思い出がない日も、思い出の木を開くご案内をお届けします。</p>
+      <p className="mt-2 text-xs leading-6 text-ink/65">毎日受け取るには全曜日を選んでください。通知の種類を両方OFFにするか、曜日をすべて外すと、自動通知は届きません。</p>
       <p className="mt-2 text-xs leading-6 text-ink/65">iPhoneではホーム画面に追加したアプリから通知を有効にしてください。届かないときは、端末の通知設定や集中モードも確認してください。</p>
     </section>
   </div>;
