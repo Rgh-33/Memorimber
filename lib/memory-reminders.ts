@@ -2,7 +2,7 @@ import type { Memory } from "./types";
 import type { MemoryTreeItem } from "./tree-data";
 import { defaultNotificationPreferences, type NotificationPreferences } from "./notification-preferences.ts";
 
-export type Reminder = { type: "harvest" | "anniversary"; candidateId: string | null; title: string; body: string; href: string };
+export type Reminder = { type: "harvest" | "anniversary" | "daily"; candidateId: string | null; title: string; body: string; href: string };
 export type ReminderMemory = Pick<Memory, "id" | "date">;
 
 function stableHash(value: string) {
@@ -46,4 +46,12 @@ export function selectMemoryReminder(userId: string, date: string, memories: Rem
 
 export function reminderPayload(reminder: Reminder) {
   return { title: reminder.title, body: reminder.body, href: reminder.href };
+}
+
+// Used only by the scheduled sender, after checking this device's preferences.
+export function dailyReminder(): Reminder {
+  return {
+    type: "daily", candidateId: null, title: "メモリンバー",
+    body: "思い出を振り返る時間です。思い出の木を開いてみませんか？", href: "/",
+  };
 }

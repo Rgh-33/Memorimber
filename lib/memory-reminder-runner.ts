@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Memory } from "./types";
 import type { MemoryFruits } from "./supabase/memory-fruits";
 import { buildPersistedTreeItems } from "./tree-growth.ts";
-import { reminderPayload, selectMemoryReminder } from "./memory-reminders.ts";
+import { dailyReminder, reminderPayload, selectMemoryReminder } from "./memory-reminders.ts";
 import { parsePushSubscription, type SavedPushSubscription } from "./push-subscription.ts";
 import { parseNotificationPreferences, receivesRemindersOn } from "./notification-preferences.ts";
 
@@ -33,7 +33,7 @@ export async function deliverUserReminder(client: SupabaseClient, userId: string
     if (rows.length < 500) break;
   }
   const items = buildPersistedTreeItems(memories, date, fruits);
-  const outcomes: ("sent" | "failed" | "skipped" | "empty")[] = [];
+  const outcomes: ("sent" | "failed" | "skipped")[] = [];
   for (const row of subscriptions) {
     try {
       // Read fresh per-device settings so a change after the initial scan is honored.
@@ -44,8 +44,7 @@ export async function deliverUserReminder(client: SupabaseClient, userId: string
       const preferences = parseNotificationPreferences(active.data);
       if (!preferences) throw new Error("Invalid notification preferences");
       if (!receivesRemindersOn(preferences, date)) { outcomes.push("skipped"); continue; }
-      const reminder = selectMemoryReminder(userId, date, memories, items, preferences);
-      if (!reminder) { outcomes.push("empty"); continue; }
+      const reminder = selectMemoryReminder(userId, date, memories, items, preferences) ?? dailyReminder();
       const subscription = parsePushSubscription({ endpoint: active.data.endpoint, keys: { p256dh: active.data.p256dh, auth: active.data.auth } });
       if (!subscription) throw new Error("Invalid push subscription");
       const claim = await client.from("push_notification_deliveries").insert({
@@ -80,8 +79,7 @@ export async function deliverUserReminder(client: SupabaseClient, userId: string
     }
   }
   // Preserve the existing cron response: these counts describe users, not devices.
-  return outcomes.includes("sent") ? "sent" : outcomes.includes("failed") ? "failed"
-    : outcomes.includes("empty") ? "empty" : "skipped";
+  return outcomes.includes("sent") ? "sent" : outcomes.includes("failed") ? "failed" : "skipped";
 }
 
 export async function runMemoryReminders(client: SupabaseClient, date: string, send: PushSender) {
@@ -94,6 +92,7 @@ export async function runMemoryReminders(client: SupabaseClient, date: string, s
   }
   const groups = new Map<string, SubscriptionRow[]>();
   for (const row of subscriptions) groups.set(row.user_id, [...(groups.get(row.user_id) ?? []), row]);
+  // Keep `empty` in the public response for compatibility; empty candidates now send daily.
   const counts = { sent: 0, skipped: 0, empty: 0, failed: 0 };
   // Bounded concurrency; a slow/broken device must not block other users.
   const queue = [...groups];
