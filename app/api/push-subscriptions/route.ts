@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { parsePushSubscription, validPushEndpoint } from "@/lib/push-subscription";
+import { parseNotificationPreferences } from "@/lib/notification-preferences";
 
 export const dynamic = "force-dynamic";
 
-async function handle(request: Request, mode: "save" | "delete" | "status") {
+async function handle(request: Request, mode: "save" | "delete" | "status" | "preferences") {
   if (request.headers.get("origin") !== new URL(request.url).origin) return Response.json({ error: "Forbidden" }, { status: 403 });
   try {
     const client = await createClient();
@@ -11,7 +12,9 @@ async function handle(request: Request, mode: "save" | "delete" | "status") {
     if (authError || !user) return Response.json({ error: "ログインしてください。" }, { status: 401 });
     const raw = await request.text();
     if (raw.length > 4096) return Response.json({ error: "Invalid subscription" }, { status: 400 });
-    const input = JSON.parse(raw);
+    let input;
+    try { input = JSON.parse(raw); }
+    catch { return Response.json({ error: "Invalid JSON" }, { status: 400 }); }
     if (mode === "save") {
       const subscription = parsePushSubscription(input);
       if (!subscription) return Response.json({ error: "Invalid subscription" }, { status: 400 });
@@ -25,10 +28,19 @@ async function handle(request: Request, mode: "save" | "delete" | "status") {
       if (error) throw error;
     } else {
       if (!validPushEndpoint(input?.endpoint)) return Response.json({ error: "Invalid endpoint" }, { status: 400 });
-      if (mode === "status") {
-        const { data, error } = await client.from("push_subscriptions").select("id").eq("user_id", user.id).eq("endpoint", input.endpoint).maybeSingle();
+      if (mode === "preferences") {
+        const preferences = parseNotificationPreferences(input.preferences);
+        if (!preferences) return Response.json({ error: "通知の種類と曜日を確認してください。" }, { status: 400 });
+        const { data, error } = await client.from("push_subscriptions").update({ ...preferences, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id).eq("endpoint", input.endpoint).select("id").maybeSingle();
         if (error) throw error;
-        return Response.json({ enabled: Boolean(data) }, { headers: { "Cache-Control": "no-store" } });
+        if (!data) return Response.json({ error: "この端末の通知登録がありません。通知を有効にしてください。" }, { status: 404 });
+        return Response.json({ enabled: true, preferences }, { headers: { "Cache-Control": "no-store" } });
+      }
+      if (mode === "status") {
+        const { data, error } = await client.from("push_subscriptions").select("id,harvest_enabled,anniversary_enabled,weekdays").eq("user_id", user.id).eq("endpoint", input.endpoint).maybeSingle();
+        if (error) throw error;
+        return Response.json({ enabled: Boolean(data), preferences: data ? parseNotificationPreferences(data) : null }, { headers: { "Cache-Control": "no-store" } });
       }
       const { error } = await client.from("push_subscriptions").delete().eq("user_id", user.id).eq("endpoint", input.endpoint);
       if (error) throw error;
@@ -42,3 +54,4 @@ async function handle(request: Request, mode: "save" | "delete" | "status") {
 export function POST(request: Request) { return handle(request, "save"); }
 export function DELETE(request: Request) { return handle(request, "delete"); }
 export function PATCH(request: Request) { return handle(request, "status"); }
+export function PUT(request: Request) { return handle(request, "preferences"); }

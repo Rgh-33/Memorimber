@@ -1,4 +1,5 @@
 import type { Reminder } from "./memory-reminders";
+import type { NotificationPreferences } from "./notification-preferences";
 
 export function notificationSupport() {
   return typeof window !== "undefined" && window.isSecureContext && "serviceWorker" in navigator && "Notification" in window;
@@ -23,11 +24,32 @@ export async function requestNotificationPermission() {
     : "通知は許可されませんでした。必要なときにもう一度お試しください。");
 }
 
-export async function pushSubscriptionRequest(method: "POST" | "DELETE" | "PATCH", value: unknown) {
+export async function pushSubscriptionRequest(method: "POST" | "DELETE" | "PATCH" | "PUT", value: unknown) {
   const response = await fetch("/api/push-subscriptions", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error ?? "通知設定を保存できませんでした。");
-  return result as { enabled?: boolean };
+  if (!response.ok) throw Object.assign(new Error(result.error ?? "通知設定を保存できませんでした。"), { status: response.status });
+  return result as { enabled?: boolean; preferences?: NotificationPreferences | null };
+}
+
+export async function getLocalPushSubscription() {
+  if (!("serviceWorker" in navigator)) return null;
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  return registration && "pushManager" in registration ? registration.pushManager.getSubscription() : null;
+}
+
+export async function removeCurrentPushForLogout() {
+  const subscription = await getLocalPushSubscription();
+  const endpoint = subscription?.endpoint ?? null;
+  if (endpoint) {
+    try { await pushSubscriptionRequest("DELETE", { endpoint }); }
+    catch (cause) {
+      // An expired login cannot delete DB rows. Unsubscribe locally before finishing
+      // logout; the push provider will invalidate that endpoint independently.
+      if (!(cause instanceof Error && "status" in cause && cause.status === 401)) throw cause;
+    }
+  }
+  await unsubscribeLocalPush();
+  return endpoint;
 }
 
 export async function unsubscribeLocalPush() {
@@ -47,26 +69,24 @@ export async function enableMemoryPush(publicKey: string) {
   const registration = await registerNotificationWorker();
   const previous = await registration.pushManager.getSubscription();
   if (previous) {
-    if (!await previous.unsubscribe()) throw new Error("以前の通知設定を解除できませんでした。");
     await pushSubscriptionRequest("DELETE", { endpoint: previous.endpoint });
+    if (!await previous.unsubscribe()) throw new Error("以前の通知設定を解除できませんでした。");
   }
   const decoded = atob(publicKey.replace(/-/g, "+").replace(/_/g, "/"));
   const key = Uint8Array.from(decoded, (char) => char.charCodeAt(0));
   const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   try { await pushSubscriptionRequest("POST", subscription.toJSON()); }
   catch (cause) { await subscription.unsubscribe().catch(() => false); throw cause; }
+  return subscription.endpoint;
 }
 
 export async function disableMemoryPush() {
   const registration = await navigator.serviceWorker.getRegistration("/");
   const subscription = await registration?.pushManager.getSubscription();
   if (subscription) {
-    const results = await Promise.allSettled([
-      pushSubscriptionRequest("DELETE", { endpoint: subscription.endpoint }),
-      subscription.unsubscribe(),
-    ]);
-    if (results[0].status === "rejected") throw results[0].reason;
-    if (results[1].status === "rejected" || !results[1].value) throw new Error("定期配信は停止しました。端末の通知解除を再試行してください。");
+    // Keep the endpoint available for retries until the server confirms removal.
+    await pushSubscriptionRequest("DELETE", { endpoint: subscription.endpoint });
+    if (!await subscription.unsubscribe()) throw new Error("定期配信は停止しました。端末の通知解除を再試行してください。");
   }
   (await registration?.getNotifications())?.forEach((notification) => notification.close());
 }

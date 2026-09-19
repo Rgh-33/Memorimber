@@ -3,6 +3,9 @@ import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 /** @param {string} phase @returns {import('next').NextConfig} */
 const nextConfig = (phase) => ({
   reactStrictMode: true,
+  async redirects() {
+    return [{ source: "/settings/more", destination: "/settings/notifications", permanent: true }];
+  },
   async headers() {
     return [{ source: "/sw.js", headers: [
       { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },

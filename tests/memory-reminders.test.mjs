@@ -7,6 +7,9 @@ import { buildPersistedTreeItems, buildTreeItems } from "../lib/tree-growth.ts";
 import { deliverUserReminder, runMemoryReminders } from "../lib/memory-reminder-runner.ts";
 import { parsePushSubscription, validPushEndpoint } from "../lib/push-subscription.ts";
 
+import { defaultNotificationPreferences, parseNotificationPreferences, receivesRemindersOn } from "../lib/notification-preferences.ts";
+import { sendTestPush } from "../lib/push-test.ts";
+
 const date = "2026-09-11";
 const memory = (id, day, createdAt = `${day}T01:00:00Z`) => ({ id, date: day, createdAt, caption: "private caption", imageUrl: "private signed URL", tags: [], people: [] });
 const ready = [{ stage: "quiz-ready" }];
@@ -51,7 +54,7 @@ test("harvest candidates use the same persisted and preview Tree builders", () =
 
 const subscription = (id, user = "u") => ({ id, user_id: user, endpoint: `https://fcm.googleapis.com/fcm/send/${id}`, p256dh: "A".repeat(87), auth: "A".repeat(22) });
 function database({ subscriptions = [subscription("s")], memories = [{ id: "m", user_id: "u", memory_date: "2025-09-11", created_at: "2026-09-01T01:00:00Z" }] } = {}) {
-  const tables = { push_subscriptions: subscriptions, memories, memory_fruits: [], memory_notification_deliveries: [] };
+  const tables = { push_subscriptions: subscriptions.map(row => ({ ...defaultNotificationPreferences(), ...row })), memories, memory_fruits: [], memory_notification_deliveries: [], push_notification_deliveries: [] };
   const queries = [];
   const client = { from(table) {
     const filters = []; let operation = "select"; let value; let start = 0; let end = Infinity; let single = false;
@@ -63,7 +66,7 @@ function database({ subscriptions = [subscription("s")], memories = [{ id: "m", 
       then(resolve, reject) { return Promise.resolve().then(() => {
         const matches = tables[table].filter(row => filters.every(filter => filter(row)));
         if (operation === "insert") {
-          if (tables[table].some(row => row.user_id === value.user_id && row.notification_date === value.notification_date)) return { error: { code: "23505" }, data: null };
+          if (tables[table].some(row => (table === "push_notification_deliveries" ? row.subscription_id === value.subscription_id : row.user_id === value.user_id) && row.notification_date === value.notification_date)) return { error: { code: "23505" }, data: null };
           tables[table].push({ ...value });
         }
         if (operation === "update") matches.forEach(row => Object.assign(row,value));
@@ -78,14 +81,14 @@ test("concurrent cron and same-day retries claim a single notification", async (
   const send = async () => { calls++; };
   await Promise.all([deliverUserReminder(client,"u",date,[subscription("s")],send),deliverUserReminder(client,"u",date,[subscription("s")],send)]);
   await deliverUserReminder(client,"u",date,[subscription("s")],send);
-  assert.equal(calls,1); assert.equal(tables.memory_notification_deliveries.length,1);
-  assert.equal(tables.memory_notification_deliveries[0].status,"sent");
+  assert.equal(calls,1); assert.equal(tables.push_notification_deliveries.length,1);
+  assert.equal(tables.push_notification_deliveries[0].status,"sent");
   assert.ok(queries.some(([table,key,value]) => table === "memories" && key === "user_id" && value === "u"));
 });
 test("no candidate writes no delivery; another user's memory is never a candidate", async () => {
   const { client,tables } = database({ memories: [{ id:"other",user_id:"other",memory_date:"2025-09-11" }] });
   assert.equal(await deliverUserReminder(client,"u",date,[subscription("s")],async () => assert.fail("no send")),"empty");
-  assert.equal(tables.memory_notification_deliveries.length,0);
+  assert.equal(tables.push_notification_deliveries.length,0);
 });
 test("404/410 removes only expired subscriptions; temporary errors do not block peers or retry", async () => {
   const subscriptions = [subscription("gone"),subscription("missing"),subscription("temporary"),subscription("ok"),subscription("peer","v")];
@@ -104,7 +107,7 @@ test("uncertain transport outcomes never get retried that day", async () => {
   const send=async()=>{ calls++; throw new Error("network timeout"); };
   await deliverUserReminder(client,"u",date,[subscription("s")],send);
   await deliverUserReminder(client,"u",date,[subscription("s")],send);
-  assert.equal(calls,1); assert.equal(tables.memory_notification_deliveries[0].status,"failed");
+  assert.equal(calls,1); assert.equal(tables.push_notification_deliveries[0].status,"failed");
 });
 test("subscription validation blocks SSRF, credentials, malformed keys", () => {
   for (const endpoint of ["http://fcm.googleapis.com/a","https://127.0.0.1/a","https://example.com/a","https://fcm.googleapis.com.evil.test/a","https://u@fcm.googleapis.com/a"]) assert.equal(validPushEndpoint(endpoint),false);
@@ -144,4 +147,109 @@ test("notification schema is private, account deletion cascades, cron requires a
   assert.match(sql,/user_id = \(select auth.uid\(\)\)/);
   const route=readFileSync(new URL("../app/api/cron/memory-reminders/route.ts",import.meta.url),"utf8");
   assert.match(route,/!secret \|\| request.headers.get\("authorization"\) !== `Bearer \$\{secret\}`/);
+});
+
+test("preferences reject invalid weekdays and allow an explicit pause", () => {
+  for (const weekdays of [[7], [-1], [1.5], ["1"], [1, 1], null]) {
+    assert.equal(parseNotificationPreferences({ ...defaultNotificationPreferences(), weekdays }), null);
+  }
+  assert.equal(parseNotificationPreferences({ harvest_enabled: "true" }), null);
+  assert.deepEqual(parseNotificationPreferences({ ...defaultNotificationPreferences(), weekdays: [6, 0] }).weekdays, [0, 6]);
+  assert.equal(receivesRemindersOn({ ...defaultNotificationPreferences(), weekdays: [] }, date), false);
+  assert.equal(receivesRemindersOn({ ...defaultNotificationPreferences(), harvest_enabled: false, anniversary_enabled: false }, date), false);
+  assert.equal(receivesRemindersOn({ ...defaultNotificationPreferences(), weekdays: [5] }, reminderDate(new Date("2026-09-10T15:00:00Z"))), true);
+  assert.equal(receivesRemindersOn({ ...defaultNotificationPreferences(), weekdays: [5] }, reminderDate(new Date("2026-09-10T14:59:59Z"))), false);
+});
+
+test("devices of the same user receive their own type, weekday and pause settings", async () => {
+  const subscriptions = [
+    { ...subscription("harvest"), anniversary_enabled: false },
+    { ...subscription("anniversary"), harvest_enabled: false },
+    { ...subscription("weekend"), weekdays: [0, 6] },
+    { ...subscription("paused"), harvest_enabled: false, anniversary_enabled: false },
+    { ...subscription("no-days"), weekdays: [] },
+  ];
+  const { client, tables } = database({ subscriptions });
+  tables.memory_fruits.push({ memory_id: "m", ripened_at: "2026-09-10", harvested_at: null });
+  const received = new Map();
+  const send = async (sub, payload) => received.set(sub.endpoint.split("/").at(-1), JSON.parse(payload));
+  await Promise.all([runMemoryReminders(client, date, send), runMemoryReminders(client, date, send)]);
+  assert.equal(received.size, 2);
+  assert.equal(received.get("harvest").title, "思い出の木");
+  assert.equal(received.get("anniversary").title, "1年前のこの頃");
+  assert.equal(tables.push_notification_deliveries.length, 2);
+  assert.equal(tables.memory_notification_deliveries.length, 0);
+});
+
+test("legacy claimed, failed and sent records suppress rollout-day sends only", async () => {
+  for (const status of ["claimed", "failed", "sent"]) {
+    const { client, tables } = database();
+    tables.memory_notification_deliveries.push({ user_id: "u", notification_date: date, status });
+    assert.equal(await deliverUserReminder(client, "u", date, [subscription("s")], async () => assert.fail("duplicate")), "skipped");
+    let calls = 0;
+    await deliverUserReminder(client, "u", "2026-09-12", [subscription("s")], async () => calls++);
+    assert.equal(calls, 1);
+  }
+});
+
+test("deleted devices and fresh preference changes are respected after initial scan", async () => {
+  const subscriptions = [subscription("first"), subscription("second")];
+  const { client, tables } = database({ subscriptions });
+  const sent = [];
+  await deliverUserReminder(client, "u", date, subscriptions, async sub => {
+    sent.push(sub.endpoint);
+    tables.push_subscriptions[1].weekdays = [];
+  });
+  assert.equal(sent.length, 1);
+  tables.push_subscriptions = [];
+  assert.equal(await deliverUserReminder(client, "u", "2026-09-12", subscriptions, async () => assert.fail("deleted")), "skipped");
+});
+
+function testLimiter() {
+  const users = new Set();
+  return { rpc: async (name, { p_user_id }) => {
+    assert.equal(name, "claim_push_notification_test");
+    const data = users.has(p_user_id) ? 60 : 0;
+    users.add(p_user_id);
+    return { data, error: null };
+  } };
+}
+
+test("test sends only to the requested owner/device, ignores preferences, and leaves daily records untouched", async () => {
+  const own = { ...subscription("own"), weekdays: [], harvest_enabled: false, anniversary_enabled: false };
+  const peer = subscription("peer");
+  const stranger = subscription("stranger", "v");
+  const { client, tables } = database({ subscriptions: [own, peer, stranger], memories: [] });
+  const admin = testLimiter();
+  const received = [];
+  const send = async (sub, payload) => received.push([sub.endpoint, JSON.parse(payload)]);
+  assert.equal((await sendTestPush(client, admin, "u", stranger.endpoint, send)).status, 404);
+  assert.equal((await sendTestPush(client, admin, "u", own.endpoint, send)).status, 200);
+  assert.equal(received.length, 1);
+  assert.equal(received[0][0], own.endpoint);
+  assert.equal(received[0][1].href, "/settings/notifications");
+  assert.equal(tables.push_notification_deliveries.length, 0);
+  assert.equal(tables.memory_notification_deliveries.length, 0);
+  assert.equal((await sendTestPush(client, admin, "u", peer.endpoint, send)).status, 429);
+  assert.equal(received.length, 1);
+});
+
+test("test requests respect the shared atomic limiter result", async () => {
+  const { client } = database();
+  const admin = testLimiter();
+  let calls = 0;
+  const results = await Promise.all(Array.from({ length: 3 }, () => sendTestPush(client, admin, "u", subscription("s").endpoint, async () => calls++)));
+  assert.equal(calls, 1);
+  assert.deepEqual(results.map(result => result.status).sort(), [200, 429, 429]);
+  assert.equal(results.find(result => result.status === 429).body.retryAfter, 60);
+});
+
+test("test expiry removes only that device while transient failures retain registration", async () => {
+  for (const statusCode of [404, 410, 503]) {
+    const { client, tables } = database({ subscriptions: [subscription("s"), subscription("peer")] });
+    const result = await sendTestPush(client, testLimiter(), "u", subscription("s").endpoint, async () => { throw { statusCode }; });
+    assert.equal(result.status, statusCode === 503 ? 502 : 410);
+    assert.equal(tables.push_subscriptions.length, statusCode === 503 ? 2 : 1);
+    assert.ok(tables.push_subscriptions.some(row => row.id === "peer"));
+  }
 });

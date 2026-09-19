@@ -17,7 +17,7 @@ const sectionLabels = {
   album: "アルバム",
   quiz: "クイズ",
   post: "写真の追加",
-  more: "その他",
+  notifications: "通知",
 } as const;
 
 type SettingSection = keyof typeof sectionLabels;
@@ -215,8 +215,8 @@ export default function SettingDetailPage() {
         />
       )}
 
-      {section === "more" && <MemoryNotificationSettings />}
-      {section !== "style" && section !== "sound" && section !== "tree" && section !== "album" && section !== "more" && (
+      {section === "notifications" && <MemoryNotificationSettings />}
+      {section !== "style" && section !== "sound" && section !== "tree" && section !== "album" && section !== "notifications" && (
         <section className="settings-card mt-7">
           <p className="rounded-xl border border-dashed border-line bg-paper/60 px-4 py-8 text-center text-sm leading-7 text-ink/55">
             「{label}」の項目はまだ設定されていません。
